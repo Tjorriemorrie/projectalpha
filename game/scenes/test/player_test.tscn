@@ -1,8 +1,8 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://nt1207sm2fy2"]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
-[ext_resource type="Script" path="res://scenes/test/test_elevator.gd" id="2_elevator"]
-[ext_resource type="Shader" path="res://scenes/test/greybox_grid.gdshader" id="3_grid"]
+[ext_resource type="Script" uid="uid://bldyp55dagvni" path="res://scenes/test/test_elevator.gd" id="2_elevator"]
+[ext_resource type="Shader" uid="uid://cpi0f5wcio20" path="res://assets/shaders/greybox_grid.gdshader" id="3_grid"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 
@@ -20,182 +20,190 @@ render_priority = 0
 shader = ExtResource("3_grid")
 shader_parameter/base_color = Color(0.36, 0.38, 0.41, 1)
 shader_parameter/line_color = Color(0.18, 0.19, 0.21, 1)
+shader_parameter/cell_size = 1.0
+shader_parameter/line_width = 0.03
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_wall"]
 render_priority = 0
 shader = ExtResource("3_grid")
 shader_parameter/base_color = Color(0.27, 0.32, 0.4, 1)
 shader_parameter/line_color = Color(0.16, 0.19, 0.25, 1)
+shader_parameter/cell_size = 1.0
+shader_parameter/line_width = 0.03
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_obstacle"]
 render_priority = 0
 shader = ExtResource("3_grid")
 shader_parameter/base_color = Color(0.85, 0.45, 0.12, 1)
 shader_parameter/line_color = Color(0.45, 0.22, 0.05, 1)
+shader_parameter/cell_size = 1.0
+shader_parameter/line_width = 0.03
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_elevator"]
+size = Vector3(2.5, 0.2, 2.5)
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_elevator"]
 render_priority = 0
 shader = ExtResource("3_grid")
 shader_parameter/base_color = Color(0.9, 0.75, 0.15, 1)
 shader_parameter/line_color = Color(0.45, 0.36, 0.05, 1)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_elevator"]
-size = Vector3(2.5, 0.2, 2.5)
+shader_parameter/cell_size = 1.0
+shader_parameter/line_width = 0.03
 
 [sub_resource type="BoxMesh" id="BoxMesh_elevator"]
 material = SubResource("ShaderMaterial_elevator")
 size = Vector3(2.5, 0.2, 2.5)
 
-[node name="PlayerTest" type="Node3D"]
+[node name="PlayerTest" type="Node3D" unique_id=1541095869]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1065822670]
 environment = SubResource("Environment_test")
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=335088614]
 transform = Transform3D(0.866, -0.383, 0.3214, 0, 0.6428, 0.766, -0.5, -0.6634, 0.5567, 0, 10, 0)
 shadow_enabled = true
 
-[node name="Geometry" type="Node3D" parent="."]
+[node name="Geometry" type="Node3D" parent="." unique_id=83007186]
 
-[node name="Floor" type="CSGBox3D" parent="Geometry"]
+[node name="Floor" type="CSGBox3D" parent="Geometry" unique_id=1130328023]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
 use_collision = true
 size = Vector3(30, 0.5, 30)
 material = SubResource("ShaderMaterial_floor")
 
-[node name="WallNorth" type="CSGBox3D" parent="Geometry"]
+[node name="WallNorth" type="CSGBox3D" parent="Geometry" unique_id=372523499]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -15.25)
 use_collision = true
 size = Vector3(31, 6, 0.5)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="WallSouth" type="CSGBox3D" parent="Geometry"]
+[node name="WallSouth" type="CSGBox3D" parent="Geometry" unique_id=1018761767]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 15.25)
 use_collision = true
 size = Vector3(31, 6, 0.5)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="WallEast" type="CSGBox3D" parent="Geometry"]
+[node name="WallEast" type="CSGBox3D" parent="Geometry" unique_id=585441240]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.25, 3, 0)
 use_collision = true
 size = Vector3(0.5, 6, 30)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="WallWest" type="CSGBox3D" parent="Geometry"]
+[node name="WallWest" type="CSGBox3D" parent="Geometry" unique_id=899090385]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.25, 3, 0)
 use_collision = true
 size = Vector3(0.5, 6, 30)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="Step015" type="CSGBox3D" parent="Geometry"]
+[node name="Step015" type="CSGBox3D" parent="Geometry" unique_id=219279958]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.075, 2)
 use_collision = true
 size = Vector3(1, 0.15, 1)
 material = SubResource("ShaderMaterial_obstacle")
 
-[node name="Step025" type="CSGBox3D" parent="Geometry"]
+[node name="Step025" type="CSGBox3D" parent="Geometry" unique_id=12506979]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.125, 2)
 use_collision = true
 size = Vector3(1, 0.25, 1)
 material = SubResource("ShaderMaterial_obstacle")
 
-[node name="Step035" type="CSGBox3D" parent="Geometry"]
+[node name="Step035" type="CSGBox3D" parent="Geometry" unique_id=1112449400]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.175, 2)
 use_collision = true
 size = Vector3(1, 0.35, 1)
 material = SubResource("ShaderMaterial_obstacle")
 
-[node name="Block050" type="CSGBox3D" parent="Geometry"]
+[node name="Block050" type="CSGBox3D" parent="Geometry" unique_id=74107666]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.25, 2)
 use_collision = true
 size = Vector3(1, 0.5, 1)
 material = SubResource("ShaderMaterial_obstacle")
 
-[node name="BodyStandIn" type="CSGBox3D" parent="Geometry"]
+[node name="BodyStandIn" type="CSGBox3D" parent="Geometry" unique_id=1918603095]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.15, 2)
 use_collision = true
 size = Vector3(0.5, 0.3, 1.8)
 material = SubResource("ShaderMaterial_obstacle")
 
-[node name="CrawlLeft" type="CSGBox3D" parent="Geometry"]
+[node name="CrawlLeft" type="CSGBox3D" parent="Geometry" unique_id=337139751]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.35, 0.7, 0)
 use_collision = true
 size = Vector3(0.3, 1.4, 4)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="CrawlRight" type="CSGBox3D" parent="Geometry"]
+[node name="CrawlRight" type="CSGBox3D" parent="Geometry" unique_id=1160317862]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.65, 0.7, 0)
 use_collision = true
 size = Vector3(0.3, 1.4, 4)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="CrawlCeiling" type="CSGBox3D" parent="Geometry"]
+[node name="CrawlCeiling" type="CSGBox3D" parent="Geometry" unique_id=786298440]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.25, 0)
 use_collision = true
 size = Vector3(1.6, 0.3, 4)
 material = SubResource("ShaderMaterial_wall")
 
-[node name="UpperDeck" type="CSGBox3D" parent="Geometry"]
+[node name="UpperDeck" type="CSGBox3D" parent="Geometry" unique_id=2051388110]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 3.85, 0)
 use_collision = true
 size = Vector3(6, 0.3, 10)
 material = SubResource("ShaderMaterial_floor")
 
-[node name="Elevator" type="AnimatableBody3D" parent="."]
+[node name="Elevator" type="AnimatableBody3D" parent="." unique_id=1306062631]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.75, 0, 0)
 script = ExtResource("2_elevator")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Elevator"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Elevator" unique_id=454087677]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 shape = SubResource("BoxShape3D_elevator")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Elevator"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Elevator" unique_id=1511041611]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 mesh = SubResource("BoxMesh_elevator")
 
-[node name="Labels" type="Node3D" parent="."]
+[node name="Labels" type="Node3D" parent="." unique_id=573589608]
 
-[node name="Step015Label" type="Label3D" parent="Labels"]
+[node name="Step015Label" type="Label3D" parent="Labels" unique_id=303159706]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.6, 2)
 billboard = 1
 text = "0.15 m"
 font_size = 48
 
-[node name="Step025Label" type="Label3D" parent="Labels"]
+[node name="Step025Label" type="Label3D" parent="Labels" unique_id=1086274275]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.7, 2)
 billboard = 1
 text = "0.25 m"
 font_size = 48
 
-[node name="Step035Label" type="Label3D" parent="Labels"]
+[node name="Step035Label" type="Label3D" parent="Labels" unique_id=1569949898]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.8, 2)
 billboard = 1
 text = "0.35 m"
 font_size = 48
 
-[node name="Block050Label" type="Label3D" parent="Labels"]
+[node name="Block050Label" type="Label3D" parent="Labels" unique_id=1788237090]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.95, 2)
 billboard = 1
 text = "0.5 m (blocks)"
 font_size = 48
 
-[node name="BodyStandInLabel" type="Label3D" parent="Labels"]
+[node name="BodyStandInLabel" type="Label3D" parent="Labels" unique_id=528806191]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.75, 2)
 billboard = 1
 text = "body 0.3 m"
 font_size = 48
 
-[node name="CrawlLabel" type="Label3D" parent="Labels"]
+[node name="CrawlLabel" type="Label3D" parent="Labels" unique_id=1014333996]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.8, 2.2)
 billboard = 1
 text = "crawl space 1.1 m"
 font_size = 48
 
-[node name="ElevatorLabel" type="Label3D" parent="Labels"]
+[node name="ElevatorLabel" type="Label3D" parent="Labels" unique_id=324726542]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.75, 2.5, 1.5)
 billboard = 1
 text = "elevator"
 font_size = 48
 
-[node name="Player" parent="." instance=ExtResource("1_player")]
+[node name="Player" parent="." unique_id=752967211 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)

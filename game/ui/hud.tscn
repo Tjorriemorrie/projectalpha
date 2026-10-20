@@ -1,0 +1,101 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/hud.gd" id="1_hud"]
+
+[sub_resource type="SystemFont" id="SystemFont_placard"]
+font_names = PackedStringArray("Bahnschrift", "DIN Alternate", "Arial Narrow")
+font_weight = 600
+
+[sub_resource type="SystemFont" id="SystemFont_action"]
+font_names = PackedStringArray("Bahnschrift", "DIN Alternate", "Arial Narrow")
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dot"]
+bg_color = Color(0.862745, 0.901961, 0.941176, 0.75)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.0431373, 0.0588235, 0.0784314, 0.6)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_keycap"]
+content_margin_left = 7.0
+content_margin_top = 1.0
+content_margin_right = 7.0
+content_margin_bottom = 1.0
+bg_color = Color(0.0431373, 0.0588235, 0.0784314, 0.55)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.862745, 0.901961, 0.941176, 0.85)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="Hud" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CentreDot" type="Panel" parent="Root"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -3.0
+offset_top = -3.0
+offset_right = 3.0
+offset_bottom = 3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_dot")
+
+[node name="Prompt" type="HBoxContainer" parent="Root"]
+layout_mode = 1
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = 24.0
+offset_bottom = 54.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="KeyCap" type="PanelContainer" parent="Root/Prompt"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_keycap")
+
+[node name="Key" type="Label" parent="Root/Prompt/KeyCap"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
+theme_override_fonts/font = SubResource("SystemFont_placard")
+theme_override_font_sizes/font_size = 16
+text = "E"
+horizontal_alignment = 1
+
+[node name="Action" type="Label" parent="Root/Prompt"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
+theme_override_colors/font_outline_color = Color(0.0196078, 0.0313726, 0.0431373, 0.8)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = SubResource("SystemFont_action")
+theme_override_font_sizes/font_size = 17
+text = "Call elevator"

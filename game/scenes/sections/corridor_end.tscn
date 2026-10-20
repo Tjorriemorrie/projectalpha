@@ -1,0 +1,66 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_ffy01"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_arlhy"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_n0kqb"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="4_s41so"]
+[ext_resource type="Script" path="res://scenes/sections/section_marker.gd" id="5_6nphl"]
+
+[node name="CorridorEnd" type="Node3D" unique_id=836143087]
+script = ExtResource("1_ffy01")
+
+[node name="Geometry" type="CSGCombiner3D" parent="." unique_id=1741385847]
+use_collision = true
+
+[node name="Box0" type="CSGBox3D" parent="Geometry" unique_id=1046512642]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0.39999998)
+size = Vector3(2.4, 0.2, 3.2)
+material = ExtResource("2_arlhy")
+
+[node name="Box1" type="CSGBox3D" parent="Geometry" unique_id=1190134803]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0.39999998)
+size = Vector3(2.4, 0.20000005, 3.2)
+material = ExtResource("3_n0kqb")
+
+[node name="Box2" type="CSGBox3D" parent="Geometry" unique_id=1152464656]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, 1.25, 1.6)
+size = Vector3(0.20000005, 2.5, 0.79999995)
+material = ExtResource("3_n0kqb")
+
+[node name="Box3" type="CSGBox3D" parent="Geometry" unique_id=602970017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 1.25, 1.6)
+size = Vector3(0.20000005, 2.5, 0.79999995)
+material = ExtResource("3_n0kqb")
+
+[node name="SocketSouth" type="Marker3D" parent="." unique_id=427770048]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 2)
+script = ExtResource("4_s41so")
+kind = 0
+
+[node name="SocketNorth" type="Marker3D" parent="." unique_id=2055743535]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+script = ExtResource("4_s41so")
+accepts_corridor = false
+wall_width = 2.4
+wall_height = 2.5
+wall_inset = 0.8
+
+[node name="SocketEast" type="Marker3D" parent="." unique_id=1462549860]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 2, 0, 0)
+script = ExtResource("4_s41so")
+accepts_corridor = false
+wall_width = 2.4
+wall_height = 2.5
+wall_inset = 0.8
+
+[node name="SocketWest" type="Marker3D" parent="." unique_id=2104466789]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2, 0, 0)
+script = ExtResource("4_s41so")
+accepts_corridor = false
+wall_width = 2.4
+wall_height = 2.5
+wall_inset = 0.8
+
+[node name="LootSpot" type="Marker3D" parent="." unique_id=783257427]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.6)
+script = ExtResource("5_6nphl")

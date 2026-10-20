@@ -1,0 +1,94 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_jgx5w"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_6k6yh"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_otm78"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="4_rdwph"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/ceiling_lamp.tscn" id="5_6l5by"]
+[ext_resource type="Script" path="res://scenes/sections/section_marker.gd" id="6_ngwjp"]
+
+[node name="CorridorT" type="Node3D" unique_id=1291449448]
+script = ExtResource("1_jgx5w")
+
+[node name="Geometry" type="CSGCombiner3D" parent="." unique_id=353257315]
+use_collision = true
+
+[node name="Box0" type="CSGBox3D" parent="Geometry" unique_id=1165831325]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+size = Vector3(4, 0.2, 2.4)
+material = ExtResource("2_6k6yh")
+
+[node name="Box1" type="CSGBox3D" parent="Geometry" unique_id=1596549253]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+size = Vector3(4, 0.20000005, 2.4)
+material = ExtResource("3_otm78")
+
+[node name="Box2" type="CSGBox3D" parent="Geometry" unique_id=847933371]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 1.6)
+size = Vector3(2.4, 0.2, 0.79999995)
+material = ExtResource("2_6k6yh")
+
+[node name="Box3" type="CSGBox3D" parent="Geometry" unique_id=2092293588]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 1.6)
+size = Vector3(2.4, 0.20000005, 0.79999995)
+material = ExtResource("3_otm78")
+
+[node name="Box4" type="CSGBox3D" parent="Geometry" unique_id=984761164]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6, 1.25, -1.1)
+size = Vector3(0.79999995, 2.5, 0.20000005)
+material = ExtResource("3_otm78")
+
+[node name="Box5" type="CSGBox3D" parent="Geometry" unique_id=440702811]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 1.25, -1.1)
+size = Vector3(0.79999995, 2.5, 0.20000005)
+material = ExtResource("3_otm78")
+
+[node name="Box6" type="CSGBox3D" parent="Geometry" unique_id=1775739753]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1.25, 1.1)
+size = Vector3(1, 2.5, 0.20000005)
+material = ExtResource("3_otm78")
+
+[node name="Box7" type="CSGBox3D" parent="Geometry" unique_id=2056559394]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, 1.25, 1.6)
+size = Vector3(0.20000005, 2.5, 0.79999995)
+material = ExtResource("3_otm78")
+
+[node name="Box8" type="CSGBox3D" parent="Geometry" unique_id=1576736332]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1.25, 1.1)
+size = Vector3(1, 2.5, 0.20000005)
+material = ExtResource("3_otm78")
+
+[node name="Box9" type="CSGBox3D" parent="Geometry" unique_id=806957737]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 1.25, 1.6)
+size = Vector3(0.20000005, 2.5, 0.79999995)
+material = ExtResource("3_otm78")
+
+[node name="SocketWest" type="Marker3D" parent="." unique_id=150716222]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2, 0, 0)
+script = ExtResource("4_rdwph")
+kind = 0
+
+[node name="SocketEast" type="Marker3D" parent="." unique_id=726275210]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 2, 0, 0)
+script = ExtResource("4_rdwph")
+kind = 0
+
+[node name="SocketSouth" type="Marker3D" parent="." unique_id=1217298331]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 2)
+script = ExtResource("4_rdwph")
+kind = 0
+
+[node name="SocketNorth" type="Marker3D" parent="." unique_id=837909365]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+script = ExtResource("4_rdwph")
+accepts_corridor = false
+wall_width = 2.4
+wall_height = 2.5
+wall_inset = 0.8
+
+[node name="Lamp1" parent="." unique_id=974258282 instance=ExtResource("5_6l5by")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+
+[node name="EnemySpot" type="Marker3D" parent="." unique_id=191415677]
+script = ExtResource("6_ngwjp")
+kind = 0

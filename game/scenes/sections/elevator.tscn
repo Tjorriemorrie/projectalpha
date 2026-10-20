@@ -1,0 +1,137 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/elevator.gd" id="1_tlwpl"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_a57yr"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_l44ev"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="4_y8gge"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/button.tscn" id="5_4v7vt"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/emergency_lamp.tscn" id="6_nt1df"]
+[ext_resource type="AudioStream" path="res://assets/audio/elevator_ding.wav" id="7_dhq46"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_arjea"]
+size = Vector3(3.5, 0.2, 3.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jm65t"]
+material = ExtResource("2_a57yr")
+size = Vector3(3.5, 0.2, 3.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yy7uf"]
+size = Vector3(0.25, 1.2, 0.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_psbem"]
+material = ExtResource("3_l44ev")
+size = Vector3(0.25, 1.2, 0.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_m71hf"]
+size = Vector3(3.4, 2, 3.4)
+
+[node name="Elevator" type="Node3D" unique_id=684691211]
+script = ExtResource("1_tlwpl")
+size = Vector3i(1, 2, 1)
+
+[node name="Geometry" type="CSGCombiner3D" parent="." unique_id=928337882]
+use_collision = true
+
+[node name="Box0" type="CSGBox3D" parent="Geometry" unique_id=955172809]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.70000005, 0)
+size = Vector3(4, 0.19999999, 4)
+material = ExtResource("2_a57yr")
+
+[node name="Box1" type="CSGBox3D" parent="Geometry" unique_id=1860450179]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.1, 0)
+size = Vector3(4, 0.19999981, 4)
+material = ExtResource("3_l44ev")
+
+[node name="Box2" type="CSGBox3D" parent="Geometry" unique_id=2088970793]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.2, 1.9)
+size = Vector3(4, 7.6, 0.20000005)
+material = ExtResource("3_l44ev")
+
+[node name="Box3" type="CSGBox3D" parent="Geometry" unique_id=46229707]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 3.2, 0)
+size = Vector3(0.20000005, 7.6, 3.6)
+material = ExtResource("3_l44ev")
+
+[node name="Box4" type="CSGBox3D" parent="Geometry" unique_id=687043291]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9, 3.2, 0)
+size = Vector3(0.20000005, 7.6, 3.6)
+material = ExtResource("3_l44ev")
+
+[node name="Box5" type="CSGBox3D" parent="Geometry" unique_id=334284955]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, -1.9)
+size = Vector3(4, 0.6, 0.20000005)
+material = ExtResource("3_l44ev")
+
+[node name="Box6" type="CSGBox3D" parent="Geometry" unique_id=2029796940]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, -1.9)
+size = Vector3(4, 1, 0.20000005)
+material = ExtResource("3_l44ev")
+
+[node name="SocketDeck1" type="Marker3D" parent="." unique_id=643569639]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+script = ExtResource("4_y8gge")
+required = true
+automatic_door = false
+
+[node name="SocketDeck2" type="Marker3D" parent="." unique_id=1669238582]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, -2)
+script = ExtResource("4_y8gge")
+required = true
+automatic_door = false
+
+[node name="CallButtonDeck1" parent="." unique_id=424196478 instance=ExtResource("5_4v7vt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.95, 1.3, -2)
+prompt = "Call elevator"
+
+[node name="EmergencyLampDeck1" parent="." unique_id=2010380857 instance=ExtResource("6_nt1df")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, -2.35)
+
+[node name="CallButtonDeck2" parent="." unique_id=1675812914 instance=ExtResource("5_4v7vt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.95, 5.3, -2)
+prompt = "Call elevator"
+
+[node name="EmergencyLampDeck2" parent="." unique_id=1228868020 instance=ExtResource("6_nt1df")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.5, -2.35)
+
+[node name="Platform" type="AnimatableBody3D" parent="." unique_id=1121649194]
+collision_mask = 0
+
+[node name="DeckShape" type="CollisionShape3D" parent="Platform" unique_id=263957376]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape3D_arjea")
+
+[node name="DeckMesh" type="MeshInstance3D" parent="Platform" unique_id=873315962]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_jm65t")
+
+[node name="ConsoleShape" type="CollisionShape3D" parent="Platform" unique_id=1552866194]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.625, 0.6, 0)
+shape = SubResource("BoxShape3D_yy7uf")
+
+[node name="ConsoleMesh" type="MeshInstance3D" parent="Platform" unique_id=1184777754]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.625, 0.6, 0)
+mesh = SubResource("BoxMesh_psbem")
+
+[node name="SendButton" parent="Platform" unique_id=387974492 instance=ExtResource("5_4v7vt")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.5, 1.05, 0)
+
+[node name="PlatformLight" type="OmniLight3D" parent="Platform" unique_id=1694094061]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 1.4, 0)
+light_color = Color(0.85, 0.92, 1, 1)
+light_energy = 0.5
+shadow_enabled = true
+omni_range = 3.0
+
+[node name="Aboard" type="Area3D" parent="Platform" unique_id=894316007]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Platform/Aboard" unique_id=1695739971]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_m71hf")
+
+[node name="Ding" type="AudioStreamPlayer3D" parent="." unique_id=1538956237]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -2)
+stream = ExtResource("7_dhq46")
+max_distance = 40.0

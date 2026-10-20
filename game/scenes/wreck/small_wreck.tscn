@@ -1,0 +1,70 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/wreck/wreck.gd" id="1_yaaoo"]
+[ext_resource type="Environment" path="res://scenes/wreck/wreck_environment.tres" id="2_bteqj"]
+[ext_resource type="PackedScene" path="res://scenes/sections/airlock.tscn" id="3_ak05s"]
+[ext_resource type="PackedScene" path="res://scenes/sections/corridor_t.tscn" id="4_grprd"]
+[ext_resource type="PackedScene" path="res://scenes/sections/room_small.tscn" id="5_6alke"]
+[ext_resource type="PackedScene" path="res://scenes/sections/corridor_end.tscn" id="6_surao"]
+[ext_resource type="PackedScene" path="res://scenes/sections/corridor_corner.tscn" id="7_n1ptd"]
+[ext_resource type="PackedScene" path="res://scenes/sections/vent_straight.tscn" id="8_vribd"]
+[ext_resource type="PackedScene" path="res://scenes/sections/vent_corner.tscn" id="9_rx3bf"]
+[ext_resource type="PackedScene" path="res://scenes/sections/elevator.tscn" id="10_y0q8u"]
+[ext_resource type="PackedScene" path="res://scenes/sections/room_large.tscn" id="11_s11sq"]
+[ext_resource type="PackedScene" path="res://scenes/sections/corridor_straight.tscn" id="12_m8qtd"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="13_gx28g"]
+
+[node name="SmallWreck" type="Node3D" unique_id=1261040855]
+script = ExtResource("1_yaaoo")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=874958639]
+environment = ExtResource("2_bteqj")
+
+[node name="Deck1" type="Node3D" parent="." unique_id=1185609713]
+
+[node name="Airlock" parent="Deck1" unique_id=1699352199 instance=ExtResource("3_ak05s")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0, 4)
+
+[node name="JunctionWest" parent="Deck1" unique_id=1291449448 instance=ExtResource("4_grprd")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4, 0, 4)
+
+[node name="StoreRoom" parent="Deck1" unique_id=399311389 instance=ExtResource("5_6alke")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+
+[node name="JunctionEast" parent="Deck1" unique_id=282943377 instance=ExtResource("4_grprd")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 4)
+
+[node name="DeadEnd" parent="Deck1" unique_id=836143087 instance=ExtResource("6_surao")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 8, 0, 8)
+
+[node name="CornerDeck1" parent="Deck1" unique_id=648497136 instance=ExtResource("7_n1ptd")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 12, 0, 4)
+
+[node name="VentDeck1" parent="Deck1" unique_id=524335483 instance=ExtResource("8_vribd")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8, 0, 0)
+
+[node name="VentCornerDeck1" parent="Deck1" unique_id=1933892870 instance=ExtResource("9_rx3bf")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 12, 0, 0)
+
+[node name="Elevator" parent="Deck1" unique_id=684691211 instance=ExtResource("10_y0q8u")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 8)
+
+[node name="Deck2" type="Node3D" parent="." unique_id=1665159294]
+
+[node name="Hold" parent="Deck2" unique_id=1563691795 instance=ExtResource("11_s11sq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 4, 2)
+
+[node name="CorridorDeck2West" parent="Deck2" unique_id=2065791159 instance=ExtResource("12_m8qtd")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8, 4, 0)
+
+[node name="CornerDeck2" parent="Deck2" unique_id=1563144818 instance=ExtResource("7_n1ptd")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 12, 4, 0)
+
+[node name="CorridorDeck2East" parent="Deck2" unique_id=827075398 instance=ExtResource("12_m8qtd")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4, 4)
+
+[node name="VentDeck2" parent="Deck2" unique_id=421226887 instance=ExtResource("8_vribd")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8, 4, 4)
+
+[node name="Player" parent="." unique_id=3432232 instance=ExtResource("13_gx28g")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.6, 0, 4)

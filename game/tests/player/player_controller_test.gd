@@ -4,7 +4,8 @@ extends GdUnitTestSuite
 
 const TEST_SCENE := "res://scenes/test/player_test.tscn"
 const ACTIONS: Array[StringName] = [
-	&"move_forward", &"move_back", &"move_left", &"move_right", &"sprint", &"crouch_hold", &"crouch_toggle"]
+	&"move_forward", &"move_back", &"move_left", &"move_right", &"sprint", &"crouch_hold", &"crouch_toggle",
+	&"flashlight"]
 ## Obstacles stand in a row at this z; the player walks towards -z.
 const OBSTACLE_Z := 2.0
 const SPEED_TOLERANCE := 0.05
@@ -176,6 +177,15 @@ func test_rides_elevator_up_and_down() -> void:
 	assert_float(Vector2(_player.global_position.x - start.x, _player.global_position.z - start.z).length()) \
 			.is_less(0.01)
 	assert_int(airborne_frames).is_equal(0)
+
+
+func test_toggles_flashlight() -> void:
+	await _place(Vector3(0.0, 0.0, 8.0))
+	assert_bool(_player.is_flashlight_on()).is_false()
+	await _tap(&"flashlight")
+	assert_bool(_player.is_flashlight_on()).is_true()
+	await _tap(&"flashlight")
+	assert_bool(_player.is_flashlight_on()).is_false()
 
 
 func _place(position: Vector3) -> void:

@@ -1,10 +1,14 @@
 class_name Player
 extends CharacterBody3D
-## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles
-## and riding elevators. MovementRules makes the decisions; this script applies them to the body and camera.
+## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
+## riding elevators, the flashlight, and using interactables by looking at them. MovementRules makes the movement
+## decisions; this script applies them to the body and camera.
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
+
+## Physics layers the look ray hits: world (1) blocks it, interactable (3) is what it looks for.
+const INTERACT_MASK := 0b101
 
 ## The camera stops this many degrees short of looking straight up or down.
 const PITCH_LIMIT_DEGREES := 89.0
@@ -55,8 +59,14 @@ const BOB_FADE_TIME := 0.2
 ## Metres travelled per full bob cycle (two footsteps).
 @export var bob_stride_length: float = 1.6
 
+@export_group("Interaction")
+## Metres from the camera within which the player can use an interactable.
+@export var interact_reach: float = 2.0
+
 var movement_state: MovementRules.State = MovementRules.State.IDLE
 var is_crouched: bool = false
+## The interactable the player is looking at within reach, or null.
+var interact_target: Interactable
 
 var _crouch_toggled := false
 var _stand_blocked := false
@@ -67,9 +77,12 @@ var _step_offset := 0.0
 var _bob_phase := 0.0
 var _bob_amplitude := 0.0
 var _body_shape: CylinderShape3D
+var _shown_prompt := ""
 
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _camera: Camera3D = $Camera3D
+@onready var _flashlight: SpotLight3D = $Camera3D/Flashlight
+@onready var _hud: Hud = $Hud
 
 
 func _ready() -> void:
@@ -113,6 +126,11 @@ func _physics_process(delta: float) -> void:
 	_update_velocity(input_dir, delta)
 	_try_step_up(delta)
 	_move_and_follow_floor()
+	_update_interact_target()
+	if Input.is_action_just_pressed("interact") and interact_target:
+		interact_target.interact()
+	if Input.is_action_just_pressed("flashlight"):
+		set_flashlight(not is_flashlight_on())
 
 
 func _process(delta: float) -> void:
@@ -122,6 +140,53 @@ func _process(delta: float) -> void:
 	_step_offset = move_toward(_step_offset, 0.0, max_step_height / STEP_SMOOTHING_TIME * delta)
 	_update_head_bob(delta)
 	_update_camera()
+
+
+## Turns the body and tilts the camera, for example to face the right way when spawning.
+func set_look(yaw: float, pitch: float = 0.0) -> void:
+	var pitch_limit := deg_to_rad(PITCH_LIMIT_DEGREES)
+	_yaw = wrapf(yaw, -PI, PI)
+	_pitch = clampf(pitch, -pitch_limit, pitch_limit)
+	rotation.y = _yaw
+	_update_camera()
+	Log.info("🏃 Look set: yaw=%.1f°, pitch=%.1f°" % [rad_to_deg(_yaw), rad_to_deg(_pitch)])
+
+
+func is_flashlight_on() -> bool:
+	return _flashlight.visible
+
+
+func set_flashlight(on: bool) -> void:
+	_flashlight.visible = on
+	Log.info("🏃 Flashlight %s: position=%s" % ["on" if on else "off", global_position])
+
+
+## Casts the look ray and keeps interact_target and the prompt up to date. Runs every physics frame, so it only
+## logs when the target changes.
+func _update_interact_target() -> void:
+	var from := _camera.global_position
+	var to := from - _camera.global_basis.z * interact_reach
+	var query := PhysicsRayQueryParameters3D.create(from, to, INTERACT_MASK, [get_rid()])
+	query.collide_with_areas = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Interactable = hit.get("collider") as Interactable if not hit.is_empty() else null
+	var action := target.prompt if target else ""
+	if target != interact_target:
+		interact_target = target
+		Log.info("🏃 Interact target changed: target=%s, prompt=%s" % [
+			"%s/%s" % [target.get_parent().name, target.name] if target else "none", action])
+	# The prompt can change while looking at the same target (the elevator's "Ride up" becomes "Ride down").
+	if action != _shown_prompt:
+		_shown_prompt = action
+		_hud.set_prompt(_action_key_label(&"interact"), action)
+
+
+## The key bound to an action, for prompts (e.g. "E"), so prompts follow the Input Map.
+static func _action_key_label(action: StringName) -> String:
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			return (event as InputEventKey).as_text_physical_keycode()
+	return "?"
 
 
 func _update_crouch(wants_crouch: bool) -> void:

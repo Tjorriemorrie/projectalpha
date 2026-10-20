@@ -1,0 +1,74 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_uv8oa"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_cvpu6"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_38fnc"]
+[ext_resource type="Material" path="res://scenes/sections/materials/door.tres" id="4_ogex1"]
+[ext_resource type="Material" path="res://scenes/sections/materials/trim.tres" id="5_j8kci"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="6_ltppl"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/emergency_lamp.tscn" id="7_2nx25"]
+
+[node name="Airlock" type="Node3D" unique_id=1699352199]
+script = ExtResource("1_uv8oa")
+
+[node name="Geometry" type="CSGCombiner3D" parent="." unique_id=2105563788]
+use_collision = true
+
+[node name="Box0" type="CSGBox3D" parent="Geometry" unique_id=181445008]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+size = Vector3(4, 0.2, 4)
+material = ExtResource("2_cvpu6")
+
+[node name="Box1" type="CSGBox3D" parent="Geometry" unique_id=2118749291]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+size = Vector3(4, 0.20000005, 4)
+material = ExtResource("3_38fnc")
+
+[node name="Box2" type="CSGBox3D" parent="Geometry" unique_id=332798678]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 1.9)
+size = Vector3(4, 2.5, 0.20000005)
+material = ExtResource("3_38fnc")
+
+[node name="Box3" type="CSGBox3D" parent="Geometry" unique_id=755621544]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 1.25, 0)
+size = Vector3(0.20000005, 2.5, 3.6)
+material = ExtResource("3_38fnc")
+
+[node name="Box4" type="CSGBox3D" parent="Geometry" unique_id=1301051401]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9, 1.25, 0)
+size = Vector3(0.20000005, 2.5, 3.6)
+material = ExtResource("3_38fnc")
+
+[node name="Box5" type="CSGBox3D" parent="Geometry" unique_id=2096006626]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 1.77)
+size = Vector3(1.4, 1.9, 0.059999943)
+material = ExtResource("4_ogex1")
+
+[node name="Box6" type="CSGBox3D" parent="Geometry" unique_id=999578840]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 1.1, 1.775)
+size = Vector3(0.100000024, 2.1000001, 0.049999952)
+material = ExtResource("5_j8kci")
+
+[node name="Box7" type="CSGBox3D" parent="Geometry" unique_id=447029289]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 1.1, 1.775)
+size = Vector3(0.100000024, 2.1000001, 0.049999952)
+material = ExtResource("5_j8kci")
+
+[node name="Box8" type="CSGBox3D" parent="Geometry" unique_id=664040378]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 1.775)
+size = Vector3(1.4, 0.10000014, 0.049999952)
+material = ExtResource("5_j8kci")
+
+[node name="Box9" type="CSGBox3D" parent="Geometry" unique_id=1533890346]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 1.775)
+size = Vector3(1.4, 0.10000001, 0.049999952)
+material = ExtResource("5_j8kci")
+
+[node name="SocketInner" type="Marker3D" parent="." unique_id=1390775585]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+script = ExtResource("6_ltppl")
+required = true
+wall_height = 2.5
+
+[node name="Lamp1" parent="." unique_id=85971833 instance=ExtResource("7_2nx25")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0.4)

@@ -1,0 +1,62 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_mmm2q"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_r8tnf"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_q40lt"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="4_0sssj"]
+
+[node name="VentCorner" type="Node3D" unique_id=1933892870]
+script = ExtResource("1_mmm2q")
+
+[node name="Geometry" type="CSGCombiner3D" parent="." unique_id=817718022]
+use_collision = true
+
+[node name="Box0" type="CSGBox3D" parent="Geometry" unique_id=1403978817]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0.6)
+size = Vector3(1.6, 0.2, 2.8)
+material = ExtResource("2_r8tnf")
+
+[node name="Box1" type="CSGBox3D" parent="Geometry" unique_id=1407031761]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0.6)
+size = Vector3(1.6, 0.19999993, 2.8)
+material = ExtResource("3_q40lt")
+
+[node name="Box2" type="CSGBox3D" parent="Geometry" unique_id=518110133]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, -0.1, 0)
+size = Vector3(1.2, 0.2, 1.6)
+material = ExtResource("2_r8tnf")
+
+[node name="Box3" type="CSGBox3D" parent="Geometry" unique_id=1802407292]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 1.3, 0)
+size = Vector3(1.2, 0.19999993, 1.6)
+material = ExtResource("3_q40lt")
+
+[node name="Box4" type="CSGBox3D" parent="Geometry" unique_id=1097658116]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.70000005, 0.6, 0.6)
+size = Vector3(0.19999999, 1.2, 2.8)
+material = ExtResource("3_q40lt")
+
+[node name="Box5" type="CSGBox3D" parent="Geometry" unique_id=1036179356]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 0.6, -0.70000005)
+size = Vector3(2.6, 1.2, 0.19999999)
+material = ExtResource("3_q40lt")
+
+[node name="Box6" type="CSGBox3D" parent="Geometry" unique_id=261874937]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.70000005, 0.6, 1.3)
+size = Vector3(0.19999999, 1.2, 1.4)
+material = ExtResource("3_q40lt")
+
+[node name="Box7" type="CSGBox3D" parent="Geometry" unique_id=784979423]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 0.6, 0.70000005)
+size = Vector3(1.2, 1.2, 0.19999999)
+material = ExtResource("3_q40lt")
+
+[node name="SocketSouth" type="Marker3D" parent="." unique_id=1464773446]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 2)
+script = ExtResource("4_0sssj")
+kind = 1
+
+[node name="SocketEast" type="Marker3D" parent="." unique_id=969893845]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 2, 0, 0)
+script = ExtResource("4_0sssj")
+kind = 1

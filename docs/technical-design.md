@@ -23,7 +23,8 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Style: follow the official Godot GDScript style guide (snake_case files, functions and variables; PascalCase class and node names).
 - Use static typing in GDScript (`var speed: float = 5.0`).
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
-  DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators).
+  DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
+  🧩 wreck assembly, 🚪 doors, 🖐️ interactables).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -33,14 +34,15 @@ Proposed layout (adjust as the project grows):
 ```text
 projectalpha/
 ├── docs/                  # Design documents
-├── art-source/            # Blender .blend files and other source art (not imported by Godot)
+├── art-source/            # Blender .blend files, asset-generating scripts and other source art (not imported by Godot)
 └── game/                  # Godot project root (project.godot lives here)
     ├── assets/
     │   ├── models/        # Exported .glb files from Blender
     │   ├── textures/
+    │   ├── shaders/       # Shared shaders (the greybox grid)
     │   ├── audio/
     │   └── fonts/
-    ├── scenes/            # .tscn scenes, grouped by feature
+    ├── scenes/            # .tscn scenes, grouped by feature (player, sections, wreck, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -52,7 +54,8 @@ projectalpha/
 
 ### Scene organization
 
-- Main scene: `res://scenes/test/player_test.tscn`, a greybox test level, until 002 provides a real wreck.
+- Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002.
+- `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests.
 - TBD: how levels are loaded, scene transitions.
 
 ### Global singletons (autoloads)
@@ -134,6 +137,10 @@ so WASD keeps its position on other keyboard layouts.
 | `crouch_hold` | Ctrl |
 | `crouch_toggle` | C |
 | `pause` | Esc (releases the mouse until there is a pause menu) |
+| `interact` | E |
+| `flashlight` | F |
+
+Prompts show the bound key by reading the Input Map (`as_text_physical_keycode()`), never a hard-coded letter.
 
 Gamepad bindings are allocated in the Controls table in [game-design.md](game-design.md#controls), but are not in
 the Input Map yet: gamepad support is wired after the MVP.
@@ -144,8 +151,66 @@ Physics engine: Jolt, at the default 60 ticks per second.
 
 | Layer | Name | Used by |
 |-------|------|---------|
-| 1     | world  | Static level geometry, elevators |
+| 1     | world  | Static level geometry, door panels, elevator platforms. Blocks movement, sight and the interact ray |
 | 2     | player | The player body (collides with `world`) |
+| 3     | interactable | `Interactable` areas (buttons), found by the player's interact ray |
+
+Trigger areas (door proximity and doorways, the elevator's "aboard" area) sit on no layer and mask `player`.
+
+### Wreck sections and assembly
+
+Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from section scenes on a grid.
+
+- **Grid.** Cells are 4 × 4 m with their centres on multiples of 4 m in x and z; deck *n* has its floor at
+  y = 4n. A section's origin is the centre of its footprint at the floor of its lowest deck, and `Section.size`
+  is its footprint in cells (x, decks, z). Kit sizes: corridors 2 m wide and 2.5 m tall inside, rooms 3 m tall,
+  doorways 1.2 × 2.2 m, vents 1.2 × 1.2 m, walls and slabs 0.2 m thick.
+- **Sockets** (`Socket`, a `Marker3D`) sit at the centre of a cell edge at floor level and face out of the
+  section along their local −Z. Their kind decides what they join:
+
+  | Kind | What it is | Joins | Not joined |
+  |------|------------|-------|------------|
+  | `CORRIDOR` | An open corridor end | `CORRIDOR` (open), `WALL` (doorway) | Error |
+  | `VENT` | An open duct end | `VENT` (open), `WALL` (vent mouth) | Error |
+  | `WALL` | A wall that can open up; `accepts_corridor` off means vents only | `CORRIDOR` or `VENT` | Solid wall, or an error when `required` |
+
+- A wall socket builds its own wall in code (`CSGBox3D`s), so its opening can change at load. It is a `@tool`
+  script, so sections show solid walls in the editor. A doorway gets a `SlidingDoor`; a wall set back from its
+  socket (`wall_inset`, as on corridor sides) gets a short duct to the cell edge when a vent joins it.
+- **Assembly.** `Wreck._ready()` collects its sections' sockets, joins every pair at the same position that
+  face each other, applies the openings, and then calls `Section.assembled()`. The rules and checks live in the
+  node-free `WreckAssembly`: loose ends, mismatched kinds, sockets off the grid and overlapping sections are
+  logged as errors and kept in `Wreck.assembly_errors`.
+- **Markers.** `SectionMarker`s (enemy or loot) mark where a mission may place things (006, 007).
+- **Adding a section:** fill whole cells, put a socket at the centre of every edge that can connect, and keep
+  geometry inside the footprint (wall sockets build the walls on their edges). Static parts go under one
+  `CSGCombiner3D` with collision.
+
+### Doors and elevators
+
+- `SlidingDoor`: an `AnimatableBody3D` panel that slides sideways into the wall. A doorway area holds a closing
+  door open while the player stands in it, but never opens a closed one. Automatic doors also have a proximity
+  area (1.5 m either side) and close 2 s after the player leaves.
+- `Elevator` (a `Section` spanning two decks): call buttons on each deck, a send button on the platform, doors
+  driven by the elevator that only open at the deck where the platform is, and a `dinged(deck, sound_position)`
+  signal on arrival for enemy hearing later.
+
+### Interaction and HUD
+
+- `Interactable` is an `Area3D` on the `interactable` layer with a `prompt` and an `interacted` signal.
+  The player casts a 2 m ray from the camera every physics frame against `world` and `interactable`, so walls
+  block it, and calls `interact()` when `interact` is pressed.
+- The HUD (`game/ui/hud.tscn`, owned by the player scene) shows a centre dot and the prompt as a key cap plus
+  action. It uses the Windows system font Bahnschrift (DIN-style signage), falling back to Godot's default font.
+
+### Lighting
+
+- The wreck's `Environment` has a black background, a very low blue-grey ambient light, filmic tonemapping and a
+  little glow. There is no sun.
+- Lamps are shadow-casting `SpotLight3D`s pointing down, so walls stop their light and nothing leaks between
+  sections. Ceiling lamps are cold white; emergency lamps (same `CeilingLamp` script) are red. Whether a lamp
+  flickers is seeded from its position, so it is the same on every run.
+- The flashlight is a shadow-casting `SpotLight3D` on the player camera, toggled by `flashlight`.
 
 ## 6. Asset pipeline (Blender → Godot)
 
@@ -167,6 +232,9 @@ Physics engine: Jolt, at the default 60 ticks per second.
 - Animations: TBD (actions naming, NLA usage, root motion or not).
 - Collision: TBD (Godot import hints such as `-col` / `-colonly` suffixes, or collision built in Godot).
 - Textures: TBD (resolution budget, PBR or not).
+- Placeholder sounds are generated the same way, by Python scripts using only the standard library in
+  `art-source/audio/`, which write `.wav` files into `game/assets/audio/`. Run them from the repository root, e.g.
+  `python art-source/audio/elevator_ding.py`.
 
 ## 7. Performance targets
 
@@ -201,7 +269,8 @@ Physics engine: Jolt, at the default 60 ticks per second.
 - **Content architecture.** If the registry and definition format are wrong, every later system pays for it.
   Settle the details in feature 003 and test them with GdUnit4.
 - **Section assembly.** Sections must connect cleanly (sockets, alignment, no gaps), and navigation and lighting
-  must work across the seams. Feature 002 proves this by hand before any generator is written.
+  must work across the seams. 002 proved the sockets, alignment and lighting by hand; navigation across seams is
+  still open and gets settled with the first enemy that moves (006).
 - **Scripted art.** Hard-surface assets suit Blender scripting, but animated characters may need another source.
 - **Free peek and hit exposure.** The peek/aim exposure model must feel fair. Settle it by playtesting feature 004.
 - Minimum hardware is TBD (see [Performance targets](#7-performance-targets)).

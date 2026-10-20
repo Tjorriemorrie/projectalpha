@@ -65,6 +65,8 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 | First-person combat | Cover-based shooting aboard stations and ships. Lethal: a few hits kill the player | [005](features/005-weapon-and-health.md), [004](features/004-free-peek-and-cover.md) |
 | Free peek | Hold Alt and move the mouse to peek out of cover in any direction (replaces fixed left/right lean). Peeking is look-only: you can't shoot, but you are hard to hit. To shoot from cover, hold right click to aim out, which exposes more of you and makes you easier to hit | [004](features/004-free-peek-and-cover.md) |
 | Vents | Crouch-only routes through ventilation shafts | [002](features/002-wreck-section-kit.md) |
+| Flashlight | Lights up dark wrecks; toggled on and off, no battery | [002](features/002-wreck-section-kit.md) |
+| Elevators | The only way between decks: call with a button, ride, and the arrival ding can be heard | [002](features/002-wreck-section-kit.md) |
 | Looting | Find and carry items out | [007](features/007-loot-and-grid-inventory.md) |
 | Grid inventory | Items take up different shapes and sizes in a grid; the player arranges them to fit more loot | [007](features/007-loot-and-grid-inventory.md) |
 | Trader hubs | Menu-based stations for selling loot and buying anything in the game | — |
@@ -103,6 +105,7 @@ Gamepad is supported. There is no jump, prone or slide.
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or stick to peek out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
+| Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory | Tab | View / Select |
 | Pause | Esc | Menu / Start |
 

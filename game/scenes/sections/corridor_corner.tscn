@@ -1,0 +1,82 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_6b4d3"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_qiy0a"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_k56di"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="4_w250h"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/ceiling_lamp.tscn" id="5_dwugw"]
+
+[node name="CorridorCorner" type="Node3D" unique_id=648497136]
+script = ExtResource("1_6b4d3")
+
+[node name="Geometry" type="CSGCombiner3D" parent="." unique_id=563247246]
+use_collision = true
+
+[node name="Box0" type="CSGBox3D" parent="Geometry" unique_id=657294069]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0.39999998)
+size = Vector3(2.4, 0.2, 3.2)
+material = ExtResource("2_qiy0a")
+
+[node name="Box1" type="CSGBox3D" parent="Geometry" unique_id=440498012]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0.39999998)
+size = Vector3(2.4, 0.20000005, 3.2)
+material = ExtResource("3_k56di")
+
+[node name="Box2" type="CSGBox3D" parent="Geometry" unique_id=1599392844]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, -0.1, 0)
+size = Vector3(0.79999995, 0.2, 2.4)
+material = ExtResource("2_qiy0a")
+
+[node name="Box3" type="CSGBox3D" parent="Geometry" unique_id=645371231]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 2.6, 0)
+size = Vector3(0.79999995, 0.20000005, 2.4)
+material = ExtResource("3_k56di")
+
+[node name="Box4" type="CSGBox3D" parent="Geometry" unique_id=1509139224]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, 1.25, 1.6)
+size = Vector3(0.20000005, 2.5, 0.79999995)
+material = ExtResource("3_k56di")
+
+[node name="Box5" type="CSGBox3D" parent="Geometry" unique_id=1763029249]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 1.25, -1.1)
+size = Vector3(0.79999995, 2.5, 0.20000005)
+material = ExtResource("3_k56di")
+
+[node name="Box6" type="CSGBox3D" parent="Geometry" unique_id=1354598132]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 1.25, 1.5)
+size = Vector3(0.20000005, 2.5, 1)
+material = ExtResource("3_k56di")
+
+[node name="Box7" type="CSGBox3D" parent="Geometry" unique_id=1845191982]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 1.25, 1.1)
+size = Vector3(0.79999995, 2.5, 0.20000005)
+material = ExtResource("3_k56di")
+
+[node name="SocketSouth" type="Marker3D" parent="." unique_id=999444229]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 2)
+script = ExtResource("4_w250h")
+kind = 0
+
+[node name="SocketEast" type="Marker3D" parent="." unique_id=2106166519]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 2, 0, 0)
+script = ExtResource("4_w250h")
+kind = 0
+
+[node name="SocketNorth" type="Marker3D" parent="." unique_id=1731865706]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+script = ExtResource("4_w250h")
+accepts_corridor = false
+wall_width = 2.4
+wall_height = 2.5
+wall_inset = 0.8
+
+[node name="SocketWest" type="Marker3D" parent="." unique_id=106007268]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2, 0, 0)
+script = ExtResource("4_w250h")
+accepts_corridor = false
+wall_width = 2.4
+wall_height = 2.5
+wall_inset = 0.8
+
+[node name="Lamp1" parent="." unique_id=1816769232 instance=ExtResource("5_dwugw")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)

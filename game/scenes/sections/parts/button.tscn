@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/parts/interactable.gd" id="1_interactable"]
+[ext_resource type="Material" path="res://scenes/sections/materials/trim.tres" id="2_trim"]
+[ext_resource type="Material" path="res://scenes/sections/materials/button.tres" id="3_button"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_button"]
+size = Vector3(0.24, 0.24, 0.12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plate"]
+material = ExtResource("2_trim")
+size = Vector3(0.22, 0.22, 0.02)
+
+[sub_resource type="BoxMesh" id="BoxMesh_button"]
+material = ExtResource("3_button")
+size = Vector3(0.12, 0.12, 0.04)
+
+[node name="Button" type="Area3D"]
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+script = ExtResource("1_interactable")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.04)
+shape = SubResource("BoxShape3D_button")
+
+[node name="Plate" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.01)
+mesh = SubResource("BoxMesh_plate")
+
+[node name="Press" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.03)
+mesh = SubResource("BoxMesh_button")

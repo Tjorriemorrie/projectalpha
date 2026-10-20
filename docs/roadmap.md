@@ -27,7 +27,7 @@ the loot kept, or die, lose it all and wake up as a new clone. All of this witho
 | #   | Feature | Status |
 |-----|---------|--------|
 | 001 | [Player controller](features/001-player-controller.md) | done |
-| 002 | [Wreck section kit](features/002-wreck-section-kit.md) | planned |
+| 002 | [Wreck section kit](features/002-wreck-section-kit.md) | done |
 | 003 | [Content registry and definitions](features/003-content-registry.md) | planned |
 | 004 | [Free peek and cover](features/004-free-peek-and-cover.md) | planned |
 | 005 | [Weapon and player health](features/005-weapon-and-health.md) | planned |
@@ -58,3 +58,6 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
   sensitivity and dead zone, click-to-sprint, tap/hold crouch).
 - Movement noise: sprinting is loud and enemies hear it, walking is quieter, crouching is quietest. This is the
   cost of sprinting instead of stamina.
+- Elevator ding draws enemies: robots hear the elevator arriving and come to investigate (the elevator already
+  emits a signal from 002).
+- Robots notice the flashlight beam, so lighting the way is a risk you choose.

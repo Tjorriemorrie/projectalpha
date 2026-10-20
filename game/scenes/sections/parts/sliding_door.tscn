@@ -1,0 +1,50 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/parts/sliding_door.gd" id="1_door"]
+[ext_resource type="Material" path="res://scenes/sections/materials/door.tres" id="2_material"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_panel"]
+size = Vector3(1.3, 2.25, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_panel"]
+material = ExtResource("2_material")
+size = Vector3(1.3, 2.25, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_doorway"]
+size = Vector3(1.2, 2.2, 0.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_proximity"]
+size = Vector3(2.4, 2.2, 3.2)
+
+[node name="SlidingDoor" type="Node3D"]
+script = ExtResource("1_door")
+slide_distance = 1.3
+
+[node name="Panel" type="AnimatableBody3D" parent="."]
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Panel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.125, 0)
+shape = SubResource("BoxShape3D_panel")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Panel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.125, 0)
+mesh = SubResource("BoxMesh_panel")
+
+[node name="Doorway" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doorway"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+shape = SubResource("BoxShape3D_doorway")
+
+[node name="Proximity" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Proximity"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+shape = SubResource("BoxShape3D_proximity")
