@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/weapons/viewmodel.gd" id="1_viewmodel"]
+[ext_resource type="PackedScene" path="res://content/base/weapons/laser_pistol/laser_pistol.glb" id="2_model"]
+[ext_resource type="AudioStream" path="res://content/base/weapons/laser_pistol/shot.wav" id="3_shot"]
+[ext_resource type="AudioStream" path="res://content/base/weapons/laser_pistol/charged_shot.wav" id="4_charged_shot"]
+[ext_resource type="AudioStream" path="res://content/base/weapons/laser_pistol/charge_hum.wav" id="5_charge_hum"]
+[ext_resource type="AudioStream" path="res://content/base/weapons/laser_pistol/clip_out.wav" id="6_clip_out"]
+[ext_resource type="AudioStream" path="res://content/base/weapons/laser_pistol/clip_in.wav" id="7_clip_in"]
+[ext_resource type="AudioStream" path="res://content/base/weapons/laser_pistol/dry_click.wav" id="8_dry_click"]
+
+[node name="LaserPistol" type="Node3D"]
+script = ExtResource("1_viewmodel")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Muzzle" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.026, -0.207)
+
+[node name="MuzzleLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.026, -0.26)
+visible = false
+light_color = Color(0.62, 0.82, 1, 1)
+light_energy = 0.0
+shadow_enabled = true
+omni_range = 6.0
+
+[node name="Sounds" type="Node" parent="."]
+
+[node name="Shot" type="AudioStreamPlayer" parent="Sounds"]
+stream = ExtResource("3_shot")
+volume_db = -6.0
+
+[node name="ChargedShot" type="AudioStreamPlayer" parent="Sounds"]
+stream = ExtResource("4_charged_shot")
+volume_db = -3.0
+
+[node name="ChargeHum" type="AudioStreamPlayer" parent="Sounds"]
+stream = ExtResource("5_charge_hum")
+volume_db = -14.0
+
+[node name="ClipOut" type="AudioStreamPlayer" parent="Sounds"]
+stream = ExtResource("6_clip_out")
+volume_db = -8.0
+
+[node name="ClipIn" type="AudioStreamPlayer" parent="Sounds"]
+stream = ExtResource("7_clip_in")
+volume_db = -8.0
+
+[node name="DryClick" type="AudioStreamPlayer" parent="Sounds"]
+stream = ExtResource("8_dry_click")
+volume_db = -6.0

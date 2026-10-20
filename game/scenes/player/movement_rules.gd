@@ -11,9 +11,9 @@ const MOVE_THRESHOLD := 0.1
 
 
 ## Sprint only counts while moving forward: forward diagonals count, strafing and backing up don't.
-## Peeking blocks it.
-static func wants_sprint(input_dir: Vector2, sprint_held: bool, peeking: bool = false) -> bool:
-	return sprint_held and not peeking and input_dir.y < -MOVE_THRESHOLD
+## Peeking and the weapon (aiming, the trigger, reloading) block it.
+static func wants_sprint(input_dir: Vector2, sprint_held: bool, blocked: bool = false) -> bool:
+	return sprint_held and not blocked and input_dir.y < -MOVE_THRESHOLD
 
 
 ## The toggled crouch flips on each toggle press, and sprinting clears it so the player doesn't drop
@@ -38,10 +38,10 @@ static func resolve_state(input_dir: Vector2, sprint_wanted: bool, crouched: boo
 	return State.SPRINT if sprint_wanted else State.WALK
 
 
-## Peeking caps the speed at crouch speed, standing or crouched.
+## Peeking and aiming down sights cap the speed at crouch speed, standing or crouched.
 static func speed_for_state(state: State, walk_speed: float, sprint_speed: float, crouch_speed: float,
-		peeking: bool = false) -> float:
-	if peeking:
+		slowed: bool = false) -> float:
+	if slowed:
 		return crouch_speed
 	match state:
 		State.SPRINT:

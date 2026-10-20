@@ -17,6 +17,23 @@ func test_registers_every_kit_section() -> void:
 	assert_array(ids).is_equal(KIT_SECTIONS)
 
 
+func test_registers_the_laser_pistol() -> void:
+	var ids := ContentRegistry.get_all(WeaponDefinition).map(func(definition: ContentDefinition) -> String:
+		return definition.id)
+	assert_array(ids).is_equal(["base:laser_pistol"])
+
+
+func test_every_weapon_viewmodel_has_a_viewmodel_root() -> void:
+	for definition: WeaponDefinition in ContentRegistry.get_all(WeaponDefinition):
+		assert_str(definition.display_name).override_failure_message(
+			"%s has no display name" % definition.id).is_not_empty()
+		var scene := load(definition.get_viewmodel_path()) as PackedScene
+		assert_object(scene).override_failure_message("%s has no viewmodel" % definition.id).is_not_null()
+		var root: Node = auto_free(scene.instantiate())
+		assert_bool(root is WeaponViewmodel).override_failure_message(
+			"%s's viewmodel root is not a WeaponViewmodel" % definition.id).is_true()
+
+
 func test_every_section_scene_has_a_section_root() -> void:
 	for definition: SectionDefinition in ContentRegistry.get_all(SectionDefinition):
 		assert_str(definition.display_name).override_failure_message(

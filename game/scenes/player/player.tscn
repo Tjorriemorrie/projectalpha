@@ -2,7 +2,10 @@
 
 [ext_resource type="Script" path="res://scenes/player/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://ui/hud.tscn" id="2_hud"]
-[ext_resource type="Script" path="res://scenes/player/hitbox.gd" id="3_hitbox"]
+[ext_resource type="Script" path="res://scenes/combat/hitbox.gd" id="3_hitbox"]
+[ext_resource type="Script" path="res://scenes/combat/health.gd" id="4_health"]
+[ext_resource type="Script" path="res://scenes/weapons/weapon.gd" id="5_weapon"]
+[ext_resource type="AudioStream" path="res://assets/audio/player_hit.wav" id="6_hit_sound"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_body"]
 height = 1.8
@@ -39,40 +42,55 @@ shadow_enabled = true
 spot_range = 16.0
 spot_angle = 24.0
 
+[node name="Weapon" type="Node3D" parent="Camera3D"]
+script = ExtResource("5_weapon")
+
 [node name="Hitboxes" type="Node3D" parent="."]
 
-[node name="Head" type="Area3D" parent="Hitboxes"]
+[node name="Head" type="Area3D" parent="Hitboxes" node_paths=PackedStringArray("health")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
 collision_layer = 8
 collision_mask = 0
 monitoring = false
 script = ExtResource("3_hitbox")
 part = 0
+damage_multiplier = 2.0
+health = NodePath("../../Health")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Hitboxes/Head"]
 shape = SubResource("SphereShape3D_head")
 
-[node name="Body" type="Area3D" parent="Hitboxes"]
+[node name="Body" type="Area3D" parent="Hitboxes" node_paths=PackedStringArray("health")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.775, 0)
 collision_layer = 8
 collision_mask = 0
 monitoring = false
 script = ExtResource("3_hitbox")
 part = 1
+health = NodePath("../../Health")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Hitboxes/Body"]
 shape = SubResource("CylinderShape3D_body_hitbox")
 
-[node name="Arm" type="Area3D" parent="Hitboxes"]
+[node name="Arm" type="Area3D" parent="Hitboxes" node_paths=PackedStringArray("health")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -0.3)
 collision_layer = 8
 collision_mask = 0
 monitoring = false
 script = ExtResource("3_hitbox")
 part = 2
+damage_multiplier = 0.5
+health = NodePath("../../Health")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Hitboxes/Arm"]
 shape = SubResource("BoxShape3D_arm")
 disabled = true
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("4_health")
+
+[node name="HitSound" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("6_hit_sound")
+volume_db = -4.0
 
 [node name="Hud" parent="." instance=ExtResource("2_hud")]

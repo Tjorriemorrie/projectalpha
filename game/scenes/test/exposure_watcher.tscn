@@ -1,6 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scenes/test/exposure_watcher.gd" id="1_watcher"]
+[ext_resource type="AudioStream" path="res://scenes/test/watcher_shot.wav" id="2_shot"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_post"]
 albedo_color = Color(0.3, 0.32, 0.35, 1)
@@ -37,3 +38,7 @@ outline_size = 8
 [node name="SightLines" type="MeshInstance3D" parent="."]
 top_level = true
 cast_shadow = 0
+
+[node name="ShotSound" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+stream = ExtResource("2_shot")

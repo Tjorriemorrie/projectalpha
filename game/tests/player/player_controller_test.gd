@@ -19,6 +19,9 @@ func before_test() -> void:
 	_runner = scene_runner(TEST_SCENE)
 	_runner.set_time_factor(5.0)
 	_player = _runner.find_child("Player") as Player
+	# The cover area's watchers would shoot at the player near the crawl space.
+	for watcher_name: String in ["WatcherCrate", "WatcherPillar"]:
+		(_runner.find_child(watcher_name) as ExposureWatcher).fire_enabled = false
 
 
 func after_test() -> void:

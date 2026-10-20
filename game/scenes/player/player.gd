@@ -1,14 +1,17 @@
 class_name Player
 extends CharacterBody3D
 ## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
-## riding elevators, the flashlight, using interactables by looking at them, peeking and aiming out of cover, and
-## the hitboxes enemies can hit. MovementRules and PeekRules make the decisions; this script applies them to the
-## body, head and camera.
+## riding elevators, the flashlight, using interactables by looking at them, peeking and aiming out of cover, the
+## hitboxes enemies can hit, the weapon (aim down sights zoom, kick) and health (hit feedback, death).
+## MovementRules and PeekRules make the decisions; this script applies them to the body, head and camera. The
+## Weapon fires and reloads, and Health counts the damage.
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
 ## Emitted when the player starts or stops peeking or aiming out of cover.
 signal peek_state_changed(previous: PeekRules.State, current: PeekRules.State)
+## Emitted once, when the player dies. The run ends: 008 wakes a new clone on the ship.
+signal died
 
 ## Physics layers the look ray hits: world (1) blocks it, interactable (3) is what it looks for.
 const INTERACT_MASK := 0b101
@@ -34,6 +37,19 @@ const BOB_FADE_TIME := 0.2
 const NECK_LENGTH := 0.1
 ## The arm hitbox starts this far below the eyes and reaches forward along the view.
 const SHOULDER_DROP := 0.2
+## Seconds the camera takes to move between the hip and aiming down sights zoom.
+const ZOOM_TIME := 0.15
+## A kick or flinch settles to 5% of its size over the weapon's kick recovery time.
+const KICK_SETTLE := 3.0
+## On death the view slumps to the floor over DEATH_SLUMP_TIME seconds: the eyes drop to DEATH_EYE_HEIGHT, and
+## the view rolls by DEATH_ROLL degrees and tips to DEATH_PITCH degrees.
+const DEATH_SLUMP_TIME := 1.2
+const DEATH_EYE_HEIGHT := 0.3
+const DEATH_ROLL := 70.0
+const DEATH_PITCH := -20.0
+## Seconds after death before the screen starts fading to black, and how long the fade takes.
+const DEATH_FADE_DELAY := 0.6
+const DEATH_FADE_TIME := 2.5
 
 @export_group("Speeds")
 @export var walk_speed: float = 1.5
@@ -89,6 +105,20 @@ const SHOULDER_DROP := 0.2
 ## Radius of the sphere that stops the head at walls.
 @export var head_radius: float = 0.15
 
+@export_group("Combat")
+## The weapon the player carries, by content ID.
+@export var weapon_id := "base:laser_pistol"
+## Fresh thermal clips carried besides the loaded one (until 007 and 008 decide the real loadout).
+@export var starting_spare_clips: int = 4
+## At or below this much health one more body hit could kill, so the screen edges stay faintly red.
+@export var critical_health: float = 35.0
+## Degrees the view flinches when hit.
+@export var flinch_degrees: float = 1.5
+## Seconds from death until the run ends.
+@export var death_restart_delay: float = 4.0
+## Reload the level when the run ends, standing in for waking up as a new clone on the ship (008). Tests turn it off.
+@export var reload_on_death: bool = true
+
 var movement_state: MovementRules.State = MovementRules.State.IDLE
 var is_crouched: bool = false
 ## The interactable the player is looking at within reach, or null.
@@ -97,6 +127,9 @@ var interact_target: Interactable
 var peek_state: PeekRules.State = PeekRules.State.NONE
 ## Where the head is relative to its normal position, in metres in the body's frame (x right, y up).
 var head_offset := Vector2.ZERO
+## The thermal clips the player carries; the weapon fires from them.
+var clips: ThermalClips
+var is_dead := false
 
 var _crouch_toggled := false
 var _stand_blocked := false
@@ -115,6 +148,13 @@ var _head_offset_previous := Vector2.ZERO
 var _head_query: PhysicsShapeQueryParameters3D
 var _body_hitbox_shape: CylinderShape3D
 var _arm_length := 0.0
+## Vertical field of view without zoom, in degrees.
+var _base_fov := 0.0
+## 0 at the hip, 1 fully zoomed in for aiming down sights.
+var _zoom := 0.0
+## How far a shot's kick or a hit's flinch has turned the view, in radians (x up, y left); it settles back to zero.
+var _view_kick := Vector2.ZERO
+var _death_time := 0.0
 
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _camera: Camera3D = $Camera3D
@@ -123,6 +163,9 @@ var _arm_length := 0.0
 @onready var _head_hitbox: Hitbox = $Hitboxes/Head
 @onready var _body_hitbox: Hitbox = $Hitboxes/Body
 @onready var _arm_hitbox: Hitbox = $Hitboxes/Arm
+@onready var _health: Health = $Health
+@onready var _weapon: Weapon = $Camera3D/Weapon
+@onready var _hit_sound: AudioStreamPlayer = $HitSound
 
 
 func _ready() -> void:
@@ -133,9 +176,11 @@ func _ready() -> void:
 	_eye_height = stand_eye_height
 	_yaw = rotation.y
 	floor_snap_length = max_step_height
-	_camera.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(horizontal_fov) / 2.0) / REFERENCE_ASPECT))
+	_base_fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(horizontal_fov) / 2.0) / REFERENCE_ASPECT))
+	_camera.fov = _base_fov
 	_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_setup_head()
+	_setup_combat()
 	_update_camera()
 	_set_mouse_captured(true)
 	Log.info(("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°, "
@@ -149,6 +194,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and mouse_captured:
 		# screen_relative is raw pixel movement, unaffected by window scaling.
 		var motion := (event as InputEventMouseMotion).screen_relative
+		if is_dead:
+			return
 		# While peeking the mouse moves the head; aiming out turns the view again, so the player can aim.
 		if Input.is_action_pressed("peek") and peek_state != PeekRules.State.AIM_OUT:
 			move_head(motion)
@@ -160,15 +207,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("pause") and mouse_captured:
 		_set_mouse_captured(false)
 	elif event is InputEventMouseButton and event.is_pressed() and not mouse_captured:
+		# The click that captures the mouse again must not also fire.
+		_weapon.suppress_trigger()
 		_set_mouse_captured(true)
 
 
 func _physics_process(delta: float) -> void:
 	rotation.y = _yaw
+	if is_dead:
+		# The body comes to rest where it fell; nothing the player presses does anything any more.
+		_set_movement_state(MovementRules.State.CROUCH_IDLE if is_crouched else MovementRules.State.IDLE)
+		_update_velocity(Vector2.ZERO, delta)
+		_move_and_follow_floor()
+		return
 	_update_peek_state()
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var sprint_wanted := MovementRules.wants_sprint(
-		input_dir, Input.is_action_pressed("sprint"), peek_state != PeekRules.State.NONE)
+	var sprint_blocked := peek_state != PeekRules.State.NONE or _weapon.blocks_sprint()
+	var sprint_wanted := MovementRules.wants_sprint(input_dir, Input.is_action_pressed("sprint"), sprint_blocked)
 	_crouch_toggled = MovementRules.next_crouch_toggle(
 		_crouch_toggled, Input.is_action_just_pressed("crouch_toggle"), sprint_wanted)
 	_update_crouch(MovementRules.wants_crouch(Input.is_action_pressed("crouch_hold"), _crouch_toggled, sprint_wanted))
@@ -182,6 +237,8 @@ func _physics_process(delta: float) -> void:
 		interact_target.interact()
 	if Input.is_action_just_pressed("flashlight"):
 		set_flashlight(not is_flashlight_on())
+	# A peek can't shoot; aiming out can.
+	_weapon.physics_update(delta, peek_state != PeekRules.State.PEEK, movement_state == MovementRules.State.SPRINT)
 
 
 func _process(delta: float) -> void:
@@ -190,7 +247,11 @@ func _process(delta: float) -> void:
 	_eye_height = move_toward(_eye_height, eye_target, eye_speed * delta)
 	_step_offset = move_toward(_step_offset, 0.0, max_step_height / STEP_SMOOTHING_TIME * delta)
 	_update_head_bob(delta)
+	_update_zoom_and_kick(delta)
+	if is_dead:
+		_death_time += delta
 	_update_camera()
+	_update_hud()
 
 
 ## Turns the body and tilts the camera, for example to face the right way when spawning.
@@ -213,6 +274,14 @@ func move_head(motion: Vector2) -> void:
 ## The parts of the player enemies can hit. Only the active ones are out (see Hitbox.is_active()).
 func get_hitboxes() -> Array[Hitbox]:
 	return [_head_hitbox, _body_hitbox, _arm_hitbox]
+
+
+func get_health() -> Health:
+	return _health
+
+
+func get_weapon() -> Weapon:
+	return _weapon
 
 
 func is_flashlight_on() -> bool:
@@ -239,6 +308,25 @@ func _setup_head() -> void:
 	_arm_length = (arm_collision.shape as BoxShape3D).size.z
 	_arm_hitbox.set_active(false)
 	_update_hitboxes()
+
+
+## Arms the player with the weapon from the content registry and the clips they start with, and listens for hits.
+func _setup_combat() -> void:
+	clips = ThermalClips.new(starting_spare_clips)
+	_health.damaged.connect(_on_damaged)
+	_health.died.connect(_on_died)
+	_weapon.fired.connect(_on_weapon_fired)
+	var definition := ContentRegistry.get_definition(weapon_id) as WeaponDefinition
+	if definition == null:
+		Log.error("🏃 No weapon equipped, not a registered weapon: weapon_id=%s" % weapon_id)
+	else:
+		var own_hitboxes: Array[RID] = []
+		for hitbox in get_hitboxes():
+			own_hitboxes.append(hitbox.get_rid())
+		_weapon.equip(definition, clips, own_hitboxes)
+	_hud.set_health(_health.health, _health.max_health, false)
+	Log.info("🏃 Combat ready: health=%.0f, weapon=%s, fresh_clips=%d, critical_health=%.0f" % [
+		_health.health, weapon_id if _weapon.is_equipped() else "none", clips.fresh, critical_health])
 
 
 ## The peek follows the peek and aim actions (see PeekRules.next_state). Releasing peek centres the peek target,
@@ -313,15 +401,7 @@ func _update_interact_target() -> void:
 	# The prompt can change while looking at the same target (the elevator's "Ride up" becomes "Ride down").
 	if action != _shown_prompt:
 		_shown_prompt = action
-		_hud.set_prompt(_action_key_label(&"interact"), action)
-
-
-## The key bound to an action, for prompts (e.g. "E"), so prompts follow the Input Map.
-static func _action_key_label(action: StringName) -> String:
-	for event in InputMap.action_get_events(action):
-		if event is InputEventKey:
-			return (event as InputEventKey).as_text_physical_keycode()
-	return "?"
+		_hud.set_prompt(Hud.key_label(&"interact"), action)
 
 
 func _update_crouch(wants_crouch: bool) -> void:
@@ -357,8 +437,8 @@ func _set_movement_state(new_state: MovementRules.State) -> void:
 
 
 func _update_velocity(input_dir: Vector2, delta: float) -> void:
-	var target_speed := MovementRules.speed_for_state(
-		movement_state, walk_speed, sprint_speed, crouch_speed, peek_state != PeekRules.State.NONE)
+	var slowed := peek_state != PeekRules.State.NONE or _weapon.is_aiming
+	var target_speed := MovementRules.speed_for_state(movement_state, walk_speed, sprint_speed, crouch_speed, slowed)
 	var target := global_basis * Vector3(input_dir.x, 0.0, input_dir.y) * target_speed
 	var moving := input_dir.length() > MovementRules.MOVE_THRESHOLD
 	var rate := target_speed / acceleration_time if moving else walk_speed / deceleration_time
@@ -440,6 +520,74 @@ func _smooth_camera_step(height_change: float) -> void:
 	reset_physics_interpolation()
 
 
+func _on_weapon_fired(_charge: float, kick_degrees: float) -> void:
+	_view_kick.x += deg_to_rad(kick_degrees)
+
+
+## A hit flinches the view, flashes the screen edges, points at where it came from and plays the hit sound.
+func _on_damaged(amount: float, source_position: Vector3, part: Hitbox.Part) -> void:
+	_view_kick += Vector2(randf_range(0.6, 1.0), randf_range(-1.0, 1.0)) * deg_to_rad(flinch_degrees)
+	_hit_sound.play()
+	var critical := _health.health <= critical_health
+	_hud.set_health(_health.health, _health.max_health, critical)
+	_hud.show_hit(source_position)
+	Log.info("🏃 Hit: part=%s, damage=%.1f, health=%.1f, critical=%s, source=%s, position=%s" % [
+		Hitbox.Part.keys()[part], amount, _health.health, critical, source_position, global_position])
+
+
+## The run ends: the controls stop, the weapon and hitboxes go, the view slumps to the floor and fades to black.
+func _on_died() -> void:
+	is_dead = true
+	_death_time = 0.0
+	_weapon.disable()
+	for hitbox in get_hitboxes():
+		hitbox.set_active(false)
+	if peek_state != PeekRules.State.NONE:
+		var previous := peek_state
+		peek_state = PeekRules.State.NONE
+		peek_state_changed.emit(previous, peek_state)
+	_peek_target = Vector2.ZERO
+	_head_offset_previous = Vector2.ZERO
+	head_offset = Vector2.ZERO
+	_hud.fade_out(DEATH_FADE_TIME, DEATH_FADE_DELAY)
+	Log.info("🏃 Player died: position=%s, restart_in=%.1f s, reload_on_death=%s, fresh=%d, spent=%d" % [
+		global_position, death_restart_delay, reload_on_death, clips.fresh, clips.spent])
+	died.emit()
+	get_tree().create_timer(death_restart_delay).timeout.connect(_end_run)
+
+
+## Until 008 wakes a new clone on the ship, the run ends by reloading the level.
+func _end_run() -> void:
+	if not reload_on_death or not is_inside_tree():
+		Log.info("🏃 Run over, staying on the death screen: reload_on_death=%s" % reload_on_death)
+		return
+	var scene := get_tree().current_scene
+	Log.info("🏃 Run over, reloading the level: scene=%s" % (scene.scene_file_path if scene else "none"))
+	get_tree().reload_current_scene()
+
+
+## Zooms in while aiming down sights, and lets the kick of shots and the flinch of hits settle back.
+func _update_zoom_and_kick(delta: float) -> void:
+	_zoom = move_toward(_zoom, 1.0 if _weapon.is_aiming else 0.0, delta / ZOOM_TIME)
+	var aim_zoom := _weapon.definition.aim_zoom if _weapon.is_equipped() else 1.0
+	var zoom := lerpf(1.0, aim_zoom, smoothstep(0.0, 1.0, _zoom))
+	_camera.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(_base_fov) / 2.0) / zoom))
+	var recovery_time := _weapon.definition.kick_recovery_time if _weapon.is_equipped() else 0.3
+	_view_kick *= exp(-KICK_SETTLE / maxf(recovery_time, 0.01) * delta)
+
+
+## Runs every frame; the HUD only redraws what changed.
+func _update_hud() -> void:
+	if not _weapon.is_equipped():
+		return
+	var definition := _weapon.definition
+	var charge_heat := WeaponRules.shot_heat(definition, _weapon.charge) if _weapon.charge >= 0.0 else 0.0
+	var saturated := not clips.has_room_for(definition.shot_heat)
+	_hud.set_clips(clips.heat, charge_heat, clips.fresh, clips.spent, _weapon.is_clip_low(), saturated,
+		_weapon.reload_progress())
+	_hud.set_charge(_weapon.charge)
+
+
 ## The head doesn't bob while peeking, so the peek holds steady.
 func _update_head_bob(delta: float) -> void:
 	var bobbing := head_bob_enabled and peek_state == PeekRules.State.NONE
@@ -455,16 +603,24 @@ func _update_head_bob(delta: float) -> void:
 
 ## Places the camera at eye height on the physics-interpolated body, so movement looks smooth on high
 ## refresh rate screens, while the look direction comes straight from the latest mouse input. The peeking head is
-## interpolated between physics frames the same way, and a sideways lean rolls the view towards it.
+## interpolated between physics frames the same way, and a sideways lean rolls the view towards it. Kicks and
+## flinches turn the view on top of where the player aims, and after death the view slumps to the floor.
 func _update_camera() -> void:
 	var head := _head_offset_previous.lerp(head_offset, Engine.get_physics_interpolation_fraction())
 	var roll := -deg_to_rad(PeekRules.tilt_degrees(head.x, peek_side_reach, peek_tilt))
-	var look := Basis.from_euler(Vector3(_pitch, _yaw, roll))
+	var pitch := _pitch + _view_kick.x
+	var eye_height := _eye_height + _step_offset
+	if is_dead:
+		var slump := smoothstep(0.0, DEATH_SLUMP_TIME, _death_time)
+		pitch = lerpf(pitch, deg_to_rad(DEATH_PITCH), slump)
+		roll = lerpf(roll, deg_to_rad(DEATH_ROLL), slump)
+		eye_height = lerpf(eye_height, DEATH_EYE_HEIGHT, slump)
+	var look := Basis.from_euler(Vector3(pitch, _yaw + _view_kick.y, roll))
 	var body_turn := Basis(Vector3.UP, _yaw)
 	var bob := body_turn * Vector3(
 		sin(_bob_phase) * _bob_amplitude * 0.5, sin(_bob_phase * 2.0) * _bob_amplitude, 0.0)
 	var feet := get_global_transform_interpolated().origin
-	var eye := feet + up_direction * (_eye_height + _step_offset) + body_turn * Vector3(head.x, head.y, 0.0)
+	var eye := feet + up_direction * eye_height + body_turn * Vector3(head.x, head.y, 0.0)
 	_camera.global_transform = Transform3D(look, eye + bob)
 
 

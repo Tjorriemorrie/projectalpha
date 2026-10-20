@@ -24,7 +24,8 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Use static typing in GDScript (`var speed: float = 5.0`).
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
-  🧩 wreck assembly, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers).
+  🧩 wreck assembly, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers, 🔫 weapons,
+  🩸 health and damage, 🎯 shooting targets).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -34,7 +35,7 @@ Proposed layout (adjust as the project grows):
 ```text
 projectalpha/
 ├── docs/                  # Design documents
-├── art-source/            # Blender .blend files, asset-generating scripts and other source art (not imported by Godot)
+├── art-source/            # Asset-generating scripts (models/, audio/) and other source art (not imported by Godot)
 └── game/                  # Godot project root (project.godot lives here)
     ├── assets/            # Shared assets that belong to no single piece of content
     │   ├── models/        # Exported .glb files from Blender
@@ -44,8 +45,10 @@ projectalpha/
     │   └── fonts/
     ├── content/           # Content packs; base/ is the base game (see Content and modding)
     │   └── base/
-    │       └── sections/  # One self-contained folder per kit section
-    ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, sections, wreck, test)
+    │       ├── sections/  # One self-contained folder per kit section
+    │       └── weapons/   # One self-contained folder per weapon (definition, viewmodel, model, sounds)
+    ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, combat, weapons,
+    │                      # sections, wreck, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -59,7 +62,8 @@ projectalpha/
 
 - Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002.
 - `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests. Its
-  south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004).
+  south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004), which
+  also shoot at the player (005). Four shooting targets stand north of the start (005).
 - TBD: how levels are loaded, scene transitions.
 
 ### Global singletons (autoloads)
@@ -118,6 +122,8 @@ Settled in [003](features/003-content-registry.md):
   one kind sorted by ID. Duplicate IDs, content folders with zero or several definitions, and definitions with
   problems are logged as errors, kept in `ContentRegistry.errors` and skipped; the rest still loads.
   `load_content(root)` takes the folder of packs, so tests run a fresh registry on fixture packs.
+- **Kinds so far.** `SectionDefinition` (003) and `WeaponDefinition` (005). A weapon definition holds all its
+  numbers (damage, heat, charge, kick, spread, zoom, reload and raise times), so a new weapon is a new folder.
 
 ### Player controller
 
@@ -187,7 +193,9 @@ so WASD keeps its position on other keyboard layouts.
 | `interact` | E |
 | `flashlight` | F |
 | `peek` | Alt (hold) |
-| `aim` | Right mouse button (hold): aims out of cover while peeking, and will aim down sights in 005 |
+| `aim` | Right mouse button (hold): aims down sights, and aims out of cover while peeking |
+| `shoot` | Left mouse button: a click fires, holding charges and releasing fires |
+| `reload` | R |
 
 Prompts show the bound key by reading the Input Map (`as_text_physical_keycode()`), never a hard-coded letter.
 
@@ -203,7 +211,7 @@ Physics engine: Jolt, at the default 60 ticks per second.
 | 1     | world  | Static level geometry, door panels, elevator platforms. Blocks movement, sight and the interact ray |
 | 2     | player | The player body (collides with `world`) |
 | 3     | interactable | `Interactable` areas (buttons), found by the player's interact ray |
-| 4     | hitbox | The player's `Hitbox` areas (head, body, arm). They collide with nothing; enemy shots cast rays against them (006) |
+| 4     | hitbox | `Hitbox` areas of anything that can be damaged: the player (head, body, arm), shooting targets, robots (006). They collide with nothing; shots cast rays against `world` and `hitbox` |
 
 Trigger areas (door proximity and doorways, the elevator's "aboard" area) sit on no layer and mask `player`.
 
@@ -247,6 +255,30 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
   driven by the elevator that only open at the deck where the platform is, and a `dinged(deck, sound_position)`
   signal on arrival for enemy hearing later.
 
+### Weapons, health and damage
+
+Built in [005](features/005-weapon-and-health.md).
+
+- **Health and hitboxes.** `Health` (`scenes/combat/`) is a node with `max_health`, `take_damage()`, and the
+  signals `damaged` and `died` (once). Anything damageable has a `Health` and one or more `Hitbox` areas on the
+  `hitbox` layer; each hitbox has a `part`, a `damage_multiplier` (the player's head 2×, body 1×, arm 0.5×) and
+  the `Health` it damages. A shot that hits a hitbox calls `Hitbox.take_hit(damage, source_position)`.
+- **Shots** are hitscan rays (lasers) from the shooter's eye, against `world` and `hitbox` with areas on,
+  excluding the shooter's own hitboxes. The first thing hit takes the damage; walls stop shots. `LaserEffects`
+  draws the beam, sparks, impact flash and scorch for any shooter, in its own colour (the player blue-white,
+  enemies red). Scorch marks are permanent for the run: each is a `Decal` child of the surface it hit (so it moves
+  with doors and elevators), at most 256 at once with the oldest removed first, fading out beyond 25 m.
+- **Weapons and thermal clips.** `Weapon` (under the player's camera) runs a `WeaponDefinition` with the clips
+  the player carries (`ThermalClips`: the loaded clip's heat as a fraction, and fresh and spent counts, until the
+  grid inventory in 007). `WeaponRules` holds the decisions. `Weapon.blocks_sprint()` and `Weapon.is_aiming` feed
+  the player's sprint block and speed cap; the player passes in whether it can shoot (not while peeking) and
+  whether it is sprinting (the weapon lowers).
+- **Viewmodels.** A weapon's viewmodel scene has a `WeaponViewmodel` root whose origin is the rear sight. Its
+  materials are swapped for `viewmodel.gdshader`, which pulls depth towards the near plane so weapons never poke
+  into walls while still being lit by the world; viewmodels cast no shadows. They draw on visual layer 20
+  (`viewmodel`), which decals leave out so scorch marks never land on the weapon in view.
+- **Death.** The player's `died` signal ends the run. Until 008 the level reloads after 4 s.
+
 ### Interaction and HUD
 
 - `Interactable` is an `Area3D` on the `interactable` layer with a `prompt` and an `interacted` signal.
@@ -254,6 +286,10 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
   block it, and calls `interact()` when `interact` is pressed.
 - The HUD (`game/ui/hud.tscn`, owned by the player scene) shows a centre dot and the prompt as a key cap plus
   action. It uses the Windows system font Bahnschrift (DIN-style signage), falling back to Godot's default font.
+  Corner placards (005): health bottom left, the loaded clip's heat bottom right as one segment per uncharged
+  shot. Red (`#FF1F14`) means danger everywhere, the laser's blue (`#9ED1FF`) means charging, and heat orange
+  matches the clip's glowing band. Custom readouts are small `Control`s that draw themselves and only redraw when
+  their state changes. `Hud.key_label(action)` gives the bound key for any prompt.
 
 ### Lighting
 
@@ -277,10 +313,12 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 - **Live editing (optional, later):** a Blender MCP server (e.g. blender-mcp by ahujasid) can be added in the art
   phase if headless scripts aren't enough.
 
-- Export format: glTF binary (`.glb`) into `game/assets/models/`.
+- Export format: glTF binary (`.glb`). A model that belongs to one piece of content goes into that content's
+  folder (e.g. `content/base/weapons/laser_pistol/`); shared models go into `game/assets/models/`.
 - Units: 1 Blender unit = 1 metre; apply scale and rotation before export.
 - Orientation: models face -Y in Blender (toward the Front view camera). This arrives as +Z in Godot, which is Godot's model front (`Vector3.MODEL_FRONT`).
-- Naming: TBD (e.g. `prop_crate.glb`, `char_player.glb`).
+- Naming: a content model is named after its content folder (`laser_pistol.glb`). Objects and materials that
+  code looks up get fixed names in the script (the pistol's `Clip`, `Emitter` and `ClipHeat`). Otherwise TBD.
 - Animations: TBD (actions naming, NLA usage, root motion or not).
 - Collision: TBD (Godot import hints such as `-col` / `-colonly` suffixes, or collision built in Godot).
 - Textures: TBD (resolution budget, PBR or not).
@@ -313,6 +351,9 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
     physics is tested by loading a scene with `scene_runner` and pressing actions with `Input.action_press`.
     `Input.action_press` changes action state without sending input events, so gameplay input that tests
     drive is read with `Input` queries in `_physics_process`, not from `_unhandled_input`.
+  - `scene_runner(...).set_time_factor(5.0)` runs five times as many physics frames per second, so one physics
+    frame is still 1/60 s of game time. A press can take one physics frame to register, so wait two frames
+    before checking its effect.
 - **Manual playtests:** feel, visuals and audio. Each feature's "Done when" includes a playtest in the running game.
 
 ## 10. Technical risks and open questions
@@ -320,8 +361,8 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 - **Scope.** One developer working on an extraction shooter with crafting, a star map and procedural ships. Mitigate by
   sticking to the MVP cut in the roadmap and the one-feature-at-a-time rule.
 - **Content architecture.** If the registry and definition format are wrong, every later system pays for it.
-  003 settled and tested the registry with sections only; the first kinds with gameplay data (weapon, robot,
-  items in 005–007) are the real test of the definition format.
+  003 settled and tested the registry with sections only. 005's weapon was the first kind with gameplay data and
+  fitted without changes to the registry; the robot and items (006, 007) are the next test.
 - **Section assembly.** Sections must connect cleanly (sockets, alignment, no gaps), and navigation and lighting
   must work across the seams. 002 proved the sockets, alignment and lighting by hand; navigation across seams is
   still open and gets settled with the first enemy that moves (006).

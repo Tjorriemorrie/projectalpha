@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/weapons/weapon_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Laser pistol"
+viewmodel = "res://content/base/weapons/laser_pistol/laser_pistol.tscn"
+damage = 25.0
+shot_range = 100.0
+fire_interval = 0.333
+shot_heat = 0.05
+full_charge_heat = 0.15
+full_charge_damage_multiplier = 4.0
+charge_delay = 0.15
+charge_time = 1.0
+kick = 0.5
+full_charge_kick = 3.0
+kick_recovery_time = 0.3
+hip_spread = 5.0
+aim_spread = 1.0
+bloom_per_shot = 1.0
+bloom_recovery = 2.0
+max_bloom = 3.0
+aim_zoom = 1.3
+reload_time = 3.0
+raise_time = 0.25

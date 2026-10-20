@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://bldyp55dagvni" path="res://scenes/test/test_elevator.gd" id="2_elevator"]
 [ext_resource type="Shader" uid="uid://cpi0f5wcio20" path="res://assets/shaders/greybox_grid.gdshader" id="3_grid"]
 [ext_resource type="PackedScene" path="res://scenes/test/exposure_watcher.tscn" id="4_watcher"]
+[ext_resource type="PackedScene" path="res://scenes/test/shooting_target.tscn" id="5_target"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 
@@ -266,7 +267,23 @@ aim_out_up_reach = 0.4
 [node name="WatcherCrate" parent="Watchers" unique_id=60249917 node_paths=PackedStringArray("player") instance=ExtResource("4_watcher")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 4.5)
 player = NodePath("../../Player")
+fire_enabled = true
 
 [node name="WatcherPillar" parent="Watchers" unique_id=962233239 node_paths=PackedStringArray("player") instance=ExtResource("4_watcher")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 4.5)
 player = NodePath("../../Player")
+fire_enabled = true
+
+[node name="Targets" type="Node3D" parent="."]
+
+[node name="TargetWest" parent="Targets" instance=ExtResource("5_target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -4)
+
+[node name="TargetCentre" parent="Targets" instance=ExtResource("5_target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4)
+
+[node name="TargetEast" parent="Targets" instance=ExtResource("5_target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -4)
+
+[node name="TargetFar" parent="Targets" instance=ExtResource("5_target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)

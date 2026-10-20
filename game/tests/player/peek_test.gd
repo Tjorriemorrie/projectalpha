@@ -29,6 +29,9 @@ func before_test() -> void:
 	_player = _runner.find_child("Player") as Player
 	_crate_watcher = _runner.find_child("WatcherCrate") as ExposureWatcher
 	_pillar_watcher = _runner.find_child("WatcherPillar") as ExposureWatcher
+	# The watchers only watch here; weapon_test.gd covers them firing.
+	_crate_watcher.fire_enabled = false
+	_pillar_watcher.fire_enabled = false
 
 
 func after_test() -> void:

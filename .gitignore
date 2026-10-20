@@ -8,6 +8,9 @@ builds/
 *.blend1
 *.blend2
 
+# Python (asset-generating scripts)
+__pycache__/
+
 # Tests
 reports/
 

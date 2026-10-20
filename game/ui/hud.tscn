@@ -1,6 +1,11 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://ui/hud.gd" id="1_hud"]
+[ext_resource type="Shader" path="res://ui/screen_edges.gdshader" id="2_edges"]
+[ext_resource type="Script" path="res://ui/charge_ring.gd" id="3_charge_ring"]
+[ext_resource type="Script" path="res://ui/hit_markers.gd" id="4_hit_markers"]
+[ext_resource type="Script" path="res://ui/health_bar.gd" id="5_health_bar"]
+[ext_resource type="Script" path="res://ui/heat_gauge.gd" id="6_heat_gauge"]
 
 [sub_resource type="SystemFont" id="SystemFont_placard"]
 font_names = PackedStringArray("Bahnschrift", "DIN Alternate", "Arial Narrow")
@@ -8,6 +13,10 @@ font_weight = 600
 
 [sub_resource type="SystemFont" id="SystemFont_action"]
 font_names = PackedStringArray("Bahnschrift", "DIN Alternate", "Arial Narrow")
+
+[sub_resource type="FontVariation" id="FontVariation_label"]
+base_font = SubResource("SystemFont_placard")
+spacing_glyph = 2
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dot"]
 bg_color = Color(0.862745, 0.901961, 0.941176, 0.75)
@@ -37,11 +46,42 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_placard"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0.0431373, 0.0588235, 0.0784314, 0.5)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.862745, 0.901961, 0.941176, 0.18)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_edges"]
+shader = ExtResource("2_edges")
+shader_parameter/tint = Color(1, 0.12, 0.08, 1)
+shader_parameter/intensity = 0.0
+
 [node name="Hud" type="CanvasLayer"]
 script = ExtResource("1_hud")
 
 [node name="Root" type="Control" parent="."]
 layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ScreenEdges" type="ColorRect" parent="Root"]
+material = SubResource("ShaderMaterial_edges")
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -64,6 +104,32 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_dot")
+
+[node name="ChargeRing" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_charge_ring")
+
+[node name="HitMarkers" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_hit_markers")
 
 [node name="Prompt" type="HBoxContainer" parent="Root"]
 layout_mode = 1
@@ -99,3 +165,113 @@ theme_override_constants/outline_size = 4
 theme_override_fonts/font = SubResource("SystemFont_action")
 theme_override_font_sizes/font_size = 17
 text = "Call elevator"
+
+[node name="Health" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = -28.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_placard")
+
+[node name="Rows" type="VBoxContainer" parent="Root/Health"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Label" type="Label" parent="Root/Health/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
+theme_override_fonts/font = SubResource("FontVariation_label")
+theme_override_font_sizes/font_size = 11
+text = "HEALTH"
+
+[node name="Bar" type="HBoxContainer" parent="Root/Health/Rows"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="HealthBar" type="Control" parent="Root/Health/Rows/Bar"]
+custom_minimum_size = Vector2(150, 5)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("5_health_bar")
+
+[node name="Number" type="Label" parent="Root/Health/Rows/Bar"]
+custom_minimum_size = Vector2(42, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
+theme_override_fonts/font = SubResource("SystemFont_placard")
+theme_override_font_sizes/font_size = 26
+text = "100"
+horizontal_alignment = 2
+
+[node name="Clips" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -28.0
+offset_top = -28.0
+offset_right = -28.0
+offset_bottom = -28.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_placard")
+
+[node name="Rows" type="VBoxContainer" parent="Root/Clips"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="Root/Clips/Rows"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Root/Clips/Rows/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
+theme_override_fonts/font = SubResource("FontVariation_label")
+theme_override_font_sizes/font_size = 11
+text = "HEAT"
+
+[node name="Value" type="Label" parent="Root/Clips/Rows/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
+theme_override_fonts/font = SubResource("SystemFont_placard")
+theme_override_font_sizes/font_size = 13
+text = "0%"
+horizontal_alignment = 2
+
+[node name="HeatGauge" type="Control" parent="Root/Clips/Rows"]
+custom_minimum_size = Vector2(198, 14)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("6_heat_gauge")
+
+[node name="Count" type="Label" parent="Root/Clips/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
+theme_override_fonts/font = SubResource("SystemFont_action")
+theme_override_font_sizes/font_size = 13
+text = "4 fresh  ·  0 spent"
+
+[node name="DeathFade" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)

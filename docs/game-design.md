@@ -63,6 +63,7 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 |----------|-------------|---------|
 | Boarding and extraction | Board a station or ship, then get out alive to keep what you found | [008](features/008-extraction-and-clone-loop.md) |
 | First-person combat | Cover-based shooting aboard stations and ships. Lethal: a few hits kill the player | [005](features/005-weapon-and-health.md), [004](features/004-free-peek-and-cover.md) |
+| Laser weapons and thermal clips | Weapons are lasers. Every shot heats the weapon, and a thermal clip (as in Mass Effect 2) soaks up the heat. Holding the trigger charges a shot that hits harder, kicks more and puts more heat into the clip; when the clip is saturated the player swaps it for a fresh one, which is the reload. The spent clip goes back into the inventory as salvage (to re-cool, break down or sell later) instead of being dropped. Thermal clips fit every weapon, take space in the grid inventory and are lost on death like everything else | [005](features/005-weapon-and-health.md) |
 | Free peek | Hold Alt and move the mouse to peek out of cover in any direction (replaces fixed left/right lean). Peeking is look-only: you can't shoot, but you are hard to hit. To shoot from cover, hold right click to aim out, which exposes more of you and makes you easier to hit | [004](features/004-free-peek-and-cover.md) |
 | Vents | Crouch-only routes through ventilation shafts | [002](features/002-wreck-section-kit.md) |
 | Flashlight | Lights up dark wrecks; toggled on and off, no battery | [002](features/002-wreck-section-kit.md) |
@@ -98,7 +99,7 @@ Gamepad is supported. There is no jump, prone or slide.
 |--------|------------------|---------|
 | Move | WASD | Left stick |
 | Look / aim | Mouse | Right stick |
-| Shoot | Left click | Right trigger |
+| Shoot: tap to fire, hold to charge a stronger shot | Left click | Right trigger |
 | Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
 | Interact / loot | E | A / Cross |
@@ -118,6 +119,8 @@ Gamepad bindings are a first draft.
 - **Lose a run:** die aboard, and lose everything you brought in and everything you found.
 - **After death:** you wake up as a new clone on your ship. In the fiction, the previous clone's lifeline died
   and the next one is activated. This also explains the permanent loss: the gear died with that clone.
+  Waking a new clone takes time, so the wreck is gone by then (destroyed, drifted away or picked clean by others):
+  the run ends at death, and there is no going back for the body.
 
 ### Run pressure
 
@@ -209,7 +212,7 @@ Sound is crucial to the tension. The player must be able to hear threats before 
 ## 7. User interface
 
 - **Menus:** main menu, pause, settings, inventory (grid), crafting and breakdown, star map, trader hub.
-- **HUD:** classic, with corner indicators for health, ammo, oxygen (on breached wrecks) and the wreck timer
+- **HUD:** classic, with corner indicators for health, thermal clip heat, oxygen (on breached wrecks) and the wreck timer
   (on doomed wrecks).
 
 ## 8. Scope
