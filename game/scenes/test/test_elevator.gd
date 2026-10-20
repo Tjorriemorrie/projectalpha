@@ -1,6 +1,6 @@
 extends AnimatableBody3D
 ## Test-scene elevator: rides between its start height and travel_height above it, pausing at each end.
-## Wrecks use the Elevator section (scenes/sections/elevator.tscn) instead.
+## Wrecks use the Elevator section (content/base/sections/elevator/elevator.tscn) instead.
 
 @export var travel_height: float = 4.0
 @export var speed: float = 1.5

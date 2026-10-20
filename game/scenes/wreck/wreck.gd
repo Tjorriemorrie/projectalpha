@@ -39,6 +39,7 @@ func assemble() -> void:
 		section.assembled()
 
 	assembly_errors = plan.errors
+	assembly_errors.append_array(_find_unregistered_sections())
 	for error in assembly_errors:
 		Log.error("🧩 Wreck assembly problem: wreck=%s, %s" % [name, error])
 	var markers: Array[Node] = []
@@ -55,6 +56,21 @@ func assemble() -> void:
 		Log.info("🧩 Wreck assembled: " + summary)
 	else:
 		Log.error("🧩 Wreck assembled with problems: " + summary)
+
+
+## Every section must be a section registered in the ContentRegistry, found by its scene.
+func _find_unregistered_sections() -> PackedStringArray:
+	var registered := {}
+	for definition: SectionDefinition in ContentRegistry.get_all(SectionDefinition):
+		registered[definition.get_scene_path()] = definition.id
+	var problems := PackedStringArray()
+	for section in sections:
+		if not registered.has(section.scene_file_path):
+			problems.append("Section is not a registered section: section=%s, scene=%s" % [
+				section.name, section.scene_file_path])
+	Log.info("🧩 Checked sections against the content registry: wreck=%s, sections=%d, registered_sections=%d, unregistered=%d" % [
+		name, sections.size(), registered.size(), problems.size()])
+	return problems
 
 
 static func _collect(node: Node, type: Variant, found: Array) -> void:

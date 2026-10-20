@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="SectionDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Small room"
+scene = "res://content/base/sections/room_small/room_small.tscn"

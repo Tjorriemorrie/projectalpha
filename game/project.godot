@@ -14,6 +14,10 @@ config/name="projectalpha"
 run/main_scene="res://scenes/wreck/small_wreck.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
+[autoload]
+
+ContentRegistry="*res://autoload/content_registry.gd"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")

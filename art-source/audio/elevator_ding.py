@@ -1,7 +1,7 @@
 """Generates the placeholder elevator ding: a soft bell tone with a few harmonics and an exponential decay.
 
 Run from the repository root: python art-source/audio/elevator_ding.py
-Writes game/assets/audio/elevator_ding.wav (16-bit mono, 44.1 kHz).
+Writes game/content/base/sections/elevator/elevator_ding.wav (16-bit mono, 44.1 kHz).
 """
 
 import math
@@ -16,7 +16,8 @@ FUNDAMENTAL = 880.0
 PARTIALS = [(1.0, 1.0, 3.0), (2.0, 0.35, 5.0), (3.0, 0.15, 8.0), (4.2, 0.08, 12.0)]
 ATTACK = 0.005
 PEAK = 0.6
-OUTPUT = Path(__file__).resolve().parents[2] / "game" / "assets" / "audio" / "elevator_ding.wav"
+OUTPUT = (Path(__file__).resolve().parents[2] / "game" / "content" / "base" / "sections" / "elevator"
+          / "elevator_ding.wav")
 
 
 def sample(t: float) -> float:

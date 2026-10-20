@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://bvaija5qny5fn"
-path="res://.godot/imported/elevator_ding.wav-38465cfa538e9d14367771879f563861.sample"
+path="res://.godot/imported/elevator_ding.wav-242322269dfb68937979205235524f99.sample"
 
 [deps]
 
-source_file="res://assets/audio/elevator_ding.wav"
-dest_files=["res://.godot/imported/elevator_ding.wav-38465cfa538e9d14367771879f563861.sample"]
+source_file="res://content/base/sections/elevator/elevator_ding.wav"
+dest_files=["res://.godot/imported/elevator_ding.wav-242322269dfb68937979205235524f99.sample"]
 
 [params]
 

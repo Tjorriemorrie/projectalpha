@@ -24,7 +24,7 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Use static typing in GDScript (`var speed: float = 5.0`).
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
-  🧩 wreck assembly, 🚪 doors, 🖐️ interactables).
+  🧩 wreck assembly, 🚪 doors, 🖐️ interactables, 📦 content registry).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -36,13 +36,16 @@ projectalpha/
 ├── docs/                  # Design documents
 ├── art-source/            # Blender .blend files, asset-generating scripts and other source art (not imported by Godot)
 └── game/                  # Godot project root (project.godot lives here)
-    ├── assets/
+    ├── assets/            # Shared assets that belong to no single piece of content
     │   ├── models/        # Exported .glb files from Blender
     │   ├── textures/
     │   ├── shaders/       # Shared shaders (the greybox grid)
     │   ├── audio/
     │   └── fonts/
-    ├── scenes/            # .tscn scenes, grouped by feature (player, sections, wreck, test)
+    ├── content/           # Content packs; base/ is the base game (see Content and modding)
+    │   └── base/
+    │       └── sections/  # One self-contained folder per kit section
+    ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, sections, wreck, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -93,7 +96,27 @@ Decided up front, because adding it later would mean rewriting every content sys
 - **External mods (later).** Load content packs at runtime (`ProjectSettings.load_resource_pack`, or the
   community Godot Mod Loader) and register them in the same registry. Steam Workshop via GodotSteam after that.
   Script mods run arbitrary code, which is acceptable for an offline single-player game.
-- Details (definition format, folder layout, IDs) are TBD, to be settled in the first feature that needs them.
+
+Settled in [003](features/003-content-registry.md):
+
+- **Packs and folders.** Each folder in `game/content/` is a pack; the base game is `base`. Inside a pack,
+  content is grouped by kind, and each piece of content is self-contained in its own folder,
+  `content/<pack>/<kind>/<name>/`, holding exactly one definition (`<name>.tres`) next to its own scene,
+  scripts, model and sounds. Framework code and parts shared by many pieces stay outside `content/`.
+- **IDs.** A definition registers as `<pack>:<name>`, taken from its path (`content/base/sections/airlock/` is
+  `base:airlock`). IDs are never typed into a definition. The kind folder is not part of the ID, so names are
+  unique within a pack across all kinds.
+- **Definitions.** Every definition extends `ContentDefinition` (`id` and `pack`, filled in by the registry, and
+  `display_name`). Each kind of content is a subclass, such as `SectionDefinition`; a new kind needs no change
+  to the registry. Definitions are small and load at startup; the scenes, models and sounds they use are
+  referenced by path (`@export_file`) and only load when used. `ContentDefinition.get_problems()` checks a
+  definition cheaply (files exist, without loading them), and subclasses add their own checks.
+- **Registry.** The `ContentRegistry` autoload scans `res://content` before the first scene loads, with
+  `ResourceLoader.list_directory`, which also sees the remapped resources of an exported build.
+  `get_definition(id)` looks one up (an unknown ID logs an error and returns null), and `get_all(kind)` lists
+  one kind sorted by ID. Duplicate IDs, content folders with zero or several definitions, and definitions with
+  problems are logged as errors, kept in `ContentRegistry.errors` and skipped; the rest still loads.
+  `load_content(root)` takes the folder of packs, so tests run a fresh registry on fixture packs.
 
 ### Player controller
 
@@ -180,11 +203,13 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 - **Assembly.** `Wreck._ready()` collects its sections' sockets, joins every pair at the same position that
   face each other, applies the openings, and then calls `Section.assembled()`. The rules and checks live in the
   node-free `WreckAssembly`: loose ends, mismatched kinds, sockets off the grid and overlapping sections are
-  logged as errors and kept in `Wreck.assembly_errors`.
+  logged as errors and kept in `Wreck.assembly_errors`. A section whose scene is not a registered
+  `SectionDefinition` is an assembly error too.
 - **Markers.** `SectionMarker`s (enemy or loot) mark where a mission may place things (006, 007).
-- **Adding a section:** fill whole cells, put a socket at the centre of every edge that can connect, and keep
-  geometry inside the footprint (wall sockets build the walls on their edges). Static parts go under one
-  `CSGCombiner3D` with collision.
+- **Adding a section:** create `content/base/sections/<name>/` with the scene and a `SectionDefinition`
+  (`<name>.tres`) pointing at it. Fill whole cells, put a socket at the centre of every edge that can connect,
+  and keep geometry inside the footprint (wall sockets build the walls on their edges). Static parts go under one
+  `CSGCombiner3D` with collision. Shared parts (doors, lamps, buttons) and materials stay in `scenes/sections/`.
 
 ### Doors and elevators
 
@@ -233,7 +258,8 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 - Collision: TBD (Godot import hints such as `-col` / `-colonly` suffixes, or collision built in Godot).
 - Textures: TBD (resolution budget, PBR or not).
 - Placeholder sounds are generated the same way, by Python scripts using only the standard library in
-  `art-source/audio/`, which write `.wav` files into `game/assets/audio/`. Run them from the repository root, e.g.
+  `art-source/audio/`, which write `.wav` files into the content folder of the piece of content they belong to
+  (or `game/assets/audio/` for shared sounds). Run them from the repository root, e.g.
   `python art-source/audio/elevator_ding.py`.
 
 ## 7. Performance targets
@@ -267,7 +293,8 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 - **Scope.** One developer working on an extraction shooter with crafting, a star map and procedural ships. Mitigate by
   sticking to the MVP cut in the roadmap and the one-feature-at-a-time rule.
 - **Content architecture.** If the registry and definition format are wrong, every later system pays for it.
-  Settle the details in feature 003 and test them with GdUnit4.
+  003 settled and tested the registry with sections only; the first kinds with gameplay data (weapon, robot,
+  items in 005–007) are the real test of the definition format.
 - **Section assembly.** Sections must connect cleanly (sockets, alignment, no gaps), and navigation and lighting
   must work across the seams. 002 proved the sockets, alignment and lighting by hand; navigation across seams is
   still open and gets settled with the first enemy that moves (006).

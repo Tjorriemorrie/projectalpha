@@ -28,7 +28,7 @@ the loot kept, or die, lose it all and wake up as a new clone. All of this witho
 |-----|---------|--------|
 | 001 | [Player controller](features/001-player-controller.md) | done |
 | 002 | [Wreck section kit](features/002-wreck-section-kit.md) | done |
-| 003 | [Content registry and definitions](features/003-content-registry.md) | planned |
+| 003 | [Content registry and definitions](features/003-content-registry.md) | done |
 | 004 | [Free peek and cover](features/004-free-peek-and-cover.md) | planned |
 | 005 | [Weapon and player health](features/005-weapon-and-health.md) | planned |
 | 006 | [Robot enemy](features/006-robot-enemy.md) | planned |
