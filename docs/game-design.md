@@ -100,8 +100,8 @@ Gamepad is supported. There is no jump, prone or slide.
 | Aim down sights | Right click | Left trigger |
 | Reload | R | X / Square |
 | Interact / loot | E | A / Cross |
-| Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click |
-| Crouch (e.g. to move through vents) | Ctrl / C | B / Circle |
+| Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
+| Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or stick to peek out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
 | Inventory | Tab | View / Select |
 | Pause | Esc | Menu / Start |
@@ -158,7 +158,7 @@ Deferred with the story. The only fixed character is the player: a cloned salvag
 ## 4. Levels / content
 
 Locations are not hand-built levels. They are assembled from a kit of predefined **sections** (corridors, rooms,
-airlocks, vents). Each ship and station class has a **blueprint** that describes how its sections fit together,
+airlocks, vents, elevators). Every deck is flat: decks connect only by elevators, with no stairs, ramps or ladders. Each ship and station class has a **blueprint** that describes how its sections fit together,
 and missions populate the result with enemies and loot to suit the difficulty (see [Modding](#modding)). Size scales with difficulty: small ships take about 5 minutes,
 and the largest stations take up to 30.
 

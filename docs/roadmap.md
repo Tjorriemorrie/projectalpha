@@ -26,7 +26,7 @@ the loot kept, or die, lose it all and wake up as a new clone. All of this witho
 
 | #   | Feature | Status |
 |-----|---------|--------|
-| 001 | [Player controller](features/001-player-controller.md) | planned |
+| 001 | [Player controller](features/001-player-controller.md) | done |
 | 002 | [Wreck section kit](features/002-wreck-section-kit.md) | planned |
 | 003 | [Content registry and definitions](features/003-content-registry.md) | planned |
 | 004 | [Free peek and cover](features/004-free-peek-and-cover.md) | planned |
@@ -54,3 +54,7 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
 - More enemy types after humans and robots: aliens, monsters, infected.
 - External mod loading (content packs) and later Steam Workshop support.
 - More wreck moods after dark horror: gritty industrial, clean sci-fi (varying by wreck type).
+- Gamepad support: wire the bindings from the Controls table in game-design.md (right-stick look with
+  sensitivity and dead zone, click-to-sprint, tap/hold crouch).
+- Movement noise: sprinting is loud and enemies hear it, walking is quieter, crouching is quietest. This is the
+  cost of sprinting instead of stamina.

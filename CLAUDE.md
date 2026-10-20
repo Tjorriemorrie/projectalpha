@@ -23,6 +23,13 @@ check off its requirements, set its status in both the feature file and the road
 project-wide decisions in `docs/technical-design.md`. New ideas that come up mid-feature go into the
 roadmap's idea backlog, not into the current feature.
 
+## Keep keyboard and gamepad controls in sync
+
+Whenever a control is added or changed, decide its keyboard/mouse and its gamepad binding at the same time,
+including hold or toggle behaviour, and update both in the Controls table in `docs/game-design.md` in the same
+change. When asking the user about a control, ask about both devices together. Never leave one device's
+binding missing or out of date.
+
 ## Keep `.gitignore` up to date
 
 Whenever a change introduces files or directories that should not be committed, update

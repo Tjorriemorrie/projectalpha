@@ -10,7 +10,7 @@
 | Tool    | Version | Purpose |
 |---------|---------|---------|
 | Godot   | 4.7.2 (standard build, not .NET) | Game engine |
-| GdUnit4 | TBD (install after the Godot project is created) | Automated tests |
+| GdUnit4 | 6.2.2 (needs Godot 4.5 or later), in `game/addons/gdUnit4/` | Automated tests |
 | Blender | 5.2.2 LTS | 3D modelling, rigging, animation |
 | Git     | | Version control |
 
@@ -22,6 +22,9 @@ Pin the Godot version and only upgrade deliberately, between features.
   Edited in Godot's editor or in VS Code with the godot-tools extension.
 - Style: follow the official Godot GDScript style guide (snake_case files, functions and variables; PascalCase class and node names).
 - Use static typing in GDScript (`var speed: float = 5.0`).
+- Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
+  DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators).
+  Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
 
@@ -40,14 +43,17 @@ projectalpha/
     ├── scenes/            # .tscn scenes, grouped by feature
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
-    └── autoload/          # Global singletons
+    ├── autoload/          # Global singletons
+    ├── addons/            # Third-party plugins (GdUnit4)
+    └── tests/             # GdUnit4 test suites, mirroring the folders they test
 ```
 
 ## 4. Architecture
 
 ### Scene organization
 
-TBD. Main scene, how levels are loaded, scene transitions.
+- Main scene: `res://scenes/test/player_test.tscn`, a greybox test level, until 002 provides a real wreck.
+- TBD: how levels are loaded, scene transitions.
 
 ### Global singletons (autoloads)
 
@@ -88,21 +94,58 @@ Decided up front, because adding it later would mean rewriting every content sys
 
 ### Player controller
 
-TBD
+Built in [001](features/001-player-controller.md). A `CharacterBody3D` with its origin at the feet and a
+cylinder collision shape. Its sizes are constraints for every section and prop:
+
+| Measure | Value | Consequence for level design |
+|---------|-------|------------------------------|
+| Standing height | 1.8 m (eyes at 1.65 m) | Doorways at least 1.9 m high |
+| Crouched height | 1.0 m (eyes at 0.85 m) | Vents and crawl spaces at least 1.1 m high |
+| Width | 0.6 m (radius 0.3 m) | Doorways and vents at least 0.7 m wide |
+| Step height | 0.35 m | Anything up to 0.35 m is stepped onto; taller blocks and can be cover |
+
+- Decks are flat and connected only by elevators (no stairs, ramps or ladders). Elevators are
+  `AnimatableBody3D`s moved in `_physics_process`, which the player rides automatically. A descending elevator
+  pushes a player standing beneath it through the floor, so elevator sections must keep the shaft closed
+  (doors) whenever the platform isn't there; the controller doesn't guard against it.
+- Anything meant to be stepped onto (bodies, broken robots) needs flat-topped collision, such as a box proxy.
+- Step-up and step-down are done by the controller itself with `test_move`, because Godot's floor snap fails
+  while the body still touches the edge it just walked off.
 
 ### Camera
 
-TBD
+- Physics interpolation is on, so movement is smooth on screens faster than the 60 Hz physics tick.
+- The player camera is a top-level `Camera3D` placed every rendered frame on the interpolated body
+  (`get_global_transform_interpolated()`), while its look direction comes straight from the latest mouse input,
+  so aiming has no interpolation delay. Sudden height changes (steps) call `reset_physics_interpolation()` and are
+  smoothed by the camera instead.
+- Field of view: 90° horizontal at 16:9, stored as the matching vertical FOV with `KEEP_HEIGHT`, so wider screens
+  see more at the sides.
 
 ### Input
 
-Define all actions in the Godot Input Map; never hard-code keys in scripts.
+Define all actions in the Godot Input Map; never hard-code keys in scripts. Keys are bound by physical key code,
+so WASD keeps its position on other keyboard layouts.
+
+| Action | Keyboard / mouse |
+|--------|------------------|
+| `move_forward`, `move_back`, `move_left`, `move_right` | W, S, A, D |
+| `sprint` | Shift |
+| `crouch_hold` | Ctrl |
+| `crouch_toggle` | C |
+| `pause` | Esc (releases the mouse until there is a pause menu) |
+
+Gamepad bindings are allocated in the Controls table in [game-design.md](game-design.md#controls), but are not in
+the Input Map yet: gamepad support is wired after the MVP.
 
 ### Physics and collision layers
 
+Physics engine: Jolt, at the default 60 ticks per second.
+
 | Layer | Name | Used by |
 |-------|------|---------|
-| 1     | TBD  |         |
+| 1     | world  | Static level geometry, elevators |
+| 2     | player | The player body (collides with `world`) |
 
 ## 6. Asset pipeline (Blender → Godot)
 
@@ -142,6 +185,13 @@ Define all actions in the Godot Input Map; never hard-code keys in scripts.
 
 - **Automated tests:** GdUnit4, for game logic that can be checked without playing (e.g. inventory fitting,
   crafting and breakdown recipes, the content registry). Run headless from the command line.
+  - Run all tests from the repository root (PowerShell, `godot` on the PATH):
+    `godot --headless --path game -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode -c -a res://tests`
+  - Reports are written to `game/reports/` (ignored by git).
+  - Keep decisions in node-free classes (like `MovementRules`) so they can be unit tested. Behaviour that needs
+    physics is tested by loading a scene with `scene_runner` and pressing actions with `Input.action_press`.
+    `Input.action_press` changes action state without sending input events, so gameplay input that tests
+    drive is read with `Input` queries in `_physics_process`, not from `_unhandled_input`.
 - **Manual playtests:** feel, visuals and audio. Each feature's "Done when" includes a playtest in the running game.
 
 ## 10. Technical risks and open questions
