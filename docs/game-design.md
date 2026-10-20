@@ -99,12 +99,13 @@ Gamepad is supported. There is no jump, prone or slide.
 | Move | WASD | Left stick |
 | Look / aim | Mouse | Right stick |
 | Shoot | Left click | Right trigger |
-| Aim down sights | Right click | Left trigger |
+| Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
 | Interact / loot | E | A / Cross |
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
-| Peek: hold, then move the mouse or stick to peek out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
+| Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
+| Aim out of cover: hold while peeking to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory | Tab | View / Select |
 | Pause | Esc | Menu / Start |

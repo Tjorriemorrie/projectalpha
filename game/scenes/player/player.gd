@@ -1,14 +1,19 @@
 class_name Player
 extends CharacterBody3D
 ## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
-## riding elevators, the flashlight, and using interactables by looking at them. MovementRules makes the movement
-## decisions; this script applies them to the body and camera.
+## riding elevators, the flashlight, using interactables by looking at them, peeking and aiming out of cover, and
+## the hitboxes enemies can hit. MovementRules and PeekRules make the decisions; this script applies them to the
+## body, head and camera.
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
+## Emitted when the player starts or stops peeking or aiming out of cover.
+signal peek_state_changed(previous: PeekRules.State, current: PeekRules.State)
 
 ## Physics layers the look ray hits: world (1) blocks it, interactable (3) is what it looks for.
 const INTERACT_MASK := 0b101
+## Physics layer that stops the head while peeking: world (1).
+const HEAD_MASK := 0b1
 
 ## The camera stops this many degrees short of looking straight up or down.
 const PITCH_LIMIT_DEGREES := 89.0
@@ -25,6 +30,10 @@ const STEP_PROBE_DISTANCE := 0.05
 const STEP_SMOOTHING_TIME := 0.12
 ## Seconds the head bob takes to fade in or out.
 const BOB_FADE_TIME := 0.2
+## The body hitbox stops this far below the eyes, where the head hitbox takes over.
+const NECK_LENGTH := 0.1
+## The arm hitbox starts this far below the eyes and reaches forward along the view.
+const SHOULDER_DROP := 0.2
 
 @export_group("Speeds")
 @export var walk_speed: float = 1.5
@@ -63,10 +72,31 @@ const BOB_FADE_TIME := 0.2
 ## Metres from the camera within which the player can use an interactable.
 @export var interact_reach: float = 2.0
 
+@export_group("Peek")
+## Metres the head reaches to either side, up and down while peeking.
+@export var peek_side_reach: float = 0.4
+@export var peek_up_reach: float = 0.35
+@export var peek_down_reach: float = 0.15
+## Metres the head reaches to either side and up while aiming out of cover; down stays at peek_down_reach.
+@export var aim_out_side_reach: float = 0.6
+@export var aim_out_up_reach: float = 0.5
+## Degrees the view tilts at a full sideways peek; 0 turns the tilt off.
+@export var peek_tilt: float = 8.0
+## Metres the head moves per pixel of mouse movement while peeking.
+@export var peek_sensitivity: float = 0.0015
+## Metres per second the head moves towards where the peek wants it.
+@export var head_speed: float = 3.0
+## Radius of the sphere that stops the head at walls.
+@export var head_radius: float = 0.15
+
 var movement_state: MovementRules.State = MovementRules.State.IDLE
 var is_crouched: bool = false
 ## The interactable the player is looking at within reach, or null.
 var interact_target: Interactable
+## Whether the player is peeking or aiming out of cover. Weapons (005) read it, because a peek can't shoot.
+var peek_state: PeekRules.State = PeekRules.State.NONE
+## Where the head is relative to its normal position, in metres in the body's frame (x right, y up).
+var head_offset := Vector2.ZERO
 
 var _crouch_toggled := false
 var _stand_blocked := false
@@ -78,11 +108,21 @@ var _bob_phase := 0.0
 var _bob_amplitude := 0.0
 var _body_shape: CylinderShape3D
 var _shown_prompt := ""
+## Where the mouse has moved the peek to; the head follows it unless a wall is in the way.
+var _peek_target := Vector2.ZERO
+## head_offset at the previous physics frame, so the camera can interpolate the head between frames.
+var _head_offset_previous := Vector2.ZERO
+var _head_query: PhysicsShapeQueryParameters3D
+var _body_hitbox_shape: CylinderShape3D
+var _arm_length := 0.0
 
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _camera: Camera3D = $Camera3D
 @onready var _flashlight: SpotLight3D = $Camera3D/Flashlight
 @onready var _hud: Hud = $Hud
+@onready var _head_hitbox: Hitbox = $Hitboxes/Head
+@onready var _body_hitbox: Hitbox = $Hitboxes/Body
+@onready var _arm_hitbox: Hitbox = $Hitboxes/Arm
 
 
 func _ready() -> void:
@@ -95,17 +135,25 @@ func _ready() -> void:
 	floor_snap_length = max_step_height
 	_camera.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(horizontal_fov) / 2.0) / REFERENCE_ASPECT))
 	_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	_setup_head()
 	_update_camera()
 	_set_mouse_captured(true)
-	Log.info("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°" % [
-		global_position, walk_speed, sprint_speed, crouch_speed, max_step_height, horizontal_fov])
+	Log.info(("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°, "
+		+ "peek=%.2f/%.2f/%.2f m, aim_out=%.2f/%.2f m") % [
+		global_position, walk_speed, sprint_speed, crouch_speed, max_step_height, horizontal_fov,
+		peek_side_reach, peek_up_reach, peek_down_reach, aim_out_side_reach, aim_out_up_reach])
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var mouse_captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and mouse_captured:
 		# screen_relative is raw pixel movement, unaffected by window scaling.
-		var turn := (event as InputEventMouseMotion).screen_relative * deg_to_rad(mouse_sensitivity)
+		var motion := (event as InputEventMouseMotion).screen_relative
+		# While peeking the mouse moves the head; aiming out turns the view again, so the player can aim.
+		if Input.is_action_pressed("peek") and peek_state != PeekRules.State.AIM_OUT:
+			move_head(motion)
+			return
+		var turn := motion * deg_to_rad(mouse_sensitivity)
 		var pitch_limit := deg_to_rad(PITCH_LIMIT_DEGREES)
 		_yaw = wrapf(_yaw - turn.x, -PI, PI)
 		_pitch = clampf(_pitch - turn.y, -pitch_limit, pitch_limit)
@@ -117,8 +165,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	rotation.y = _yaw
+	_update_peek_state()
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var sprint_wanted := MovementRules.wants_sprint(input_dir, Input.is_action_pressed("sprint"))
+	var sprint_wanted := MovementRules.wants_sprint(
+		input_dir, Input.is_action_pressed("sprint"), peek_state != PeekRules.State.NONE)
 	_crouch_toggled = MovementRules.next_crouch_toggle(
 		_crouch_toggled, Input.is_action_just_pressed("crouch_toggle"), sprint_wanted)
 	_update_crouch(MovementRules.wants_crouch(Input.is_action_pressed("crouch_hold"), _crouch_toggled, sprint_wanted))
@@ -126,6 +176,7 @@ func _physics_process(delta: float) -> void:
 	_update_velocity(input_dir, delta)
 	_try_step_up(delta)
 	_move_and_follow_floor()
+	_update_head(delta)
 	_update_interact_target()
 	if Input.is_action_just_pressed("interact") and interact_target:
 		interact_target.interact()
@@ -152,6 +203,18 @@ func set_look(yaw: float, pitch: float = 0.0) -> void:
 	Log.info("🏃 Look set: yaw=%.1f°, pitch=%.1f°" % [rad_to_deg(_yaw), rad_to_deg(_pitch)])
 
 
+## Moves the head while peeking, by a mouse motion in pixels (right and down are positive, as on screen).
+## The gamepad's right stick will feed it too. The head follows over the next physics frames.
+func move_head(motion: Vector2) -> void:
+	_peek_target = PeekRules.clamp_to_range(_peek_target + Vector2(motion.x, -motion.y) * peek_sensitivity,
+		peek_side_reach, peek_up_reach, peek_down_reach)
+
+
+## The parts of the player enemies can hit. Only the active ones are out (see Hitbox.is_active()).
+func get_hitboxes() -> Array[Hitbox]:
+	return [_head_hitbox, _body_hitbox, _arm_hitbox]
+
+
 func is_flashlight_on() -> bool:
 	return _flashlight.visible
 
@@ -159,6 +222,78 @@ func is_flashlight_on() -> bool:
 func set_flashlight(on: bool) -> void:
 	_flashlight.visible = on
 	Log.info("🏃 Flashlight %s: position=%s" % ["on" if on else "off", global_position])
+
+
+func _setup_head() -> void:
+	var head_shape := SphereShape3D.new()
+	head_shape.radius = head_radius
+	_head_query = PhysicsShapeQueryParameters3D.new()
+	_head_query.shape = head_shape
+	_head_query.collision_mask = HEAD_MASK
+	_head_query.exclude = [get_rid()]
+	# The body hitbox changes height when crouching, so each player gets its own shape.
+	var body_hitbox_collision := _body_hitbox.get_node("CollisionShape3D") as CollisionShape3D
+	_body_hitbox_shape = (body_hitbox_collision.shape as CylinderShape3D).duplicate()
+	body_hitbox_collision.shape = _body_hitbox_shape
+	var arm_collision := _arm_hitbox.get_node("CollisionShape3D") as CollisionShape3D
+	_arm_length = (arm_collision.shape as BoxShape3D).size.z
+	_arm_hitbox.set_active(false)
+	_update_hitboxes()
+
+
+## The peek follows the peek and aim actions (see PeekRules.next_state). Releasing peek centres the peek target,
+## so the next peek starts from the body. Runs every physics frame, so it only logs when the state changes.
+func _update_peek_state() -> void:
+	var centred := PeekRules.is_centred(_peek_target, peek_side_reach, peek_up_reach, peek_down_reach)
+	var next := PeekRules.next_state(peek_state, Input.is_action_pressed("peek"), Input.is_action_pressed("aim"),
+		Input.is_action_just_pressed("aim"), centred)
+	if next == peek_state:
+		return
+	var previous := peek_state
+	peek_state = next
+	if next == PeekRules.State.NONE:
+		_peek_target = Vector2.ZERO
+	_arm_hitbox.set_active(next == PeekRules.State.AIM_OUT)
+	Log.info("🏃 Peek state changed: %s -> %s, peek_target=%s, head=%s, position=%s" % [
+		PeekRules.State.keys()[previous], PeekRules.State.keys()[next], _peek_target, head_offset, global_position])
+	peek_state_changed.emit(previous, next)
+
+
+## Moves the head towards where the peek wants it (further out in the same direction while aiming out, back to
+## the body when not peeking), stops it at walls, and moves the hitboxes with it. Runs every physics frame.
+func _update_head(delta: float) -> void:
+	var target := _peek_target
+	if peek_state == PeekRules.State.AIM_OUT:
+		target = PeekRules.aim_out_offset(_peek_target, peek_side_reach, peek_up_reach, peek_down_reach,
+			aim_out_side_reach, aim_out_up_reach)
+	_head_offset_previous = head_offset
+	head_offset = _clear_head_path(head_offset.move_toward(target, head_speed * delta))
+	_update_hitboxes()
+
+
+## Shortens a head offset so the head stops where it would touch a wall, by sweeping a sphere out from the normal
+## eye position.
+func _clear_head_path(offset: Vector2) -> Vector2:
+	if offset.is_zero_approx():
+		return Vector2.ZERO
+	_head_query.transform = Transform3D(Basis.IDENTITY, global_position + up_direction * _eye_height)
+	_head_query.motion = global_basis * Vector3(offset.x, offset.y, 0.0)
+	var safe_fraction := get_world_3d().direct_space_state.cast_motion(_head_query)[0]
+	return offset * safe_fraction
+
+
+## Places the hitboxes: the head where the camera is, the body below the neck, and the arm reaching forward
+## along the view from below the head, so it comes out of cover with the head when aiming out.
+func _update_hitboxes() -> void:
+	var head := Vector3(head_offset.x, _eye_height + head_offset.y, 0.0)
+	_head_hitbox.position = head
+	var body_height := _eye_height - NECK_LENGTH
+	if not is_equal_approx(_body_hitbox_shape.height, body_height):
+		_body_hitbox_shape.height = body_height
+	_body_hitbox.position = Vector3(0.0, body_height / 2.0, 0.0)
+	var aim := Basis(Vector3.RIGHT, _pitch)
+	var shoulder := head + Vector3.DOWN * SHOULDER_DROP
+	_arm_hitbox.transform = Transform3D(aim, shoulder + aim * Vector3.FORWARD * (_arm_length / 2.0))
 
 
 ## Casts the look ray and keeps interact_target and the prompt up to date. Runs every physics frame, so it only
@@ -222,7 +357,8 @@ func _set_movement_state(new_state: MovementRules.State) -> void:
 
 
 func _update_velocity(input_dir: Vector2, delta: float) -> void:
-	var target_speed := MovementRules.speed_for_state(movement_state, walk_speed, sprint_speed, crouch_speed)
+	var target_speed := MovementRules.speed_for_state(
+		movement_state, walk_speed, sprint_speed, crouch_speed, peek_state != PeekRules.State.NONE)
 	var target := global_basis * Vector3(input_dir.x, 0.0, input_dir.y) * target_speed
 	var moving := input_dir.length() > MovementRules.MOVE_THRESHOLD
 	var rate := target_speed / acceleration_time if moving else walk_speed / deceleration_time
@@ -304,11 +440,13 @@ func _smooth_camera_step(height_change: float) -> void:
 	reset_physics_interpolation()
 
 
+## The head doesn't bob while peeking, so the peek holds steady.
 func _update_head_bob(delta: float) -> void:
+	var bobbing := head_bob_enabled and peek_state == PeekRules.State.NONE
 	var target_amplitude := 0.0
-	if head_bob_enabled and movement_state == MovementRules.State.WALK:
+	if bobbing and movement_state == MovementRules.State.WALK:
 		target_amplitude = walk_bob_amplitude
-	elif head_bob_enabled and movement_state == MovementRules.State.SPRINT:
+	elif bobbing and movement_state == MovementRules.State.SPRINT:
 		target_amplitude = sprint_bob_amplitude
 	_bob_amplitude = move_toward(_bob_amplitude, target_amplitude, sprint_bob_amplitude / BOB_FADE_TIME * delta)
 	var speed := Vector2(velocity.x, velocity.z).length()
@@ -316,13 +454,18 @@ func _update_head_bob(delta: float) -> void:
 
 
 ## Places the camera at eye height on the physics-interpolated body, so movement looks smooth on high
-## refresh rate screens, while the look direction comes straight from the latest mouse input.
+## refresh rate screens, while the look direction comes straight from the latest mouse input. The peeking head is
+## interpolated between physics frames the same way, and a sideways lean rolls the view towards it.
 func _update_camera() -> void:
-	var look := Basis.from_euler(Vector3(_pitch, _yaw, 0.0))
-	var bob := Basis(Vector3.UP, _yaw) * Vector3(
+	var head := _head_offset_previous.lerp(head_offset, Engine.get_physics_interpolation_fraction())
+	var roll := -deg_to_rad(PeekRules.tilt_degrees(head.x, peek_side_reach, peek_tilt))
+	var look := Basis.from_euler(Vector3(_pitch, _yaw, roll))
+	var body_turn := Basis(Vector3.UP, _yaw)
+	var bob := body_turn * Vector3(
 		sin(_bob_phase) * _bob_amplitude * 0.5, sin(_bob_phase * 2.0) * _bob_amplitude, 0.0)
 	var feet := get_global_transform_interpolated().origin
-	_camera.global_transform = Transform3D(look, feet + up_direction * (_eye_height + _step_offset) + bob)
+	var eye := feet + up_direction * (_eye_height + _step_offset) + body_turn * Vector3(head.x, head.y, 0.0)
+	_camera.global_transform = Transform3D(look, eye + bob)
 
 
 func _apply_body_height(height: float) -> void:

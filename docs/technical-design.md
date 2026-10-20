@@ -24,7 +24,7 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Use static typing in GDScript (`var speed: float = 5.0`).
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
-  🧩 wreck assembly, 🚪 doors, 🖐️ interactables, 📦 content registry).
+  🧩 wreck assembly, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -58,7 +58,8 @@ projectalpha/
 ### Scene organization
 
 - Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002.
-- `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests.
+- `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests. Its
+  south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004).
 - TBD: how levels are loaded, scene transitions.
 
 ### Global singletons (autoloads)
@@ -129,6 +130,7 @@ cylinder collision shape. Its sizes are constraints for every section and prop:
 | Crouched height | 1.0 m (eyes at 0.85 m) | Vents and crawl spaces at least 1.1 m high |
 | Width | 0.6 m (radius 0.3 m) | Doorways and vents at least 0.7 m wide |
 | Step height | 0.35 m | Anything up to 0.35 m is stepped onto; taller blocks and can be cover |
+| Peek reach | 0.4 m sideways, 0.35 m up, 0.15 m down; aiming out 0.6 m sideways, 0.5 m up | Waist-high cover is 1 m: it hides a crouched player (eyes 0.85 m), who peeks over it with eyes at 1.2 m |
 
 - Decks are flat and connected only by elevators (no stairs, ramps or ladders). Elevators are
   `AnimatableBody3D`s moved in `_physics_process`, which the player rides automatically. A descending elevator
@@ -137,6 +139,28 @@ cylinder collision shape. Its sizes are constraints for every section and prop:
 - Anything meant to be stepped onto (bodies, broken robots) needs flat-topped collision, such as a box proxy.
 - Step-up and step-down are done by the controller itself with `test_move`, because Godot's floor snap fails
   while the body still touches the edge it just walked off.
+
+### Peek, aim out and hitboxes
+
+Built in [004](features/004-free-peek-and-cover.md). There is no cover system: cover is level geometry, and the
+player peeks from wherever they stand.
+
+- The head offset lives in the body's yaw frame (x right, y up). A sphere (radius 0.15 m) swept out from the
+  normal eye position against `world` stops the head at walls. The camera interpolates the head between physics
+  frames like the body, and a sideways lean rolls the view (up to 8°).
+- `Player.peek_state` (`PeekRules.State`: `NONE`, `PEEK`, `AIM_OUT`) and `peek_state_changed` tell other systems
+  what the player is doing. A peek can't shoot, so weapons (005) must not fire while `peek_state` is `PEEK`.
+  Aim out is decided when `aim` is pressed: off-centre while peeking aims out until it is released, otherwise it
+  stays plain aim down sights.
+- Hitboxes are `Hitbox` areas on the `hitbox` layer under `Player/Hitboxes`, moved by the player every physics
+  frame: a head sphere (radius 0.12 m) at the eyes, a body cylinder (radius 0.25 m) from the feet to 0.1 m below
+  the eyes, and an arm box (0.14 × 0.14 × 0.6 m) reaching forward along the view from 0.2 m below the eyes, which
+  is only active while aiming out. `Player.get_hitboxes()` lists them; `Hitbox.sample_points()` gives each one's
+  centre and a point towards each side.
+- Exposure is physical: an enemy can only hit what it can see. Enemies decide what they see by casting rays
+  against `world` to the sample points (as the debug `ExposureWatcher` does), and shots hit by casting against
+  `hitbox` (006). Because the camera sits at the centre of the head hitbox, a peek that shows the player an enemy
+  also shows that enemy the player's head.
 
 ### Camera
 
@@ -162,6 +186,8 @@ so WASD keeps its position on other keyboard layouts.
 | `pause` | Esc (releases the mouse until there is a pause menu) |
 | `interact` | E |
 | `flashlight` | F |
+| `peek` | Alt (hold) |
+| `aim` | Right mouse button (hold): aims out of cover while peeking, and will aim down sights in 005 |
 
 Prompts show the bound key by reading the Input Map (`as_text_physical_keycode()`), never a hard-coded letter.
 
@@ -177,6 +203,7 @@ Physics engine: Jolt, at the default 60 ticks per second.
 | 1     | world  | Static level geometry, door panels, elevator platforms. Blocks movement, sight and the interact ray |
 | 2     | player | The player body (collides with `world`) |
 | 3     | interactable | `Interactable` areas (buttons), found by the player's interact ray |
+| 4     | hitbox | The player's `Hitbox` areas (head, body, arm). They collide with nothing; enemy shots cast rays against them (006) |
 
 Trigger areas (door proximity and doorways, the elevator's "aboard" area) sit on no layer and mask `player`.
 
@@ -299,5 +326,7 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
   must work across the seams. 002 proved the sockets, alignment and lighting by hand; navigation across seams is
   still open and gets settled with the first enemy that moves (006).
 - **Scripted art.** Hard-surface assets suit Blender scripting, but animated characters may need another source.
-- **Free peek and hit exposure.** The peek/aim exposure model must feel fair. Settle it by playtesting feature 004.
+- **Free peek and hit exposure.** 004 made exposure physical (hitboxes plus line of sight to their sample
+  points) and checks it with debug watchers. Whether it feels fair against enemies that shoot back is settled with
+  the robots in 006.
 - Minimum hardware is TBD (see [Performance targets](#7-performance-targets)).

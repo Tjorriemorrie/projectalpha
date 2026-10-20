@@ -65,3 +65,16 @@ func test_speed_for_state(state: MovementRules.State, expected: float, test_para
 	[MovementRules.State.CROUCH_WALK, 1.5],
 ]) -> void:
 	assert_float(MovementRules.speed_for_state(state, 3.0, 5.5, 1.5)).is_equal(expected)
+
+
+func test_peeking_blocks_sprint() -> void:
+	assert_bool(MovementRules.wants_sprint(FORWARD, true, true)).is_false()
+	assert_bool(MovementRules.wants_sprint(FORWARD, true, false)).is_true()
+
+
+func test_peeking_caps_speed_at_crouch_speed(state: MovementRules.State, test_parameters := [
+	[MovementRules.State.WALK],
+	[MovementRules.State.SPRINT],
+	[MovementRules.State.CROUCH_WALK],
+]) -> void:
+	assert_float(MovementRules.speed_for_state(state, 1.5, 3.0, 1.0, true)).is_equal(1.0)

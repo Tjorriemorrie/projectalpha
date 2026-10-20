@@ -29,7 +29,7 @@ the loot kept, or die, lose it all and wake up as a new clone. All of this witho
 | 001 | [Player controller](features/001-player-controller.md) | done |
 | 002 | [Wreck section kit](features/002-wreck-section-kit.md) | done |
 | 003 | [Content registry and definitions](features/003-content-registry.md) | done |
-| 004 | [Free peek and cover](features/004-free-peek-and-cover.md) | planned |
+| 004 | [Free peek and cover](features/004-free-peek-and-cover.md) | done |
 | 005 | [Weapon and player health](features/005-weapon-and-health.md) | planned |
 | 006 | [Robot enemy](features/006-robot-enemy.md) | planned |
 | 007 | [Loot containers and grid inventory](features/007-loot-and-grid-inventory.md) | planned |
@@ -61,3 +61,6 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
 - Elevator ding draws enemies: robots hear the elevator arriving and come to investigate (the elevator already
   emits a signal from 002).
 - Robots notice the flashlight beam, so lighting the way is a risk you choose.
+- Robot reaction delay before firing (for 006): a player aiming out round a corner and a robot see each other at
+  almost the same moment (measured in 004), so the delay decides who shoots first. Too short makes slicing the
+  pie a sure loss, too long makes it a free kill.

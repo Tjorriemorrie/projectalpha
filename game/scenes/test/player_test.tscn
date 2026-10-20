@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
 [ext_resource type="Script" uid="uid://bldyp55dagvni" path="res://scenes/test/test_elevator.gd" id="2_elevator"]
 [ext_resource type="Shader" uid="uid://cpi0f5wcio20" path="res://assets/shaders/greybox_grid.gdshader" id="3_grid"]
+[ext_resource type="PackedScene" path="res://scenes/test/exposure_watcher.tscn" id="4_watcher"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 
@@ -149,6 +150,36 @@ use_collision = true
 size = Vector3(6, 0.3, 10)
 material = SubResource("ShaderMaterial_floor")
 
+[node name="CoverCrate" type="CSGBox3D" parent="Geometry" unique_id=1021425169]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.5, 10)
+use_collision = true
+size = Vector3(1.6, 1, 0.8)
+material = SubResource("ShaderMaterial_obstacle")
+
+[node name="CoverPillar" type="CSGBox3D" parent="Geometry" unique_id=1483494270]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 10)
+use_collision = true
+size = Vector3(0.8, 3, 0.8)
+material = SubResource("ShaderMaterial_wall")
+
+[node name="DoorframeWallWest" type="CSGBox3D" parent="Geometry" unique_id=762262248]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.7, 1.5, 12.5)
+use_collision = true
+size = Vector3(3.4, 3, 0.2)
+material = SubResource("ShaderMaterial_wall")
+
+[node name="DoorframeWallEast" type="CSGBox3D" parent="Geometry" unique_id=1073420792]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.8, 1.5, 12.5)
+use_collision = true
+size = Vector3(4.4, 3, 0.2)
+material = SubResource("ShaderMaterial_wall")
+
+[node name="DoorframeLintel" type="CSGBox3D" parent="Geometry" unique_id=1096118564]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 2.6, 12.5)
+use_collision = true
+size = Vector3(1.2, 0.8, 0.2)
+material = SubResource("ShaderMaterial_wall")
+
 [node name="Elevator" type="AnimatableBody3D" parent="." unique_id=1306062631]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.75, 0, 0)
 script = ExtResource("2_elevator")
@@ -205,5 +236,37 @@ billboard = 1
 text = "elevator"
 font_size = 48
 
+[node name="CoverCrateLabel" type="Label3D" parent="Labels" unique_id=1920241257]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 2, 10)
+billboard = 1
+text = "cover 1 m"
+font_size = 48
+
+[node name="CoverPillarLabel" type="Label3D" parent="Labels" unique_id=1682612212]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3.3, 10)
+billboard = 1
+text = "pillar"
+font_size = 48
+
+[node name="DoorframeLabel" type="Label3D" parent="Labels" unique_id=114976412]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 3.3, 12.5)
+billboard = 1
+text = "doorframe"
+font_size = 48
+
 [node name="Player" parent="." unique_id=752967211 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+peek_side_reach = 0.25
+peek_up_reach = 0.15
+aim_out_side_reach = 0.5
+aim_out_up_reach = 0.4
+
+[node name="Watchers" type="Node3D" parent="." unique_id=858434297]
+
+[node name="WatcherCrate" parent="Watchers" unique_id=60249917 node_paths=PackedStringArray("player") instance=ExtResource("4_watcher")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 4.5)
+player = NodePath("../../Player")
+
+[node name="WatcherPillar" parent="Watchers" unique_id=962233239 node_paths=PackedStringArray("player") instance=ExtResource("4_watcher")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 4.5)
+player = NodePath("../../Player")
