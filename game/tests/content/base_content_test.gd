@@ -2,8 +2,8 @@ extends GdUnitTestSuite
 ## Checks the base game's own content as the ContentRegistry autoload registered it at startup.
 
 const KIT_SECTIONS: Array[String] = [
-	"base:airlock", "base:corridor_corner", "base:corridor_end", "base:corridor_straight", "base:corridor_t",
-	"base:elevator", "base:room_large", "base:room_small", "base:vent_corner", "base:vent_straight"]
+	"base:airlock", "base:cockpit", "base:corridor_corner", "base:corridor_end", "base:corridor_straight",
+	"base:corridor_t", "base:elevator", "base:room_large", "base:room_small", "base:vent_corner", "base:vent_straight"]
 const ITEMS: Array[String] = [
 	"base:circuit_board", "base:conduit", "base:data_drive", "base:gyroscope", "base:hull_plating",
 	"base:plasma_coil", "base:power_cell", "base:servo_motor", "base:spent_thermal_clip", "base:thermal_clip"]

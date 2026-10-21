@@ -29,7 +29,6 @@ func before_test() -> void:
 	_runner.set_time_factor(5.0)
 	_wreck = _runner.scene() as Wreck
 	_player = _runner.find_child("Player") as Player
-	_player.reload_on_death = false
 	_locker = _wreck.containers[0].get_lootable()
 	await _physics_frames(2)
 

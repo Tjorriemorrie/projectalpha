@@ -257,6 +257,7 @@ font_size = 48
 
 [node name="Player" parent="." unique_id=752967211 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+starting_backpack_clips = 2
 peek_side_reach = 0.25
 peek_up_reach = 0.15
 aim_out_side_reach = 0.5

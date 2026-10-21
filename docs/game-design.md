@@ -103,7 +103,7 @@ Gamepad is supported. There is no jump, prone or slide.
 | Shoot: tap to fire, hold to charge a stronger shot | Left click | Right trigger |
 | Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
-| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory | E | A / Cross |
+| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory; opens the ship's stash; hold on an airlock's outer door to board the wreck or return to the ship; continues past the run summary | E | A / Cross |
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |

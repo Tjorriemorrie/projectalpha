@@ -29,7 +29,6 @@ func before_test() -> void:
 	_runner = scene_runner(TEST_SCENE)
 	_runner.set_time_factor(5.0)
 	_player = _runner.find_child("Player") as Player
-	_player.reload_on_death = false
 	_weapon = _player.get_weapon()
 	_weapon.rng.seed = 5
 	_target = _runner.find_child("TargetCentre") as ShootingTarget

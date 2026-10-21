@@ -1,0 +1,231 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/ship/ship.gd" id="1_ship"]
+[ext_resource type="Environment" path="res://scenes/ship/ship_environment.tres" id="2_environment"]
+[ext_resource type="AudioStream" path="res://assets/audio/ship/ship_hum.wav" id="3_hum"]
+[ext_resource type="PackedScene" path="res://content/base/sections/cockpit/cockpit.tscn" id="4_cockpit"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_t/corridor_t.tscn" id="5_corridor_t"]
+[ext_resource type="PackedScene" path="res://content/base/sections/room_small/room_small.tscn" id="6_room_small"]
+[ext_resource type="PackedScene" path="res://content/base/sections/airlock/airlock.tscn" id="7_airlock"]
+[ext_resource type="PackedScene" path="res://scenes/ship/clone_pod.tscn" id="8_clone_pod"]
+[ext_resource type="PackedScene" path="res://scenes/ship/stash.tscn" id="9_stash"]
+[ext_resource type="PackedScene" path="res://assets/models/ship/pilot_seat.glb" id="10_seat"]
+[ext_resource type="PackedScene" path="res://assets/models/ship/console.glb" id="11_console"]
+[ext_resource type="PackedScene" path="res://assets/models/ship/bunk.glb" id="12_bunk"]
+[ext_resource type="PackedScene" path="res://content/base/containers/locker/locker.glb" id="13_locker"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="14_player"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_seat"]
+size = Vector3(0.62, 1.4, 0.75)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_console"]
+size = Vector3(1.4, 0.9, 0.55)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_screen"]
+size = Vector3(0.98, 0.6, 0.08)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bunk"]
+size = Vector3(2, 0.62, 0.9)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_locker"]
+size = Vector3(0.8, 1.9, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hull"]
+albedo_color = Color(0.05, 0.055, 0.06, 1)
+metallic = 0.4
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_beacon"]
+shading_mode = 0
+albedo_color = Color(0.8, 0.08, 0.04, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_porthole"]
+shading_mode = 0
+albedo_color = Color(0.3, 0.18, 0.07, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_beacon"]
+material = SubResource("StandardMaterial3D_beacon")
+size = Vector3(0.25, 0.25, 0.25)
+
+[sub_resource type="BoxMesh" id="BoxMesh_porthole"]
+material = SubResource("StandardMaterial3D_porthole")
+size = Vector3(0.45, 0.2, 0.05)
+
+[node name="Ship" type="Node3D"]
+script = ExtResource("1_ship")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_environment")
+
+[node name="Hum" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_hum")
+volume_db = -10.0
+autoplay = true
+
+[node name="Deck1" type="Node3D" parent="."]
+
+[node name="Cockpit" parent="Deck1" instance=ExtResource("4_cockpit")]
+
+[node name="CorridorFore" parent="Deck1" instance=ExtResource("5_corridor_t")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+
+[node name="CorridorMid" parent="Deck1" instance=ExtResource("5_corridor_t")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 8, 0, 0)
+
+[node name="CorridorAft" parent="Deck1" instance=ExtResource("5_corridor_t")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 12, 0, 0)
+
+[node name="CloneBay" parent="Deck1" instance=ExtResource("6_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
+
+[node name="Bedroom" parent="Deck1" instance=ExtResource("6_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -4)
+
+[node name="StashRoom" parent="Deck1" instance=ExtResource("6_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 4)
+
+[node name="Airlock" parent="Deck1" instance=ExtResource("7_airlock")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 12, 0, -4)
+
+[node name="ClonePod" parent="." instance=ExtResource("8_clone_pod")]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 5)
+
+[node name="ArrivalSpawn" type="Marker3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 12, 0, -4.9)
+
+[node name="Stash" parent="." instance=ExtResource("9_stash")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 5.8)
+
+[node name="Props" type="Node3D" parent="."]
+
+[node name="PilotSeat" type="StaticBody3D" parent="Props"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -0.55)
+
+[node name="Model" parent="Props/PilotSeat" instance=ExtResource("10_seat")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Props/PilotSeat"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+shape = SubResource("BoxShape3D_seat")
+
+[node name="Console" type="StaticBody3D" parent="Props"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8)
+
+[node name="Model" parent="Props/Console" instance=ExtResource("11_console")]
+
+[node name="Body" type="CollisionShape3D" parent="Props/Console"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0.275)
+shape = SubResource("BoxShape3D_console")
+
+[node name="Screen" type="CollisionShape3D" parent="Props/Console"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0.04)
+shape = SubResource("BoxShape3D_screen")
+
+[node name="ScreenText" type="Label3D" parent="Props/Console"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0.078)
+pixel_size = 0.0025
+modulate = Color(0.55, 0.8, 1, 1)
+outline_modulate = Color(0.02, 0.05, 0.08, 1)
+text = "STAR MAP
+OFFLINE"
+font_size = 56
+outline_size = 4
+line_spacing = 6.0
+
+[node name="Bunk" type="StaticBody3D" parent="Props"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -5.8)
+
+[node name="Model" parent="Props/Bunk" instance=ExtResource("12_bunk")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Props/Bunk"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.31, 0.45)
+shape = SubResource("BoxShape3D_bunk")
+
+[node name="WallLocker" type="StaticBody3D" parent="Props"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 9.8, 0, -3.2)
+
+[node name="Model" parent="Props/WallLocker" instance=ExtResource("13_locker")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Props/WallLocker"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0.25)
+shape = SubResource("BoxShape3D_locker")
+
+[node name="Outside" type="Node3D" parent="."]
+
+[node name="HullLight" type="DirectionalLight3D" parent="Outside"]
+transform = Transform3D(-0.447214, -0.645772, 0.618853, 0, 0.691898, 0.721995, -0.894427, 0.322886, -0.309426, 0, 20, 0)
+light_color = Color(0.55, 0.65, 0.85, 1)
+light_energy = 0.9
+light_cull_mask = 2
+
+[node name="Hull" type="Node3D" parent="Outside"]
+transform = Transform3D(0.997564, -0.069756, 0, 0.069756, 0.997564, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Shape" type="CSGCombiner3D" parent="Outside/Hull"]
+layers = 2
+material_override = SubResource("StandardMaterial3D_hull")
+
+[node name="Body" type="CSGBox3D" parent="Outside/Hull/Shape"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, -3.5, -31)
+layers = 2
+size = Vector3(80, 10, 30)
+
+[node name="Ridge" type="CSGBox3D" parent="Outside/Hull/Shape"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 2.5, -21)
+layers = 2
+size = Vector3(36, 2.5, 5)
+
+[node name="Superstructure" type="CSGBox3D" parent="Outside/Hull/Shape"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 3.5, -26)
+layers = 2
+size = Vector3(8, 5, 8)
+
+[node name="Tower" type="CSGBox3D" parent="Outside/Hull/Shape"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 6, -28)
+layers = 2
+size = Vector3(14, 18, 14)
+
+[node name="Mast" type="CSGBox3D" parent="Outside/Hull/Shape"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 10.5, -26)
+layers = 2
+size = Vector3(0.3, 9, 0.3)
+
+[node name="Breach" type="CSGBox3D" parent="Outside/Hull/Shape"]
+transform = Transform3D(0.92388, 0, 0.382683, 0, 1, 0, -0.382683, 0, 0.92388, -4, 0, -16)
+layers = 2
+operation = 2
+size = Vector3(5, 3, 3)
+
+[node name="BeaconMast" type="MeshInstance3D" parent="Outside/Hull"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 15.2, -26)
+mesh = SubResource("BoxMesh_beacon")
+
+[node name="BeaconTower" type="MeshInstance3D" parent="Outside/Hull"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.3, 15.2, -21)
+mesh = SubResource("BoxMesh_beacon")
+
+[node name="BeaconHull" type="MeshInstance3D" parent="Outside/Hull"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34.8, 1.6, -16.2)
+mesh = SubResource("BoxMesh_beacon")
+
+[node name="Porthole1" type="MeshInstance3D" parent="Outside/Hull"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.3, -15.95)
+mesh = SubResource("BoxMesh_porthole")
+
+[node name="Porthole2" type="MeshInstance3D" parent="Outside/Hull"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, -0.3, -15.95)
+mesh = SubResource("BoxMesh_porthole")
+
+[node name="DockingTube" type="CSGCylinder3D" parent="Outside"]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 12, 1.2, -11)
+layers = 2
+radius = 0.9
+height = 10.2
+sides = 12
+material = SubResource("StandardMaterial3D_hull")
+
+[node name="Player" parent="." instance=ExtResource("14_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.12, 5)
+holstered = true
+has_floor = false

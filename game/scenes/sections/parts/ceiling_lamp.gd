@@ -38,6 +38,21 @@ func _ready() -> void:
 		_fixture.material_override = _material
 
 
+## Makes it a steady lamp of this colour that never flickers, its light energy_scale times as strong, such as the
+## ship's warm lamps. Its fixture glows in the same colour.
+func set_steady(color: Color, energy_scale: float = 1.0) -> void:
+	flickering = false
+	set_process(false)
+	_base_energy *= energy_scale
+	_light.light_color = color
+	_light.light_energy = _base_energy
+	_material = (_fixture.mesh.surface_get_material(0) as StandardMaterial3D).duplicate()
+	_material.albedo_color = color
+	_material.emission = color
+	_fixture.material_override = _material
+	Log.info("💡 Lamp made steady: lamp=%s/%s, color=%s, energy=%.2f" % [get_parent().name, name, color, _base_energy])
+
+
 ## Runs every frame on flickering lamps only, so it doesn't log.
 func _process(delta: float) -> void:
 	if _burst_left <= 0.0:

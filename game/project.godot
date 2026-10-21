@@ -11,13 +11,14 @@ config_version=5
 [application]
 
 config/name="projectalpha"
-run/main_scene="res://scenes/wreck/small_wreck.tscn"
+run/main_scene="res://scenes/ship/ship.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 
 ContentRegistry="*res://autoload/content_registry.gd"
 ItemIcons="*res://autoload/item_icons.gd"
+GameSession="*res://autoload/game_session.gd"
 
 [editor_plugins]
 
@@ -120,6 +121,7 @@ inventory_mirror={
 
 [layer_names]
 
+3d_render/layer_2="exterior"
 3d_render/layer_20="viewmodel"
 3d_physics/layer_1="world"
 3d_physics/layer_2="player"

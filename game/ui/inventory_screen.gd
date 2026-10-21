@@ -2,7 +2,7 @@ class_name InventoryScreen
 extends Control
 ## The inventory screen, part of the HUD, over the running game, which stays visible and slightly dimmed: the
 ## player's pockets and backpack as placards on the right half; on the left half an open container's grid and,
-## always, the floor: the dropped items within the player's reach. The middle stays clear to watch for robots. Loot
+## except on the ship, the floor: the dropped items within the player's reach. The middle stays clear to watch for robots. Loot
 ## only ever moves by being dragged with the pointer (inventory_drag), turned (inventory_rotate) and mirrored
 ## (inventory_mirror) while dragged; nothing is sorted by itself. Pressing on an item selects it (a thick border),
 ## and the item under the pointer shows its item card: name, picture, value, size, value per cell and description.
@@ -77,6 +77,8 @@ var _loot_column: VBoxContainer
 var _loot_placard: PanelContainer
 var _loot_title: Label
 var _loot_size: Label
+var _floor_placard: PanelContainer
+var _drop_hint: Label
 var _backpack_size: Label
 var _carried: Label
 var _hint: HBoxContainer
@@ -121,7 +123,8 @@ func _ready() -> void:
 	_loot_size = _label("", 12, DIM_TEXT_COLOR, true)
 	_loot_placard = _placard("", _loot_size, _loot_view, _loot_title)
 	_loot_column.add_child(_loot_placard)
-	_loot_column.add_child(_placard("FLOOR", _label("Within reach", 12, DIM_TEXT_COLOR, false), _floor_view))
+	_floor_placard = _placard("FLOOR", _label("Within reach", 12, DIM_TEXT_COLOR, false), _floor_view)
+	_loot_column.add_child(_floor_placard)
 	_player_column = VBoxContainer.new()
 	_player_column.add_theme_constant_override("separation", 12)
 	add_child(_player_column)
@@ -148,16 +151,22 @@ func _ready() -> void:
 
 
 ## Opens the screen on what the player carries, the dropped items within reach (floor, FLOOR_COLUMNS wide; an empty
-## one when none is given) and, when searching one, a container's grid.
-func open(carried: Inventory, container: Lootable = null, floor: ItemGrid = null) -> void:
+## one when none is given) and, when searching one, a container's grid. Without a floor (on the ship) the floor's
+## placard is hidden and nothing can be dropped: an item released outside the placards goes back.
+func open(carried: Inventory, container: Lootable = null, floor: ItemGrid = null, with_floor: bool = true) -> void:
 	inventory = carried
 	loot = container
-	floor_grid = floor if floor else ItemGrid.new(Vector2i(FLOOR_COLUMNS, FLOOR_SPARE_ROWS))
+	floor_grid = null
+	if with_floor:
+		floor_grid = floor if floor else ItemGrid.new(Vector2i(FLOOR_COLUMNS, FLOOR_SPARE_ROWS))
 	_cell_px = clampf(roundf(get_viewport_rect().size.y * CELL_FRACTION), MIN_CELL, MAX_CELL)
 	_pockets_view.setup(inventory.pockets, _cell_px)
 	_backpack_view.setup(inventory.backpack, _cell_px)
-	_floor_view.setup(floor_grid, _cell_px)
-	_keep_floor_room()
+	_floor_placard.visible = with_floor
+	_drop_hint.visible = with_floor
+	if floor_grid:
+		_floor_view.setup(floor_grid, _cell_px)
+		_keep_floor_room()
 	_backpack_size.text = "%d × %d" % [inventory.backpack.size.x, inventory.backpack.size.y]
 	_loot_placard.visible = loot != null
 	if loot:
@@ -181,8 +190,8 @@ func open(carried: Inventory, container: Lootable = null, floor: ItemGrid = null
 	_layout()
 	# Labels and containers settle their sizes during the frame; lay out again once they have.
 	_layout.call_deferred()
-	Log.info(("🎒 Inventory opened: loot=%s, floor=%d items, pockets=%d items, backpack=%d items, free=%d/%d, "
-		+ "value=%d, cell=%.0f px") % [loot.title if loot else "none", floor_grid.items.size(),
+	Log.info(("🎒 Inventory opened: loot=%s, floor=%s items, pockets=%d items, backpack=%d items, free=%d/%d, "
+		+ "value=%d, cell=%.0f px") % [loot.title if loot else "none", floor_grid.items.size() if floor_grid else "no",
 		inventory.pockets.items.size(), inventory.backpack.items.size(), inventory.pockets.free_cells(),
 		inventory.backpack.free_cells(), inventory.value(), _cell_px])
 
@@ -204,8 +213,8 @@ func close() -> void:
 		if grid.changed.is_connected(_update_carried):
 			grid.changed.disconnect(_update_carried)
 	_play(close_sound)
-	Log.info("🎒 Inventory closed: loot=%s, floor=%d items, pockets=%d items, backpack=%d items, value=%d" % [
-		loot.title if loot else "none", floor_grid.items.size(), inventory.pockets.items.size(),
+	Log.info("🎒 Inventory closed: loot=%s, floor=%s items, pockets=%d items, backpack=%d items, value=%d" % [
+		loot.title if loot else "none", floor_grid.items.size() if floor_grid else "no", inventory.pockets.items.size(),
 		inventory.backpack.items.size(), inventory.value()])
 	loot = null
 	floor_grid = null
@@ -307,9 +316,16 @@ func drop_drag(grid: ItemGrid, cell: Vector2i) -> bool:
 
 
 ## Drops the dragged item: it lands on the floor and shows in the floor's grid. An item dragged off the floor and
-## released outside goes back where it was, since it is on the floor already.
+## released outside goes back where it was, since it is on the floor already, and so does any item where there is
+## no floor (on the ship).
 func drop_drag_outside() -> void:
 	if dragged == null:
+		return
+	if floor_grid == null:
+		_play(bump_sound)
+		Log.info("🎒 Item released outside with no floor to drop it on, back where it was: item=%s" % [
+			dragged.definition.id])
+		_return_drag()
 		return
 	if _drag_view.grid == floor_grid:
 		Log.info("🎒 Floor item released outside, back where it was: item=%s" % dragged.definition.id)
@@ -366,8 +382,11 @@ func _return_drag() -> void:
 	if grid == floor_grid:
 		floor_grid.add(item)
 		_keep_floor_room()
-	else:
+	elif floor_grid:
 		_put_on_floor(item)
+	elif not grid.add(item):
+		Log.error("🎒 Item couldn't go back and there is no floor, it is lost: item=%s, grid=%s" % [
+			item.definition.id, _grid_name(grid)])
 
 
 ## Lays an item on the floor's first free spot (the floor keeps room for any item) and drops it into the world.
@@ -519,7 +538,8 @@ func _build_hint() -> void:
 		pair.add_child(cap)
 		pair.add_child(_label(entry[1], 13, DIM_TEXT_COLOR, false))
 		_hint.add_child(pair)
-	_hint.add_child(_label("Drag onto the floor or outside to drop", 13, DIM_TEXT_COLOR, false))
+	_drop_hint = _label("Drag onto the floor or outside to drop", 13, DIM_TEXT_COLOR, false)
+	_hint.add_child(_drop_hint)
 
 
 ## A placard holding one grid: a header with its label and a detail on the right, and the grid under it.

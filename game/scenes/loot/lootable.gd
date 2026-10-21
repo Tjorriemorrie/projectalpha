@@ -1,7 +1,7 @@
 class_name Lootable
 extends Interactable
 ## Loot the player pries open by holding interact on it, then searches: a container, or a destroyed robot's
-## wreckage. It holds the loot in an ItemGrid. Prying makes a scrape while it is held and a clunk when it gives,
+## wreckage. It holds the loot in an ItemGrid; the ship's stash binds one the GameSession keeps, already open. Prying makes a scrape while it is held and a clunk when it gives,
 ## and the opening is a noise robots hear. Once open it stays open, and interact searches it straight away: the
 ## player opens the inventory screen with it. Its area should be a little bigger than the body it sits on, so the
 ## player's look ray finds it before the body.
@@ -11,6 +11,8 @@ signal opened
 
 ## Seconds of holding interact to pry it open.
 @export var pry_time := 1.5
+## What interact does once it is open, before its title: "Search supply crate", "Open stash".
+@export var search_verb := "Search"
 ## Metres the opening carries as noise, about as far as a walking step.
 @export var pry_loudness := 4.0
 @export var pry_sound: AudioStream = preload("res://assets/audio/loot/pry.wav")
@@ -40,6 +42,17 @@ func setup(loot_title: String, grid_size: Vector2i) -> void:
 	title = loot_title
 	grid = ItemGrid.new(grid_size)
 	_update_prompt()
+
+
+## Names it and gives it a grid kept elsewhere (the ship's stash, which the GameSession keeps between scenes),
+## already open, so interact searches it straight away.
+func bind(loot_title: String, kept: ItemGrid) -> void:
+	title = loot_title
+	grid = kept
+	is_open = true
+	_update_prompt()
+	Log.info("🎒 Loot bound to a kept grid: loot=%s, title=%s, grid=%s, items=%d, value=%d" % [
+		_path(), title, kept.size, kept.items.size(), kept.value()])
 
 
 ## Packs items into its grid in the order given, each in the first spot it fits. Returns the ones that didn't fit.
@@ -75,7 +88,7 @@ func _open() -> void:
 
 func _update_prompt() -> void:
 	var what := title.to_lower() if not title.is_empty() else "container"
-	prompt = ("Search %s" if is_open else "Pry open %s") % what
+	prompt = "%s %s" % [search_verb, what] if is_open else "Pry open %s" % what
 	hold_time = 0.0 if is_open else pry_time
 
 

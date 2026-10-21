@@ -33,7 +33,7 @@ the loot kept, or die, lose it all and wake up as a new clone. All of this witho
 | 005 | [Weapon and player health](features/005-weapon-and-health.md) | done |
 | 006 | [Robot enemy](features/006-robot-enemy.md) | done |
 | 007 | [Loot containers and grid inventory](features/007-loot-and-grid-inventory.md) | done |
-| 008 | [Extraction, death and clone loop](features/008-extraction-and-clone-loop.md) | planned |
+| 008 | [Extraction, death and clone loop](features/008-extraction-and-clone-loop.md) | done |
 
 ## After MVP
 
@@ -58,5 +58,7 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
   sensitivity and dead zone, click-to-sprint, tap/hold crouch).
 - Salvage tools as weapons (Dead Space style: plasma cutter, rivet gun, arc welder), much later and only if it
   fits next to the lasers.
+- Saving the game to disk (the stash, what the player carries, the clone number), with a main menu and a new game;
+  008 keeps the session in memory only.
 - Loot tables: container contents rolled each run (bigger containers rolling better loot), with missions filling
   loot markers by difficulty; 007 keeps every wreck's loot fixed.

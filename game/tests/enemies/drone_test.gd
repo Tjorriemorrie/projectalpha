@@ -27,7 +27,6 @@ func before_test() -> void:
 	_runner.set_time_factor(5.0)
 	_wreck = _runner.scene() as Wreck
 	_player = _runner.find_child("Player") as Player
-	_player.reload_on_death = false
 	for robot in _wreck.robots:
 		if robot is Drone:
 			_drone = robot

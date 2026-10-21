@@ -29,6 +29,8 @@ var is_reloading := false
 var is_aiming := false
 ## How far the weapon is raised: 0 is lowered for a sprint, 1 is up and ready to fire.
 var raise := 1.0
+## Holstered on the ship: lowered, it can't aim or fire, but a reload still works.
+var holstered := false
 var shots_fired := 0
 ## Spread is random; tests can seed it.
 var rng := RandomNumberGenerator.new()
@@ -72,11 +74,14 @@ func is_equipped() -> bool:
 
 ## Runs the weapon for one physics frame. can_shoot is false while the player can't fire (peeking); lowered is true
 ## while sprinting or sorting the inventory. has_input is false while the inventory is open: the shoot, aim and
-## reload actions are ignored (they work the grids then), but a reload under way still finishes. Runs every physics
-## frame, so it only logs when something happens.
+## reload actions are ignored (they work the grids then), but a reload under way still finishes. While holstered it
+## is lowered and can't shoot. Runs every physics frame, so it only logs when something happens.
 func physics_update(delta: float, can_shoot: bool, lowered: bool, has_input: bool = true) -> void:
 	if not is_equipped() or not _enabled:
 		return
+	if holstered:
+		can_shoot = false
+		lowered = true
 	_cooldown = maxf(_cooldown - delta, 0.0)
 	_since_shot += delta
 	_bloom = move_toward(_bloom, 0.0, definition.bloom_recovery * delta)
@@ -98,6 +103,8 @@ func physics_update(delta: float, can_shoot: bool, lowered: bool, has_input: boo
 func blocks_sprint() -> bool:
 	if not is_equipped() or not _enabled:
 		return false
+	if holstered:
+		return is_reloading
 	var trigger_held := Input.is_action_pressed("shoot") and not _trigger_suppressed
 	return trigger_held or Input.is_action_pressed("aim") or charge >= 0.0 or is_reloading \
 			or _since_shot < SPRINT_BLOCK_AFTER_SHOT
@@ -140,7 +147,22 @@ func suppress_trigger() -> void:
 	_trigger_suppressed = true
 
 
-## Stops the weapon for good when the player dies: the charge is dropped with no heat used, and a reload in
+## Finishes a reload under way at once, when the run ends with the player alive: the spent clip goes into the cell
+## the fresh one left. Returns whether there was one.
+func finish_reload() -> bool:
+	if not is_reloading:
+		Log.info("🔫 No reload to finish: heat=%.0f%%" % (clips.heat * 100.0 if clips else 0.0))
+		return false
+	is_reloading = false
+	_reload_left = 0.0
+	clips.swap()
+	Log.info("🔫 Reload finished early, the run is ending: fresh=%d, packed=%d, spent=%d" % [
+		clips.fresh, clips.packed, clips.spent])
+	reload_finished.emit()
+	return true
+
+
+## Stops the weapon for good when the player dies or leaves: the charge is dropped with no heat used, and a reload in
 ## progress never finishes.
 func disable() -> void:
 	if not _enabled:

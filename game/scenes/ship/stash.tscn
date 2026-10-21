@@ -1,0 +1,33 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/ship/stash.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/models/ship/stash_cabinet.glb" id="2_model"]
+[ext_resource type="Script" path="res://scenes/loot/lootable.gd" id="3_lootable"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.6, 2, 0.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_loot"]
+size = Vector3(1.66, 2.06, 0.7)
+
+[node name="Stash" type="StaticBody3D"]
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -0.3)
+shape = SubResource("BoxShape3D_body")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Lootable" type="Area3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -0.33)
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+script = ExtResource("3_lootable")
+search_verb = "Open"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Lootable"]
+shape = SubResource("BoxShape3D_loot")

@@ -1,12 +1,17 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_uv8oa"]
+[ext_resource type="Script" path="res://content/base/sections/airlock/airlock.gd" id="1_uv8oa"]
 [ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_cvpu6"]
 [ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_38fnc"]
 [ext_resource type="Material" path="res://scenes/sections/materials/door.tres" id="4_ogex1"]
 [ext_resource type="Material" path="res://scenes/sections/materials/trim.tres" id="5_j8kci"]
 [ext_resource type="Script" path="res://scenes/sections/socket.gd" id="6_ltppl"]
 [ext_resource type="PackedScene" path="res://scenes/sections/parts/emergency_lamp.tscn" id="7_2nx25"]
+[ext_resource type="Script" path="res://scenes/sections/parts/interactable.gd" id="8_door"]
+[ext_resource type="AudioStream" path="res://assets/audio/ship/airlock_cycle.wav" id="9_cycle"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_outer_door"]
+size = Vector3(1.5, 2, 0.2)
 
 [node name="Airlock" type="Node3D" unique_id=1699352199]
 script = ExtResource("1_uv8oa")
@@ -72,3 +77,32 @@ wall_height = 2.5
 
 [node name="Lamp1" parent="." unique_id=85971833 instance=ExtResource("7_2nx25")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0.4)
+
+[node name="OuterDoor" type="Area3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 1.72)
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+script = ExtResource("8_door")
+prompt = "Return to ship"
+hold_time = 3.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="OuterDoor"]
+shape = SubResource("BoxShape3D_outer_door")
+
+[node name="CycleSound" type="AudioStreamPlayer3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 1.6)
+stream = ExtResource("9_cycle")
+unit_size = 6.0
+
+[node name="Sign" type="Label3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2.3, 1.74)
+pixel_size = 0.0035
+modulate = Color(1, 0.72, 0.36, 1)
+outline_modulate = Color(0.08, 0.04, 0.01, 1)
+text = "SHIP DOCKED"
+font_size = 48
+outline_size = 6

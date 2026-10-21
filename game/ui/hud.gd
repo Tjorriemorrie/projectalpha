@@ -5,7 +5,8 @@ extends CanvasLayer
 ## a container open); under it the prompt for the interactable they are looking at ("[E]  Call elevator", or
 ## "HOLD [E]  Pry open supply crate"); health in the bottom left and the loaded clip's heat in the bottom right; and
 ## the inventory screen. Hits flash the screen edges red and point to where they came from, the edges stay faintly
-## red while health is critical, and death fades to black. The player calls it; it decides nothing.
+## red while health is critical, and death fades to black. A run ends on black with the run summary placard, and an
+## arrival fades in from black. The player calls it; it decides nothing.
 
 ## Seconds the prompt takes to fade in.
 const FADE_TIME := 0.12
@@ -53,6 +54,7 @@ var _shown_clips := []
 @onready var _heat_gauge: HeatGauge = $Root/Clips/Rows/HeatGauge
 @onready var _clip_count: Label = $Root/Clips/Rows/Count
 @onready var _death_screen: ColorRect = $Root/DeathFade
+@onready var _summary: RunSummaryCard = $Root/RunSummary
 
 
 func _ready() -> void:
@@ -157,6 +159,31 @@ func set_hold(progress: float) -> void:
 func show_hit(source_position: Vector3) -> void:
 	_hit_flash = HIT_FLASH
 	_hit_markers.add(source_position)
+
+
+## Starts black and fades the whole screen in over duration seconds: arriving on the ship or the wreck.
+func fade_in(duration: float) -> void:
+	if _death_fade:
+		_death_fade.kill()
+	_death_screen.color.a = 1.0
+	_death_fade = create_tween()
+	_death_fade.tween_property(_death_screen, "color:a", 0.0, duration).set_ease(Tween.EASE_OUT)
+	Log.info("🏃 HUD fading in from black: duration=%.1f s" % duration)
+
+
+## Shows how the run ended on the black screen, with the key that continues.
+func show_summary(summary: RunSummary) -> void:
+	_prompt.visible = false
+	_summary.show_summary(summary, key_label(&"interact"))
+
+
+func hide_summary() -> void:
+	_summary.hide_summary()
+
+
+## What the run summary says, or "" while it is hidden, for tests.
+func summary_text() -> String:
+	return _summary.text if _summary.visible else ""
 
 
 ## Fades the whole screen to black over duration seconds, after delay seconds.

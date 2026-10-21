@@ -25,7 +25,8 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
   🧩 wreck assembly and navigation, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers,
-  🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music, 🎒 inventory, loot and items).
+  🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music, 🎒 inventory, loot and items,
+  🧬 the game session and travel, 🚀 the ship, 💡 lamps).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -51,7 +52,7 @@ projectalpha/
     │       ├── items/     # One self-contained folder per item (definition, model)
     │       └── containers/ # One self-contained folder per loot container (definition, scene, model)
     ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, combat, weapons,
-    │                      # enemies, sections, wreck, test)
+    │                      # enemies, loot, sections, wreck, ship, run, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -63,8 +64,10 @@ projectalpha/
 
 ### Scene organization
 
-- Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002, with two turrets and two
-  drones since 006, and six loot containers since 007.
+- Main scene: `res://scenes/ship/ship.tscn`, the player's ship (008), where the game starts with the first clone
+  waking up. `res://scenes/wreck/small_wreck.tscn` is the wreck built by hand in 002, with two turrets and two
+  drones since 006 and six loot containers since 007; every run boards it. Either can be run on its own: the player
+  then starts with the basic kit.
 - `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests. Its
   south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004), which
   also shoot at the player (005). Four shooting targets stand north of the start (005).
@@ -72,7 +75,9 @@ projectalpha/
   and a supply crate in a room, and a small case in the entrance stub and in a vent.
 - `res://scenes/test/robot_test.tscn` is the robots' test level (006): a small one-deck wreck with a turret and a
   drone that show their state above them.
-- TBD: how levels are loaded, scene transitions.
+- Levels change with `SceneTree.change_scene_to_file()`, through `GameSession` only. The ship and the wreck are
+  separate scenes, each with its own player instance; what the player carries goes across in the session (008).
+  Changing the scene takes the old one out of the tree at once, so code that triggers it must stop for that frame.
 
 ### Global singletons (autoloads)
 
@@ -80,6 +85,7 @@ projectalpha/
 |----------|----------------|
 | ContentRegistry | Discovers and registers all content definitions by ID (see [Content and modding](#content-and-modding)) |
 | ItemIcons | Renders every registered item's grid icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
+| GameSession | The session between scenes: the stash, the clone number, the kit handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session)) |
 
 ### Communication between nodes
 
@@ -88,7 +94,9 @@ projectalpha/
 
 ### Game state and saving
 
-TBD. What is saved, file format, where (`user://`).
+The session lives in memory in `GameSession` (008): the stash, the clone number, the runs boarded and the kit
+handed between scenes. Nothing is saved yet, so quitting starts a new game. TBD: what is saved, file format, where
+(`user://`).
 
 ## 5. Systems
 
@@ -206,7 +214,7 @@ so WASD keeps its position on other keyboard layouts.
 | `crouch_hold` | Ctrl |
 | `crouch_toggle` | C |
 | `pause` | Esc (releases the mouse until there is a pause menu) |
-| `interact` | E |
+| `interact` | E: uses what the player looks at (hold to pry open, board or extract), and continues past the run summary |
 | `flashlight` | F |
 | `peek` | Alt (hold) |
 | `aim` | Right mouse button (hold): aims down sights, and aims out of cover while peeking |
@@ -236,6 +244,9 @@ Physics engine: Jolt, at the default 60 ticks per second.
 | 4     | hitbox | `Hitbox` areas of anything that can be damaged: the player (head, body, arm), shooting targets, robots (eye, body). They collide with nothing; shots cast rays against `world` and `hitbox` |
 | 5     | enemy  | Drone bodies (006). The player and drones collide with it; shots and sight ignore it. Turrets, out of reach, are on no layer; destroyed robots move to `world` |
 | 6     | item   | Dropped items (007). They collide with `world` and each other only, so the player walks through them and shots and sight ignore them; their `PickUp` interactable is on `interactable`. Loot containers are on `world` |
+
+Render layers: 2 `exterior` is the wreck's hull outside the ship's window (008), lit only by its own light; 20
+`viewmodel` is the weapon in view (005).
 
 Trigger areas sit on no layer: door proximity and doorway areas mask `player` and `enemy` (so doors open for
 drones), the elevator's "aboard" area and a drone's contact area mask `player`.
@@ -318,7 +329,8 @@ Built in [005](features/005-weapon-and-health.md).
   materials are swapped for `viewmodel.gdshader`, which pulls depth towards the near plane so weapons never poke
   into walls while still being lit by the world; viewmodels cast no shadows. They draw on visual layer 20
   (`viewmodel`), which decals leave out so scorch marks never land on the weapon in view.
-- **Death.** The player's `died` signal ends the run. Until 008 the level reloads after 4 s.
+- **Death.** The player's `died` signal ends the run: everything carried is lost, and once the screen is black the
+  run summary shows (008).
 
 ### Robots, senses and navigation
 
@@ -367,7 +379,9 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
   `PanelContainer` stops clicks by default) and reads the pointer from its events, not from the window, so headless
   tests can push real mouse events. `Hud.key_label(action)` gives the bound key for any prompt; a held action shows "HOLD"
   before the key cap and fills a second ring, in the placards' ink, round the centre dot. The inventory screen
-  (007) is part of the HUD.
+  (007) is part of the HUD. So is the run summary (008), a placard drawn on the black screen after a run (`RunSummaryCard`,
+  with the clone's lifeline traced in the laser's blue, or flatlining in red after a death); `Hud.fade_in()` lifts the
+  black on arrival.
 
 ### Loot and inventory
 
@@ -395,6 +409,34 @@ Built in [007](features/007-loot-and-grid-inventory.md).
   middle of the footprint, rows along +Z). Headless runs have no renderer, so no icons: the grid tints the cells
   instead.
 
+### Runs, the ship and the session
+
+Built in [008](features/008-extraction-and-clone-loop.md).
+
+- **Session.** `GameSession` keeps the stash (`ItemGrid` 10×8), the clone number (one more per death), the runs
+  boarded, how the player arrives on the ship (`NEW_CLONE` in the clone pod, `EXTRACTED` in the airlock) and the kit
+  (the `Inventory` and the loaded clip's heat) while it crosses to the next scene. `board()`, `extract()` and `die()`
+  record the run (`RunSummary`) and hand the kit over (a death hands none); `board()` and `continue_to_ship()`
+  travel. A player takes the kit in `_setup_combat()` (`take_carried()`, once) or builds the basic kit from
+  `starting_pocket_clips` (2) and `starting_backpack_clips` (0; the test levels set 2). Travel sounds play on the
+  session, so they carry on through the scene change; every arrival fades in from black (`fade_in_next`).
+- **Airlocks.** The airlock section (`Airlock`) has an outer door (`%OuterDoor`, an `Interactable` with a hold time)
+  and a sign above it. While interact is held on it, it loops a cycling sound and makes an `airlock` noise (10 m)
+  every second; a full hold emits `cycled`. Every `Wreck` connects its airlocks (`Wreck.airlocks`): on a wreck
+  cycling extracts ("Return to ship", 3 s), and the `Ship` sets "Board the wreck", 1 s.
+- **Leaving.** `Player.extract()` and `Player.board()` stop the player without the death's slump: a reload under way
+  finishes, the weapon and hitboxes go (nothing can see or hit them), and the screen fades to black over the docking
+  sound (`leave_fade_time`). Boarding then travels; extracting and dying show the run summary, and interact (read in
+  `_physics_process`) continues to the ship.
+- **The ship.** `Ship` is a `Wreck` with no robots or loot (a wreck bakes navigation only when it has robots). It
+  turns its lamps warm and steady (`CeilingLamp.set_steady()`) with a warm fill light under each, and places the
+  player in the clone pod (`ClonePod`) or the airlock. Its player instance has `holstered` on (`Weapon.holstered`:
+  lowered, no aim or trigger, reloads work) and `has_floor` off (the inventory screen has no floor and returns items
+  released outside). The `Stash` binds a `Lootable` to the session's grid (`Lootable.bind()`), already open.
+- **Outside.** The space beyond the cockpit window is the ship environment's star sky shader
+  (`scenes/ship/starfield.gdshader`) and the wreck's dark hull as CSG on render layer 2 (`exterior`), lit only by a
+  directional light whose cull mask is that layer, so it never lights the ship's inside.
+
 ### Lighting
 
 - The wreck's `Environment` has a black background, a very low blue-grey ambient light, filmic tonemapping and a
@@ -404,6 +446,8 @@ Built in [007](features/007-loot-and-grid-inventory.md).
   flickers is seeded from its position, so it is the same on every run. Lamps are in the `sight_lights` group,
   so what they light, robots see from afar (006).
 - The flashlight is a shadow-casting `SpotLight3D` on the player camera, toggled by `flashlight`.
+- The ship (008) uses the same lamps, made warm (about 3800 K), steady and 1.6 times as strong, plus a warm fill
+  `OmniLight3D` under each, with a brighter warm ambient light, so it reads as safe next to the wreck.
 
 ## 6. Asset pipeline (Blender → Godot)
 
@@ -422,7 +466,9 @@ Built in [007](features/007-loot-and-grid-inventory.md).
   folder (e.g. `content/base/weapons/laser_pistol/`); shared models go into `game/assets/models/`.
 - Units: 1 Blender unit = 1 metre; apply scale and rotation before export.
 - Orientation: models face -Y in Blender (toward the Front view camera). This arrives as +Z in Godot, which is Godot's model front (`Vector3.MODEL_FRONT`).
-- Naming: a content model is named after its content folder (`laser_pistol.glb`). Objects and materials that
+- Naming: a content model is named after its content folder (`laser_pistol.glb`). The ship's props are shared
+  models in `game/assets/models/ship/`, built by `art-source/models/ship_props.py`, one object each named after the
+  prop. Objects and materials that
   code looks up get fixed names in the script (the pistol's `Clip`, `Emitter` and `ClipHeat`; the turret's `Ring`
   and `Head`; every robot's `Eye` and `Vents` materials; every container's `Lid`). Otherwise TBD.
 - One script may build many pieces of content of one kind when they share their helpers (`items.py` and
@@ -455,6 +501,8 @@ Built in [007](features/007-loot-and-grid-inventory.md).
   - Run all tests from the repository root (PowerShell, `godot` on the PATH):
     `godot --headless --path game -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode -c -a res://tests`
   - Reports are written to `game/reports/` (ignored by git).
+  - Suites that end runs turn `GameSession.travel_enabled` off (it still emits `travelled`) and call
+    `GameSession.new_game()` before and after each test, so no kit or clone count leaks into another suite.
   - Keep decisions in node-free classes (like `MovementRules`) so they can be unit tested. Behaviour that needs
     physics is tested by loading a scene with `scene_runner` and pressing actions with `Input.action_press`.
     `Input.action_press` changes action state without sending input events, so gameplay input that tests

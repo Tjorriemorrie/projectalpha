@@ -26,6 +26,11 @@ func count(definition: ItemDefinition) -> int:
 	return pockets.count(definition) + backpack.count(definition)
 
 
+## Items in both grids.
+func item_count() -> int:
+	return pockets.items.size() + backpack.items.size()
+
+
 ## Cells no item covers in both grids.
 func free_cells() -> int:
 	return pockets.free_cells() + backpack.free_cells()

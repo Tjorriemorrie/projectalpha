@@ -2,7 +2,8 @@ class_name Wreck
 extends Node3D
 ## A wreck assembled from kit sections. On load it joins the sockets of its sections, opens up the walls they
 ## join, and reports everything that doesn't fit (see WreckAssembly). Then it places the robots of its enemy list
-## and the containers of its loot list on their markers, and bakes the navigation drones fly by, one region per deck.
+## and the containers of its loot list on their markers, and, when it has robots, bakes the navigation drones fly by,
+## one region per deck. Its airlock is where the player's ship is docked: cycling it extracts the player.
 
 ## The drones' navigation agent: its radius keeps paths off the walls, and its height keeps them out of vents.
 const AGENT_RADIUS := 0.375
@@ -31,15 +32,22 @@ var robots: Array[Robot] = []
 ## The containers the wreck placed, in the order of its loot list.
 var containers: Array[LootContainer] = []
 var navigation_regions: Array[NavigationRegion3D] = []
+## The airlocks among its sections, where a ship can be docked.
+var airlocks: Array[Airlock] = []
 
 
 func _ready() -> void:
 	assemble()
 	place_enemies()
 	place_loot()
+	_connect_airlocks()
+	if robots.is_empty():
+		Log.info("🧩 No robots, so no navigation to bake: wreck=%s" % name)
+		return
 	# CSG shapes rebuild at the end of the frame, so the walls the sockets changed are only there to bake from then.
 	# Drones wait for the navigation.
 	bake_navigation.call_deferred()
+	Log.info("🧩 Wreck ready, navigation baking at the end of the frame: wreck=%s, robots=%d" % [name, robots.size()])
 
 
 func assemble() -> void:
@@ -228,6 +236,30 @@ func place_loot() -> void:
 	assembly_errors.append_array(problems)
 	Log.info("🧩 Loot placed: wreck=%s, containers=%d, listed=%d, items=%d, problems=%d" % [
 		name, containers.size(), loot.size(), items_packed, problems.size()])
+
+
+## Listens to every airlock: cycling one is how the player leaves.
+func _connect_airlocks() -> void:
+	airlocks.clear()
+	for section in sections:
+		var airlock := section as Airlock
+		if airlock:
+			airlocks.append(airlock)
+			airlock.cycled.connect(_on_airlock_cycled.bind(airlock))
+	if airlocks.is_empty():
+		Log.warning("🧩 Wreck has no airlock, the player can't leave it: wreck=%s" % name)
+		return
+	Log.info("🧩 Airlocks connected: wreck=%s, airlocks=%d" % [name, airlocks.size()])
+
+
+## The player cycled an airlock. On a wreck that is the way back to their ship: they extract.
+func _on_airlock_cycled(airlock: Airlock) -> void:
+	var player := get_tree().get_first_node_in_group(Player.GROUP) as Player
+	if player == null:
+		Log.error("🧩 Airlock cycled with no player to extract: wreck=%s, airlock=%s" % [name, airlock.name])
+		return
+	Log.info("🧩 Player extracting: wreck=%s, airlock=%s" % [name, airlock.name])
+	player.extract()
 
 
 ## A navigation mesh for the drones on one deck, baked only from the slice of the wreck around that deck's floor.

@@ -8,12 +8,15 @@ extends CharacterBody3D
 ## they can be seen from afar. MovementRules and PeekRules make the decisions; this script applies them to the body,
 ## head and camera. The Weapon fires and reloads, Health counts the damage, and the HUD's InventoryScreen moves the
 ## items. While the inventory is open the player stands still: no moving, looking, peeking or shooting.
+## A run ends by dying or by leaving through an airlock (extracting from a wreck, or boarding one from the ship): the
+## player stops, the screen fades to black, and the GameSession takes what they carry on to the next scene. The
+## player takes it over in turn when it is ready, or builds the basic kit when there is none (after a death).
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
 ## Emitted when the player starts or stops peeking or aiming out of cover.
 signal peek_state_changed(previous: PeekRules.State, current: PeekRules.State)
-## Emitted once, when the player dies. The run ends: 008 wakes a new clone on the ship.
+## Emitted once, when the player dies. The run ends, and a new clone wakes up on the ship.
 signal died
 
 ## Physics layers the look ray hits: world (1) blocks it, interactable (3) is what it looks for.
@@ -119,19 +122,29 @@ const DROP_SCATTER := 0.2
 @export var critical_health: float = 10.0
 ## Degrees the view flinches when hit.
 @export var flinch_degrees: float = 1.5
-## Seconds from death until the run ends.
-@export var death_restart_delay: float = 4.0
-## Reload the level when the run ends, standing in for waking up as a new clone on the ship (008). Tests turn it off.
-@export var reload_on_death: bool = true
+## Seconds from death until the run summary shows on the black screen.
+@export var death_summary_delay: float = 4.0
+## Holstered on the ship: the pistol is lowered and can't aim or fire, but reloads still work.
+@export var holstered := false
+
+@export_group("Travel")
+## Seconds the screen takes to fade to black when leaving through an airlock, and to fade in on arriving.
+@export var leave_fade_time: float = 1.2
+@export var arrive_fade_time: float = 1.5
+## Docking clunks and hiss, playing through the fade when the player boards or extracts.
+@export var dock_sound: AudioStream
 
 @export_group("Inventory")
 ## Cells of the pockets, for things at hand (a reload takes its clips from there), and of the backpack.
 @export var pocket_size := Vector2i(4, 1)
 @export var backpack_size := Vector2i(6, 5)
-## Fresh thermal clips the player starts with besides the loaded one, in the pockets and in the backpack (until 008
-## decides the real loadout).
+## Fresh thermal clips in the basic kit besides the loaded one, in the pockets and in the backpack: a new clone
+## wakes with it, and so does a player in a level started on its own. A player arriving from another scene carries
+## on with what they had instead. Test levels pack two in the backpack.
 @export var starting_pocket_clips: int = 2
-@export var starting_backpack_clips: int = 2
+@export var starting_backpack_clips: int = 0
+## Whether dropped items lie on the floor here. There is no floor on the ship: nothing can be dropped there.
+@export var has_floor := true
 ## Metres an item dropped on the floor carries as noise, so enemies hear it clatter.
 @export var drop_loudness: float = 3.0
 ## Metres in front of the feet where dropped items land.
@@ -162,6 +175,10 @@ var clips: ThermalClips
 ## What the player carries: the pockets and the backpack.
 var inventory: Inventory
 var is_dead := false
+## Leaving through an airlock: the player stands still and can't be hit while the screen fades to black.
+var is_leaving := false
+## How the run ended, once its summary shows; null before.
+var run_summary: RunSummary
 
 var _crouch_toggled := false
 var _stand_blocked := false
@@ -196,6 +213,8 @@ var _step_distance := 0.0
 ## Which hitboxes are lit, worked out at most once per physics frame (_lit_frame).
 var _lit_parts := {}
 var _lit_frame := -1
+## The run summary is showing, and interact goes on to the ship.
+var _awaiting_continue := false
 
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _camera: Camera3D = $Camera3D
@@ -229,6 +248,9 @@ func _ready() -> void:
 	_inventory_screen.taken_from_floor.connect(_on_taken_from_floor)
 	_update_camera()
 	_set_mouse_captured(true)
+	if GameSession.fade_in_next:
+		GameSession.fade_in_next = false
+		_hud.fade_in(arrive_fade_time)
 	Log.info(("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°, "
 		+ "peek=%.2f/%.2f/%.2f m, aim_out=%.2f/%.2f m") % [
 		global_position, walk_speed, sprint_speed, crouch_speed, max_step_height, horizontal_fov,
@@ -240,7 +262,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and mouse_captured:
 		# screen_relative is raw pixel movement, unaffected by window scaling.
 		var motion := (event as InputEventMouseMotion).screen_relative
-		if is_dead:
+		if is_dead or is_leaving:
 			return
 		# While peeking the mouse moves the head; aiming out turns the view again, so the player can aim.
 		if Input.is_action_pressed("peek") and peek_state != PeekRules.State.AIM_OUT:
@@ -263,8 +285,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	rotation.y = _yaw
-	if is_dead:
-		# The body comes to rest where it fell; nothing the player presses does anything any more.
+	if _awaiting_continue and Input.is_action_just_pressed("interact"):
+		# Changing the scene takes this one out of the tree at once, so nothing more may run this frame.
+		_continue_to_ship()
+		return
+	if is_dead or is_leaving:
+		# The body comes to rest where it fell (or stands in the airlock); only interact, past the summary, does
+		# anything any more.
 		_set_movement_state(MovementRules.State.CROUCH_IDLE if is_crouched else MovementRules.State.IDLE)
 		_update_velocity(Vector2.ZERO, delta)
 		_move_and_follow_floor()
@@ -350,8 +377,9 @@ func is_inventory_open() -> bool:
 ## given. picked is a dropped item the player looked at, which is on the floor even if it is a little out of reach.
 ## The player stands still until it closes.
 func open_inventory(loot: Lootable = null, picked: DroppedItem = null) -> void:
-	if is_dead or is_inventory_open():
-		Log.info("🏃 Inventory not opened: dead=%s, already_open=%s" % [is_dead, is_inventory_open()])
+	if is_dead or is_leaving or is_inventory_open():
+		Log.info("🏃 Inventory not opened: dead=%s, leaving=%s, already_open=%s" % [
+			is_dead, is_leaving, is_inventory_open()])
 		return
 	_end_hold()
 	interact_target = null
@@ -359,10 +387,10 @@ func open_inventory(loot: Lootable = null, picked: DroppedItem = null) -> void:
 	_shown_hold = false
 	_hud.set_prompt("", "")
 	_set_mouse_captured(false)
-	var floor := _gather_floor(picked)
-	_inventory_screen.open(inventory, loot, floor)
-	Log.info("🏃 Inventory opened: loot=%s, floor_items=%d, position=%s, crouched=%s" % [
-		loot.title if loot else "none", floor.items.size(), global_position, is_crouched])
+	var floor := _gather_floor(picked) if has_floor else null
+	_inventory_screen.open(inventory, loot, floor, has_floor)
+	Log.info("🏃 Inventory opened: loot=%s, floor_items=%s, position=%s, crouched=%s" % [
+		loot.title if loot else "none", floor.items.size() if floor else "no floor", global_position, is_crouched])
 
 
 func close_inventory() -> void:
@@ -417,10 +445,12 @@ func _setup_head() -> void:
 	_update_hitboxes()
 
 
-## Arms the player with the weapon from the content registry, fills the inventory with the clips they start with,
-## and listens for hits.
+## Arms the player with the weapon from the content registry, takes over the kit the last scene's player carried
+## (or builds the basic kit when there is none), and listens for hits.
 func _setup_combat() -> void:
-	inventory = Inventory.new(pocket_size, backpack_size)
+	var carried := GameSession.take_carried()
+	inventory = carried if carried else Inventory.new(pocket_size, backpack_size)
+	var loaded_heat := GameSession.carried_heat if carried else 0.0
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
 	_weapon.fired.connect(_on_weapon_fired)
@@ -434,20 +464,22 @@ func _setup_combat() -> void:
 		if fresh_clip == null or spent_clip == null:
 			Log.error("🏃 Weapon clips are not registered items: weapon=%s, clip_item=%s, spent_clip_item=%s" % [
 				weapon_id, definition.clip_item, definition.spent_clip_item])
-		else:
+		elif carried == null:
 			for i in starting_pocket_clips:
 				inventory.pockets.add(Item.new(fresh_clip))
 			for i in starting_backpack_clips:
 				inventory.backpack.add(Item.new(fresh_clip))
-		clips = ThermalClips.new(inventory, fresh_clip, spent_clip)
+		clips = ThermalClips.new(inventory, fresh_clip, spent_clip, loaded_heat)
 		var own_hitboxes: Array[RID] = []
 		for hitbox in get_hitboxes():
 			own_hitboxes.append(hitbox.get_rid())
 		_weapon.equip(definition, clips, own_hitboxes)
+	_weapon.holstered = holstered
 	_hud.set_health(_health.health, _health.max_health, false)
-	Log.info(("🏃 Combat ready: health=%.0f, weapon=%s, pockets=%s, backpack=%s, fresh=%d, packed=%d, "
-		+ "critical_health=%.0f") % [_health.health, weapon_id if _weapon.is_equipped() else "none", pocket_size,
-		backpack_size, clips.fresh, clips.packed, critical_health])
+	Log.info(("🏃 Combat ready: health=%.0f, weapon=%s, kit=%s, pockets=%s, backpack=%s, items=%d, fresh=%d, "
+		+ "packed=%d, heat=%.0f%%, holstered=%s, critical_health=%.0f") % [_health.health,
+		weapon_id if _weapon.is_equipped() else "none", "carried" if carried else "basic", pocket_size, backpack_size,
+		inventory.item_count(), clips.fresh, clips.packed, clips.heat * 100.0, holstered, critical_health])
 
 
 ## The peek follows the peek and aim actions (see PeekRules.next_state). Releasing peek centres the peek target,
@@ -815,10 +847,70 @@ func _on_damaged(amount: float, source_position: Vector3, part: Hitbox.Part) -> 
 		Hitbox.Part.keys()[part], amount, _health.health, critical, source_position, global_position])
 
 
-## The run ends: the controls stop, the weapon and hitboxes go, the view slumps to the floor and fades to black.
+## The run ends: the controls stop, the weapon and hitboxes go, the view slumps to the floor and fades to black, and
+## everything carried is lost. Once the screen is black the run summary shows.
 func _on_died() -> void:
 	is_dead = true
 	_death_time = 0.0
+	_stop_acting()
+	_hud.fade_out(DEATH_FADE_TIME, DEATH_FADE_DELAY)
+	var summary := GameSession.die(inventory)
+	Log.info("🏃 Player died: position=%s, summary_in=%.1f s, fresh=%d, spent=%d, items=%d, value=%d" % [
+		global_position, death_summary_delay, clips.fresh, clips.spent, inventory.item_count(), inventory.value()])
+	died.emit()
+	get_tree().create_timer(death_summary_delay).timeout.connect(_show_summary.bind(summary))
+
+
+## The player got out through the wreck's airlock: nothing can hit them any more, the screen fades to black over the
+## docking sound, and then the run summary shows what they carried out. What they carry stays theirs and goes on to
+## the ship with them; the loaded clip keeps its heat.
+func extract() -> void:
+	if not _start_leaving("extract"):
+		return
+	var summary := GameSession.extract(inventory, clips.heat)
+	get_tree().create_timer(leave_fade_time).timeout.connect(_show_summary.bind(summary))
+	Log.info("🏃 Extracting: position=%s, items=%d, value=%d, heat=%.0f%%, summary_in=%.1f s" % [
+		global_position, inventory.item_count(), inventory.value(), clips.heat * 100.0, leave_fade_time])
+
+
+## The player boards the wreck through the ship's airlock: the screen fades to black over the docking sound, and then
+## the game travels to the wreck with what they carry.
+func board() -> void:
+	if not _start_leaving("board"):
+		return
+	get_tree().create_timer(leave_fade_time).timeout.connect(_finish_boarding)
+	Log.info("🏃 Boarding: position=%s, items=%d, value=%d, heat=%.0f%%, travel_in=%.1f s" % [
+		global_position, inventory.item_count(), inventory.value(), clips.heat * 100.0, leave_fade_time])
+
+
+func _finish_boarding() -> void:
+	if not is_inside_tree():
+		Log.warning("🏃 Boarding cut short, the player has left the tree")
+		return
+	Log.info("🏃 Faded to black, travelling to the wreck: items=%d, value=%d" % [
+		inventory.item_count(), inventory.value()])
+	GameSession.board(inventory, clips.heat)
+
+
+## Stops the player to leave through an airlock, without the death's slump: a reload under way finishes, the player
+## is taken out of the action, and the screen fades to black over the docking sound. Returns false when they are dead
+## or already leaving.
+func _start_leaving(why: String) -> bool:
+	if is_dead or is_leaving:
+		Log.info("🏃 Not leaving: why=%s, dead=%s, already_leaving=%s" % [why, is_dead, is_leaving])
+		return false
+	is_leaving = true
+	_weapon.finish_reload()
+	_stop_acting()
+	GameSession.play_travel_sound(dock_sound)
+	_hud.fade_out(leave_fade_time)
+	Log.info("🏃 Leaving through the airlock: why=%s, position=%s, fade=%.1f s" % [why, global_position, leave_fade_time])
+	return true
+
+
+## Takes the player out of the action when they die or leave: the weapon and hitboxes go (so nothing can see or hit
+## them any more), the peek centres, a hold ends, the inventory closes and the prompt goes.
+func _stop_acting() -> void:
 	_weapon.disable()
 	for hitbox in get_hitboxes():
 		hitbox.set_active(false)
@@ -831,21 +923,29 @@ func _on_died() -> void:
 	head_offset = Vector2.ZERO
 	_end_hold()
 	close_inventory()
-	_hud.fade_out(DEATH_FADE_TIME, DEATH_FADE_DELAY)
-	Log.info("🏃 Player died: position=%s, restart_in=%.1f s, reload_on_death=%s, fresh=%d, spent=%d, value=%d" % [
-		global_position, death_restart_delay, reload_on_death, clips.fresh, clips.spent, inventory.value()])
-	died.emit()
-	get_tree().create_timer(death_restart_delay).timeout.connect(_end_run)
+	interact_target = null
+	_shown_prompt = ""
+	_shown_hold = false
+	_hud.set_prompt("", "")
+	Log.info("🏃 Stopped acting: dead=%s, leaving=%s, position=%s" % [is_dead, is_leaving, global_position])
 
 
-## Until 008 wakes a new clone on the ship, the run ends by reloading the level.
-func _end_run() -> void:
-	if not reload_on_death or not is_inside_tree():
-		Log.info("🏃 Run over, staying on the death screen: reload_on_death=%s" % reload_on_death)
+## The screen is black and the run is over: its summary shows until the player presses interact to go on to the ship.
+func _show_summary(summary: RunSummary) -> void:
+	if not is_inside_tree():
+		Log.info("🏃 Run summary not shown, the player has left the tree: %s" % summary)
 		return
-	var scene := get_tree().current_scene
-	Log.info("🏃 Run over, reloading the level: scene=%s" % (scene.scene_file_path if scene else "none"))
-	get_tree().reload_current_scene()
+	run_summary = summary
+	_awaiting_continue = true
+	_hud.show_summary(summary)
+	Log.info("🏃 Run summary shown, waiting for interact: %s" % summary)
+
+
+func _continue_to_ship() -> void:
+	_awaiting_continue = false
+	_hud.hide_summary()
+	Log.info("🏃 Continuing past the run summary: %s" % run_summary)
+	GameSession.continue_to_ship()
 
 
 ## Zooms in while aiming down sights, and lets the kick of shots and the flinch of hits settle back.
