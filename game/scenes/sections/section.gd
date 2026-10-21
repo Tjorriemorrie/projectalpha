@@ -5,6 +5,8 @@ extends Node3D
 
 ## Footprint in grid cells: x, decks, z.
 @export var size := Vector3i.ONE
+## Whether drones can move through it. Vents and elevators can't, so they get no navigation.
+@export var navigable := true
 
 
 func get_sockets() -> Array[Socket]:

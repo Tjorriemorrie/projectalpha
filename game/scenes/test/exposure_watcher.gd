@@ -28,7 +28,7 @@ const IDLE_COLOR := Color(0.55, 0.6, 0.65)
 @export var fire_interval: float = 2.0
 ## Seconds from spotting the player to the first shot.
 @export var first_shot_delay: float = 1.0
-@export var damage: float = 35.0
+@export var damage: float = 10.0
 ## Degrees from the aimed point that shots land within.
 @export var fire_spread: float = 1.5
 

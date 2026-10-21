@@ -44,23 +44,25 @@ func test_aim_out_offset(peek: Vector2, expected: Vector2, test_parameters := [
 			.is_equal_approx(expected, Vector2.ONE * 0.0001)
 
 
-func test_next_state(current: PeekRules.State, peek_held: bool, aim_held: bool, aim_pressed: bool, centred: bool,
+func test_next_state(current: PeekRules.State, peek_held: bool, aim_held: bool, centred: bool,
 		expected: PeekRules.State, test_parameters := [
-	[NONE, false, false, false, true, NONE],
-	[NONE, true, false, false, true, PEEK],
-	[PEEK, true, false, false, false, PEEK],
-	# Aim pressed off-centre while peeking aims out, and stays out while aim is held.
-	[PEEK, true, true, true, false, AIM_OUT],
-	[AIM_OUT, true, true, false, false, AIM_OUT],
-	[AIM_OUT, true, false, false, false, PEEK],
-	[AIM_OUT, false, true, false, false, NONE],
-	# Aim pressed while centred, or held from before the peek moved, stays plain aim down sights.
-	[PEEK, true, true, true, true, PEEK],
-	[PEEK, true, true, false, false, PEEK],
+	[NONE, false, false, true, NONE],
+	[NONE, true, false, true, PEEK],
+	[PEEK, true, false, false, PEEK],
+	# Peek and aim held with the head off-centre aim out, whichever was pressed first, and stay out while both are.
+	[PEEK, true, true, false, AIM_OUT],
+	[NONE, true, true, false, AIM_OUT],
+	[AIM_OUT, true, true, false, AIM_OUT],
+	[AIM_OUT, true, true, true, AIM_OUT],
+	[AIM_OUT, true, false, false, PEEK],
+	[AIM_OUT, false, true, false, NONE],
+	# With the head still centred there is no direction to lean out in yet, so it stays a peek.
+	[PEEK, true, true, true, PEEK],
+	[NONE, true, true, true, PEEK],
 	# Aim without peek is plain aim down sights.
-	[NONE, false, true, true, false, NONE],
+	[NONE, false, true, false, NONE],
 ]) -> void:
-	assert_int(PeekRules.next_state(current, peek_held, aim_held, aim_pressed, centred)).is_equal(expected)
+	assert_int(PeekRules.next_state(current, peek_held, aim_held, centred)).is_equal(expected)
 
 
 func test_tilt_degrees(offset_x: float, expected: float, test_parameters := [

@@ -36,12 +36,13 @@ static func aim_out_offset(peek_offset: Vector2, side: float, up: float, down: f
 	return Vector2(direction.x * aim_side, direction.y * (aim_up if direction.y >= 0.0 else down))
 
 
-## Aim out is decided when aim is pressed: off-centre while peeking aims out until aim is released; otherwise aim
-## stays plain aim down sights until released, even if the head moves off-centre meanwhile.
-static func next_state(current: State, peek_held: bool, aim_held: bool, aim_pressed: bool, centred: bool) -> State:
+## Holding peek and aim together aims out, whichever was pressed first, as soon as the head is off-centre: aiming
+## out needs a direction to lean in. Until then (aim held, then peek pressed) it is a peek, and the mouse moves the
+## head; once aiming out, it stays out until either is released.
+static func next_state(current: State, peek_held: bool, aim_held: bool, centred: bool) -> State:
 	if not peek_held:
 		return State.NONE
-	if aim_held and (current == State.AIM_OUT or (aim_pressed and not centred)):
+	if aim_held and (current == State.AIM_OUT or not centred):
 		return State.AIM_OUT
 	return State.PEEK
 

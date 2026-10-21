@@ -62,12 +62,13 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 | Mechanic | Description | Feature |
 |----------|-------------|---------|
 | Boarding and extraction | Board a station or ship, then get out alive to keep what you found | [008](features/008-extraction-and-clone-loop.md) |
-| First-person combat | Cover-based shooting aboard stations and ships. Lethal: a few hits kill the player | [005](features/005-weapon-and-health.md), [004](features/004-free-peek-and-cover.md) |
+| First-person combat | Cover-based shooting aboard stations and ships. Forgiving enough to get through many fights in a run: about ten hits kill the player, but health doesn't come back during a run, so every fight wears the player down | [005](features/005-weapon-and-health.md), [004](features/004-free-peek-and-cover.md) |
 | Laser weapons and thermal clips | Weapons are lasers. Every shot heats the weapon, and a thermal clip (as in Mass Effect 2) soaks up the heat. Holding the trigger charges a shot that hits harder, kicks more and puts more heat into the clip; when the clip is saturated the player swaps it for a fresh one, which is the reload. The spent clip goes back into the inventory as salvage (to re-cool, break down or sell later) instead of being dropped. Thermal clips fit every weapon, take space in the grid inventory and are lost on death like everything else | [005](features/005-weapon-and-health.md) |
 | Free peek | Hold Alt and move the mouse to peek out of cover in any direction (replaces fixed left/right lean). Peeking is look-only: you can't shoot, but you are hard to hit. To shoot from cover, hold right click to aim out, which exposes more of you and makes you easier to hit | [004](features/004-free-peek-and-cover.md) |
 | Vents | Crouch-only routes through ventilation shafts | [002](features/002-wreck-section-kit.md) |
-| Flashlight | Lights up dark wrecks; toggled on and off, no battery | [002](features/002-wreck-section-kit.md) |
+| Flashlight | Lights up dark wrecks, but lights you up for enemies too; toggled on and off, no battery | [002](features/002-wreck-section-kit.md), [006](features/006-robot-enemy.md) |
 | Elevators | The only way between decks: call with a button, ride, and the arrival ding can be heard | [002](features/002-wreck-section-kit.md) |
+| Enemy senses | Enemies see, hear and feel the player. In the dark they only see you up close, unless you are lit by a lamp, your flashlight or your own muzzle flash. Shots, sprinting and the elevator's ding carry far; walking is quieter and crouching quietest. Moving fast, shooting and lighting the way are risks you choose | [006](features/006-robot-enemy.md) |
 | Looting | Find and carry items out | [007](features/007-loot-and-grid-inventory.md) |
 | Grid inventory | Items take up different shapes and sizes in a grid; the player arranges them to fit more loot | [007](features/007-loot-and-grid-inventory.md) |
 | Trader hubs | Menu-based stations for selling loot and buying anything in the game | — |
@@ -106,7 +107,7 @@ Gamepad is supported. There is no jump, prone or slide.
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
-| Aim out of cover: hold while peeking to lean further out and shoot | Right click (hold) | Left trigger (hold) |
+| Aim out of cover: hold together with peek, in either order, to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory | Tab | View / Select |
 | Pause | Esc | Menu / Start |

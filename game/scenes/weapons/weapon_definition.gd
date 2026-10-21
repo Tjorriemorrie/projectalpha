@@ -15,6 +15,9 @@ extends ContentDefinition
 @export var shot_range: float = 100.0
 ## Seconds between shots: the fire rate cap.
 @export var fire_interval: float = 1.0 / 3.0
+## Metres an uncharged shot carries as noise, so enemies hear it, and a fully charged one.
+@export var shot_loudness: float = 20.0
+@export var full_charge_loudness: float = 30.0
 
 @export_group("Heat and charge")
 ## Heat an uncharged shot puts into the clip.

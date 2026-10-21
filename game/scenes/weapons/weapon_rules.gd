@@ -15,6 +15,11 @@ static func shot_damage(definition: WeaponDefinition, charge: float) -> float:
 	return definition.damage * lerpf(1.0, definition.full_charge_damage_multiplier, charge)
 
 
+## Metres the shot carries as noise.
+static func shot_loudness(definition: WeaponDefinition, charge: float) -> float:
+	return lerpf(definition.shot_loudness, definition.full_charge_loudness, charge)
+
+
 ## Degrees the shot kicks the view up.
 static func shot_kick(definition: WeaponDefinition, charge: float) -> float:
 	return lerpf(definition.kick, definition.full_charge_kick, charge)

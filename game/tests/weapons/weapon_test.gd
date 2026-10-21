@@ -94,6 +94,8 @@ func test_fire_rate_is_capped() -> void:
 
 func test_peek_cannot_shoot() -> void:
 	await _face_target()
+	# Held together with peek, aim would aim out (which can shoot), so this is a plain peek.
+	Input.action_release(&"aim")
 	Input.action_press(&"peek")
 	await _physics_frames(2)
 	_player.move_head(Vector2(1000.0, 0.0))
@@ -189,16 +191,18 @@ func test_aiming_slows_to_crouch_speed_and_zooms() -> void:
 
 func test_head_hits_do_double_damage() -> void:
 	var head := _player.get_hitboxes()[Hitbox.Part.HEAD]
-	head.take_hit(35.0, Vector3(0.0, 1.5, 0.0))
-	assert_float(_player.get_health().health).is_equal(30.0)
+	head.take_hit(10.0, Vector3(0.0, 1.5, 0.0))
+	assert_float(_player.get_health().health).is_equal(80.0)
 	await _physics_frames(1)
-	assert_str(_hud().health_text).is_equal("30")
+	assert_str(_hud().health_text).is_equal("80")
 
 
 func test_firing_watcher_damages_and_kills_the_player() -> void:
 	var died := [0]
 	_player.died.connect(func() -> void: died[0] += 1)
 	await _place(IN_WATCHER_SIGHT)
+	# Ten body hits kill, so the watcher fires quickly to get there.
+	_watchers[0].fire_interval = 0.5
 	_watchers[0].fire_enabled = true
 	for frame in 30 * FRAMES_PER_SECOND:
 		await _physics_frames(1)

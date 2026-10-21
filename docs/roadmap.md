@@ -11,7 +11,7 @@ Placeholder art (Godot primitives / grey boxes) is fine; no menus, saving or pol
 
 **In scope:**
 - First-person movement with sprint, crouch and free peek; keyboard and mouse only.
-- One weapon and lethal player health.
+- One weapon and player health that lasts through several fights (about ten hits kill).
 - One enemy type: robots (automated defenses).
 - One small, quiet wreck built from modular sections.
 - Loot containers, grid inventory and an extraction point.
@@ -31,7 +31,7 @@ the loot kept, or die, lose it all and wake up as a new clone. All of this witho
 | 003 | [Content registry and definitions](features/003-content-registry.md) | done |
 | 004 | [Free peek and cover](features/004-free-peek-and-cover.md) | done |
 | 005 | [Weapon and player health](features/005-weapon-and-health.md) | done |
-| 006 | [Robot enemy](features/006-robot-enemy.md) | planned |
+| 006 | [Robot enemy](features/006-robot-enemy.md) | done |
 | 007 | [Loot containers and grid inventory](features/007-loot-and-grid-inventory.md) | planned |
 | 008 | [Extraction, death and clone loop](features/008-extraction-and-clone-loop.md) | planned |
 
@@ -56,13 +56,5 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
 - More wreck moods after dark horror: gritty industrial, clean sci-fi (varying by wreck type).
 - Gamepad support: wire the bindings from the Controls table in game-design.md (right-stick look with
   sensitivity and dead zone, click-to-sprint, tap/hold crouch).
-- Movement noise: sprinting is loud and enemies hear it, walking is quieter, crouching is quietest. This is the
-  cost of sprinting instead of stamina.
-- Elevator ding draws enemies: robots hear the elevator arriving and come to investigate (the elevator already
-  emits a signal from 002).
-- Robots notice the flashlight beam, so lighting the way is a risk you choose.
 - Salvage tools as weapons (Dead Space style: plasma cutter, rivet gun, arc welder), much later and only if it
   fits next to the lasers.
-- Robot reaction delay before firing (for 006): a player aiming out round a corner and a robot see each other at
-  almost the same moment (measured in 004), so the delay decides who shoots first. Too short makes slicing the
-  pie a sure loss, too long makes it a free kill.

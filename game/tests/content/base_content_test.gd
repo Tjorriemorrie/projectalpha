@@ -23,6 +23,23 @@ func test_registers_the_laser_pistol() -> void:
 	assert_array(ids).is_equal(["base:laser_pistol"])
 
 
+func test_registers_the_robots() -> void:
+	var ids := ContentRegistry.get_all(EnemyDefinition).map(func(definition: ContentDefinition) -> String:
+		return definition.id)
+	assert_array(ids).is_equal(["base:drone", "base:turret"])
+
+
+func test_every_enemy_scene_has_a_robot_root() -> void:
+	for definition: EnemyDefinition in ContentRegistry.get_all(EnemyDefinition):
+		assert_str(definition.display_name).override_failure_message(
+			"%s has no display name" % definition.id).is_not_empty()
+		var scene := load(definition.get_scene_path()) as PackedScene
+		assert_object(scene).override_failure_message("%s has no scene" % definition.id).is_not_null()
+		var root: Node = auto_free(scene.instantiate())
+		assert_bool(root is Robot).override_failure_message(
+			"%s's scene root is not a Robot" % definition.id).is_true()
+
+
 func test_every_weapon_viewmodel_has_a_viewmodel_root() -> void:
 	for definition: WeaponDefinition in ContentRegistry.get_all(WeaponDefinition):
 		assert_str(definition.display_name).override_failure_message(

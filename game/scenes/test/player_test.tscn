@@ -61,7 +61,7 @@ size = Vector3(2.5, 0.2, 2.5)
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1065822670]
 environment = SubResource("Environment_test")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=335088614]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=335088614 groups=["sight_lights"]]
 transform = Transform3D(0.866, -0.383, 0.3214, 0, 0.6428, 0.766, -0.5, -0.6634, 0.5567, 0, 10, 0)
 shadow_enabled = true
 

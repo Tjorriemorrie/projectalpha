@@ -5,7 +5,7 @@ extends GdUnitTestSuite
 
 const TEST_SCENE := "res://scenes/test/player_test.tscn"
 const ACTIONS: Array[StringName] = [
-	&"peek", &"aim", &"move_forward", &"move_left", &"move_right", &"sprint", &"crouch_hold"]
+	&"peek", &"aim", &"shoot", &"move_forward", &"move_left", &"move_right", &"sprint", &"crouch_hold"]
 ## Crouched south of the 1 m crate, pressed against it. WatcherCrate stands north of the crate.
 const BEHIND_CRATE := Vector3(10.0, 0.0, 10.75)
 ## Standing west of the pillar, 0.05 m from its side.
@@ -105,16 +105,36 @@ func test_aim_without_peek_stays_plain() -> void:
 	assert_bool(_arm().is_active()).is_false()
 
 
-func test_aim_while_centred_stays_a_peek() -> void:
+func test_aim_while_centred_stays_a_peek_until_the_head_moves_out() -> void:
 	await _place(OPEN)
 	Input.action_press(&"peek")
 	await _physics_frames(2)
 	Input.action_press(&"aim")
 	await _physics_frames(2)
-	_player.move_head(Vector2(FAR, 0.0))
-	await _physics_frames(20)
 	assert_int(_player.peek_state).is_equal(PeekRules.State.PEEK)
 	assert_bool(_arm().is_active()).is_false()
+	_player.move_head(Vector2(FAR, 0.0))
+	await _physics_frames(20)
+	assert_int(_player.peek_state).is_equal(PeekRules.State.AIM_OUT)
+	assert_bool(_arm().is_active()).is_true()
+
+
+func test_aim_first_then_peek_aims_out_and_can_shoot() -> void:
+	await _place(OPEN)
+	Input.action_press(&"aim")
+	await _physics_frames(5)
+	Input.action_press(&"peek")
+	await _physics_frames(2)
+	_player.move_head(Vector2(FAR, 0.0))
+	await _physics_frames(20)
+	assert_int(_player.peek_state).is_equal(PeekRules.State.AIM_OUT)
+	assert_vector(_player.head_offset).is_equal_approx(Vector2(_player.aim_out_side_reach, 0.0), _tolerance())
+	var weapon := _player.get_weapon()
+	Input.action_press(&"shoot")
+	await _physics_frames(2)
+	Input.action_release(&"shoot")
+	await _physics_frames(5)
+	assert_int(weapon.shots_fired).is_equal(1)
 
 
 func test_aim_out_pushes_further_and_releases_back_to_peek() -> void:

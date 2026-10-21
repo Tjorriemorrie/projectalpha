@@ -54,3 +54,9 @@ script = ExtResource("6_h4e73")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
 script = ExtResource("6_h4e73")
 kind = 0
+
+[node name="TurretMount" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 3, -1.5)
+script = ExtResource("6_h4e73")
+kind = 0
+mount = 1

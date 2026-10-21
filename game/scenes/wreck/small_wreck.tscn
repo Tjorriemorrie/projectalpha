@@ -16,6 +16,12 @@
 
 [node name="SmallWreck" type="Node3D" unique_id=1261040855]
 script = ExtResource("1_yaaoo")
+enemies = Dictionary[String, String]({
+"Deck1/JunctionEast/EnemySpot": "base:drone",
+"Deck1/StoreRoom/TurretMount": "base:turret",
+"Deck2/Hold/EnemySpotNorthEast": "base:drone",
+"Deck2/Hold/TurretMount": "base:turret"
+})
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=874958639]
 environment = ExtResource("2_bteqj")

@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/enemy_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Ceiling turret"
+scene = "res://content/base/enemies/turret/turret.tscn"
+mount = 1
+max_health = 200.0
+sight_range = 20.0
+sight_angle = 90.0
+dark_sight_range = 5.0
+sight_memory = 0.25
+idle_lock_time = 0.8
+alert_lock_time = 0.4
+damage = 10.0
+fire_interval = 0.333
+initial_spread = 8.0
+spread = 4.0
+settle_time = 1.5
+aim_lag = 0.2
+shot_range = 50.0
+aim_tolerance = 8.0
+shot_heat = 0.1667
+cool_delay = 0.5
+cool_rate = 0.25
+vent_time = 2.0
+investigate_time = 5.0
+search_time = 4.0
+shot_loudness = 20.0
+crash_loudness = 12.0

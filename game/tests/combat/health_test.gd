@@ -23,31 +23,33 @@ func test_starts_full() -> void:
 
 
 func test_damage_reduces_health() -> void:
-	_health.take_damage(35.0, Vector3.ZERO)
-	assert_float(_health.health).is_equal(65.0)
-	assert_array(_damage_taken).is_equal([35.0])
+	_health.take_damage(10.0, Vector3.ZERO)
+	assert_float(_health.health).is_equal(90.0)
+	assert_array(_damage_taken).is_equal([10.0])
 
 
 func test_hitbox_multiplies_damage_by_its_part(multiplier: float, expected_health: float, test_parameters := [
-	[2.0, 30.0],
-	[1.0, 65.0],
-	[0.5, 82.5],
+	[2.0, 80.0],
+	[1.0, 90.0],
+	[0.5, 95.0],
 ]) -> void:
-	var dealt := _hitbox(multiplier).take_hit(35.0, Vector3.ZERO)
-	assert_float(dealt).is_equal(35.0 * multiplier)
+	var dealt := _hitbox(multiplier).take_hit(10.0, Vector3.ZERO)
+	assert_float(dealt).is_equal(10.0 * multiplier)
 	assert_float(_health.health).is_equal(expected_health)
 
 
-func test_three_body_hits_kill_once() -> void:
+func test_ten_body_hits_kill_once() -> void:
 	var body := _hitbox(1.0)
-	for hit in 3:
-		body.take_hit(35.0, Vector3.ZERO)
+	for hit in 9:
+		body.take_hit(10.0, Vector3.ZERO)
+	assert_bool(_health.is_dead()).is_false()
+	body.take_hit(10.0, Vector3.ZERO)
 	assert_bool(_health.is_dead()).is_true()
 	assert_float(_health.health).is_equal(0.0)
 	assert_int(_deaths).is_equal(1)
-	body.take_hit(35.0, Vector3.ZERO)
+	body.take_hit(10.0, Vector3.ZERO)
 	assert_int(_deaths).is_equal(1)
-	assert_int(_damage_taken.size()).is_equal(3)
+	assert_int(_damage_taken.size()).is_equal(10)
 
 
 func test_reset_restores_full_health() -> void:

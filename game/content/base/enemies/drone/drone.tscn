@@ -1,0 +1,166 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/drone.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://content/base/enemies/drone/drone.glb" id="2_model"]
+[ext_resource type="Script" path="res://scenes/combat/hitbox.gd" id="3_hitbox"]
+[ext_resource type="Script" path="res://scenes/combat/health.gd" id="4_health"]
+[ext_resource type="AudioStream" path="res://content/base/enemies/drone/drone_hum.wav" id="5_hum"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/chirp_investigate.wav" id="6_investigate"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/chirp_alarm.wav" id="7_alarm"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/chirp_lost.wav" id="8_lost"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/lock_on.wav" id="9_lock"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/robot_shot.wav" id="10_shot"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/vent_hiss.wav" id="11_vent"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/robot_hit.wav" id="12_hit"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/robot_destroyed.wav" id="13_destroyed"]
+[ext_resource type="AudioStream" path="res://assets/audio/robots/robot_crash.wav" id="14_crash"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.3
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hull"]
+size = Vector3(0.5, 0.26, 0.36)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_eye"]
+radius = 0.075
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_contact"]
+radius = 0.45
+
+[node name="Drone" type="CharacterBody3D"]
+collision_layer = 16
+collision_mask = 19
+motion_mode = 1
+script = ExtResource("1_script")
+investigate_chirp = ExtResource("6_investigate")
+alarm_chirp = ExtResource("7_alarm")
+lost_chirp = ExtResource("8_lost")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_body")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+unique_name_in_owner = true
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Eye" type="Marker3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.015, -0.23)
+
+[node name="Searchlight" type="SpotLight3D" parent="Eye" groups=["sight_lights"]]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.02)
+light_color = Color(0.85, 0.92, 1, 1)
+light_energy = 1.6
+shadow_enabled = true
+spot_range = 14.0
+spot_attenuation = 0.5
+spot_angle = 22.0
+
+[node name="Hitboxes" type="Node3D" parent="."]
+
+[node name="Eye" type="Area3D" parent="Hitboxes" node_paths=PackedStringArray("health")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.015, -0.21)
+collision_layer = 8
+collision_mask = 0
+monitoring = false
+script = ExtResource("3_hitbox")
+part = 0
+damage_multiplier = 2.0
+health = NodePath("../../Health")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hitboxes/Eye"]
+shape = SubResource("SphereShape3D_eye")
+
+[node name="Hull" type="Area3D" parent="Hitboxes" node_paths=PackedStringArray("health")]
+collision_layer = 8
+collision_mask = 0
+monitoring = false
+script = ExtResource("3_hitbox")
+health = NodePath("../../Health")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hitboxes/Hull"]
+shape = SubResource("BoxShape3D_hull")
+
+[node name="Contact" type="Area3D" parent="."]
+unique_name_in_owner = true
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Contact"]
+shape = SubResource("SphereShape3D_contact")
+
+[node name="Sounds" type="Node3D" parent="."]
+
+[node name="IdleSound" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("5_hum")
+volume_db = -8.0
+unit_size = 3.0
+max_distance = 25.0
+
+[node name="Voice" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+volume_db = -4.0
+unit_size = 6.0
+max_distance = 40.0
+
+[node name="LockTone" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("9_lock")
+volume_db = -6.0
+unit_size = 5.0
+max_distance = 30.0
+
+[node name="ShotSound" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("10_shot")
+volume_db = -4.0
+unit_size = 8.0
+max_distance = 60.0
+max_polyphony = 4
+
+[node name="VentSound" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("11_vent")
+volume_db = -6.0
+unit_size = 5.0
+max_distance = 30.0
+
+[node name="HitSound" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("12_hit")
+volume_db = -6.0
+unit_size = 5.0
+max_distance = 30.0
+max_polyphony = 3
+
+[node name="DestroyedSound" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("13_destroyed")
+unit_size = 6.0
+max_distance = 40.0
+
+[node name="CrashSound" type="AudioStreamPlayer3D" parent="Sounds"]
+unique_name_in_owner = true
+stream = ExtResource("14_crash")
+volume_db = -4.0
+unit_size = 6.0
+max_distance = 40.0
+
+[node name="Health" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("4_health")
+max_health = 75.0
+
+[node name="Label" type="Label3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+visible = false
+pixel_size = 0.003
+billboard = 1
+no_depth_test = true
+text = "drone"
+font_size = 24
+outline_size = 6

@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/wreck/wreck.gd" id="1_wreck"]
+[ext_resource type="Environment" path="res://scenes/wreck/wreck_environment.tres" id="2_environment"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_end/corridor_end.tscn" id="3_corridor_end"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_straight/corridor_straight.tscn" id="4_corridor_straight"]
+[ext_resource type="PackedScene" path="res://content/base/sections/room_large/room_large.tscn" id="5_room_large"]
+[ext_resource type="PackedScene" path="res://content/base/sections/vent_straight/vent_straight.tscn" id="6_vent_straight"]
+[ext_resource type="PackedScene" path="res://content/base/sections/room_small/room_small.tscn" id="7_room_small"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="8_player"]
+
+[node name="RobotTest" type="Node3D"]
+script = ExtResource("1_wreck")
+enemies = Dictionary[String, String]({
+"Sections/Hall/EnemySpotNorthEast": "base:drone",
+"Sections/Hall/TurretMount": "base:turret"
+})
+debug_robots = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_environment")
+
+[node name="Sections" type="Node3D" parent="."]
+
+[node name="Entrance" parent="Sections" instance=ExtResource("3_corridor_end")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 8)
+
+[node name="Corridor" parent="Sections" instance=ExtResource("4_corridor_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+
+[node name="Hall" parent="Sections" instance=ExtResource("5_room_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -2)
+
+[node name="Vent" parent="Sections" instance=ExtResource("6_vent_straight")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 8, 0, 0)
+
+[node name="Closet" parent="Sections" instance=ExtResource("7_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 0)
+
+[node name="Player" parent="." instance=ExtResource("8_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)

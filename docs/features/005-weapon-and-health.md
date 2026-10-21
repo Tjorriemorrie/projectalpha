@@ -9,11 +9,12 @@
 ## Goal
 
 The player has one weapon, a semi-automatic laser pistol cooled by thermal clips (shoot, aim down sights,
-reload), and lethal health: a few hits kill.
+reload), and health that takes about ten hits to run out, so the player can get through many fights in a run.
 
 ## Player experience
 
-Dangerous combat where every hit matters. Supports *Lose it all*.
+Combat that wears the player down over a run: a single fight rarely kills, but health doesn't come back until the
+next clone, so the hits add up. Supports *Lose it all*.
 
 ## Requirements
 
@@ -54,7 +55,7 @@ Dangerous combat where every hit matters. Supports *Lose it all*.
 ### Aim and accuracy
 
 - [x] Shots spread randomly around the centre dot, enough that fights have misses and feel like a gun battle,
-      even though getting hit is deadly. Hip fire lands within about 5° of the centre dot; aiming down sights
+      even though every hit counts. Hip fire lands within about 5° of the centre dot; aiming down sights
       tightens that to about 1°.
 - [x] Holding right click aims down sights: a slight zoom (about 1.3×), movement slowed to crouch speed
       (1.0 m/s), and no sprint. Aiming out of cover (004) aims down sights too.
@@ -66,9 +67,10 @@ Dangerous combat where every hit matters. Supports *Lose it all*.
 
 ### Player health
 
-- [x] The player has 100 health. A hit does the shooter's damage (robots set theirs in 006; about 35, so three
-      body hits kill) times a multiplier for where it lands: head 2×, body 1×, arm 0.5× (exported variables).
-      The hitboxes from 004 decide where a hit lands.
+- [x] The player has 100 health. A hit does the shooter's damage (robots set theirs in 006: 10, so ten body hits
+      kill) times a multiplier for where it lands: head 2×, body 1×, arm 0.5× (exported variables). The hitboxes
+      from 004 decide where a hit lands. (Changed in 006's playtest from about 35, three body hits, so the player
+      can survive the many fights of a run.)
 - [x] Health doesn't regenerate during a run. A new clone starts at full health (008); healing items come later.
 - [x] At 0 health the player dies: controls stop, the view slumps to the floor and fades to black, and the run
       ends. The player emits a `died` signal. Waking up as a new clone on the home ship is 008; until then the

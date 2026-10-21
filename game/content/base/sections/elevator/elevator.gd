@@ -3,8 +3,8 @@ extends Section
 ## A shaft spanning two decks, with a platform that rides between them. The call button beside the doors on
 ## each deck brings the platform, or opens the doors when it is already there; the button on the platform sends
 ## it to the other deck. A deck's doors only open while the platform is at that deck, and they close once nobody
-## has been aboard or in the doorway for close_delay seconds. Arriving dings, and the ding is a signal so that
-## enemies can come to investigate.
+## has been aboard or in the doorway for close_delay seconds. Arriving dings: a signal, and a noise that enemies
+## on that deck hear and come to investigate. Drones don't ride it, so it is not navigable.
 
 ## Emitted when the platform arrives and dings, with the deck it reached and where the ding sounded.
 signal dinged(deck: int, sound_position: Vector3)
@@ -17,6 +17,8 @@ enum State { IDLE, CLOSING, MOVING }
 @export var close_delay := 3.0
 ## Height of the ding above the deck's floor, at the doors.
 @export var ding_height := 2.0
+## Metres the ding carries as noise, so enemies come to see who arrived.
+@export var ding_loudness := 20.0
 
 var state: State = State.IDLE
 ## The deck the platform is at, or is leaving while its doors close and it moves.
@@ -131,6 +133,7 @@ func _arrive() -> void:
 	Log.info("🛗 Elevator arrived and dinged: elevator=%s, deck=%d, height=%.2f m, queued_deck=%d" % [
 		name, deck, _platform.position.y, _pending_call])
 	dinged.emit(deck, _ding.global_position)
+	Hearing.make_noise(self, _ding.global_position, ding_loudness, &"elevator_ding")
 
 
 ## Closes the doors once nobody has been aboard or in the doorway for close_delay, then answers a queued call.

@@ -28,6 +28,7 @@ size = Vector3(3.4, 2, 3.4)
 [node name="Elevator" type="Node3D" unique_id=684691211]
 script = ExtResource("1_tlwpl")
 size = Vector3i(1, 2, 1)
+navigable = false
 
 [node name="Geometry" type="CSGCombiner3D" parent="." unique_id=928337882]
 use_collision = true
@@ -115,7 +116,7 @@ mesh = SubResource("BoxMesh_psbem")
 [node name="SendButton" parent="Platform" unique_id=387974492 instance=ExtResource("5_4v7vt")]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.5, 1.05, 0)
 
-[node name="PlatformLight" type="OmniLight3D" parent="Platform" unique_id=1694094061]
+[node name="PlatformLight" type="OmniLight3D" parent="Platform" unique_id=1694094061 groups=["sight_lights"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 1.4, 0)
 light_color = Color(0.85, 0.92, 1, 1)
 light_energy = 0.5

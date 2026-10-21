@@ -97,11 +97,17 @@ reload={
 
 [layer_names]
 
+3d_render/layer_20="viewmodel"
 3d_physics/layer_1="world"
 3d_physics/layer_2="player"
 3d_physics/layer_3="interactable"
 3d_physics/layer_4="hitbox"
-3d_render/layer_20="viewmodel"
+3d_physics/layer_5="enemy"
+
+[navigation]
+
+3d/default_cell_size=0.125
+3d/default_cell_height=0.125
 
 [physics]
 

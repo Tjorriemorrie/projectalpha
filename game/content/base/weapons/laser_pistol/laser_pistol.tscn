@@ -18,7 +18,7 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 [node name="Muzzle" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.026, -0.207)
 
-[node name="MuzzleLight" type="OmniLight3D" parent="."]
+[node name="MuzzleLight" type="OmniLight3D" parent="." groups=["sight_lights"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.026, -0.26)
 visible = false
 light_color = Color(0.62, 0.82, 1, 1)

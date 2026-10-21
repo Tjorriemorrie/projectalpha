@@ -17,7 +17,7 @@ Two levels of exposure:
 
 ## Player experience
 
-Cover-based, lethal combat where exposing yourself is a risk you control. Supports *Choose your risk*.
+Cover-based combat where exposing yourself is a risk you control. Supports *Choose your risk*.
 
 ## Requirements
 
@@ -52,8 +52,11 @@ Cover-based, lethal combat where exposing yourself is a risk you control. Suppor
 - [x] While aiming out, the mouse turns the view as normal, so the player can aim; the head holds its aimed-out
       position. Releasing right click drops back to the peek (the mouse moves the head again), and releasing Alt
       returns the head to the body.
-- [x] Right click without Alt, or while the head is still centred, is plain aim down sights (005), with no
-      extra exposure.
+- [x] Holding Alt and right click together aims out whichever was pressed first: aiming and then peeking works
+      the same as peeking and then aiming. Aiming out needs a direction to lean in, so while the head is still
+      centred it is a peek (the mouse moves the head), and it aims out as soon as the head moves off-centre.
+      (Changed in 006's playtest: aim held before Alt used to stay a peek, which couldn't shoot.)
+- [x] Right click without Alt is plain aim down sights (005), with no extra exposure.
 - [x] Aiming out allows the same movement as peeking: crouch speed, no sprint.
 
 ### Controls
@@ -101,8 +104,8 @@ Cover-based, lethal combat where exposing yourself is a risk you control. Suppor
   `Player.move_head()`, which the gamepad's right stick will call too. Each physics frame the head moves towards
   its target at `head_speed`, and a sphere `cast_motion` from the normal eye position against `world` stops it at
   walls. The camera interpolates the head between physics frames, like the body.
-- Aim out is decided when right click is pressed: off-centre while peeking aims out until right click is
-  released, otherwise it stays plain aim down sights until released.
+- `PeekRules.next_state()`: peek and aim held with the head off-centre aim out, in either order, and stay out
+  until either is released.
 - Hitboxes: `Hitbox` (`game/scenes/player/hitbox.gd`), an `Area3D` per part on a new `hitbox` physics layer (4),
   positioned by the player every physics frame. Each one offers sample points (its centre and a point towards each
   side) to check line of sight against; enemies (006) will aim at the points they can see.

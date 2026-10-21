@@ -33,7 +33,7 @@ mesh = SubResource("BoxMesh_panel")
 
 [node name="Doorway" type="Area3D" parent="."]
 collision_layer = 0
-collision_mask = 2
+collision_mask = 18
 monitorable = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Doorway"]
@@ -42,7 +42,7 @@ shape = SubResource("BoxShape3D_doorway")
 
 [node name="Proximity" type="Area3D" parent="."]
 collision_layer = 0
-collision_mask = 2
+collision_mask = 18
 monitorable = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Proximity"]

@@ -7,6 +7,7 @@
 
 [node name="VentCorner" type="Node3D" unique_id=1933892870]
 script = ExtResource("1_mmm2q")
+navigable = false
 
 [node name="Geometry" type="CSGCombiner3D" parent="." unique_id=817718022]
 use_collision = true

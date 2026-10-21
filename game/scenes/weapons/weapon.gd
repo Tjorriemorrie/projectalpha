@@ -256,3 +256,4 @@ func _fire(shot_charge: float) -> void:
 		+ "aiming=%s, heat=%.0f%%->%.0f%%") % [shot_charge, damage, dealt, target, origin.distance_to(end), spread,
 		is_aiming, heat_before * 100.0, clips.heat * 100.0])
 	fired.emit(shot_charge, kick)
+	Hearing.make_noise(self, origin, WeaponRules.shot_loudness(definition, shot_charge), &"shot")

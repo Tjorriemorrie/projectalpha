@@ -1,5 +1,6 @@
 extends GdUnitTestSuite
-## Plays the small wreck with simulated keys and checks its doors, vents, elevator and interaction.
+## Plays the small wreck with simulated keys and checks its doors, vents, elevator and interaction. Its robots are
+## noted and then taken out, so they don't shoot the player or hold doors open; the robot suites test them.
 ## Positions refer to the layout of res://scenes/wreck/small_wreck.tscn: cell centres sit on multiples of 4 m,
 ## deck 1 has its floor at y = 0 and deck 2 at y = 4.
 
@@ -19,6 +20,8 @@ var _runner: GdUnitSceneRunner
 var _wreck: Wreck
 var _player: Player
 var _elevator: Elevator
+## The robots the wreck placed, as "enemy ID on marker section", before they were taken out.
+var _placed_robots: Array[String] = []
 
 
 func before_test() -> void:
@@ -27,6 +30,11 @@ func before_test() -> void:
 	_wreck = _runner.scene() as Wreck
 	_player = _runner.find_child("Player") as Player
 	_elevator = _runner.find_child("Elevator") as Elevator
+	_placed_robots.clear()
+	for robot in _wreck.robots:
+		_placed_robots.append("%s on %s" % [robot.definition.id, robot.name.get_slice("_", 1)])
+		robot.queue_free()
+	await _runner.simulate_frames(2)
 
 
 func after_test() -> void:
@@ -40,6 +48,17 @@ func test_assembles_without_errors() -> void:
 	assert_int(_wreck.plan.joins).is_equal(15)
 	assert_int(_wreck.plan.count_openings(Socket.Opening.DOORWAY)).is_equal(5)
 	assert_int(_wreck.plan.count_openings(Socket.Opening.VENT_MOUTH)).is_equal(4)
+
+
+func test_places_two_turrets_and_two_drones() -> void:
+	assert_array(_placed_robots).contains_exactly_in_any_order([
+		"base:drone on JunctionEast", "base:turret on StoreRoom", "base:drone on Hold", "base:turret on Hold"])
+
+
+func test_bakes_navigation_for_both_decks() -> void:
+	assert_int(_wreck.navigation_regions.size()).is_equal(2)
+	for region in _wreck.navigation_regions:
+		assert_int(region.navigation_mesh.get_polygon_count()).is_greater(0)
 
 
 func test_uses_every_kit_piece() -> void:

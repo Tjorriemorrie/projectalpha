@@ -24,8 +24,8 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Use static typing in GDScript (`var speed: float = 5.0`).
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
-  🧩 wreck assembly, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers, 🔫 weapons,
-  🩸 health and damage, 🎯 shooting targets).
+  🧩 wreck assembly and navigation, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers,
+  🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -46,9 +46,10 @@ projectalpha/
     ├── content/           # Content packs; base/ is the base game (see Content and modding)
     │   └── base/
     │       ├── sections/  # One self-contained folder per kit section
-    │       └── weapons/   # One self-contained folder per weapon (definition, viewmodel, model, sounds)
+    │       ├── weapons/   # One self-contained folder per weapon (definition, viewmodel, model, sounds)
+    │       └── enemies/   # One self-contained folder per enemy (definition, scene, model, own sounds)
     ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, combat, weapons,
-    │                      # sections, wreck, test)
+    │                      # enemies, sections, wreck, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -60,10 +61,13 @@ projectalpha/
 
 ### Scene organization
 
-- Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002.
+- Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002, with two turrets and two
+  drones since 006.
 - `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests. Its
   south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004), which
   also shoot at the player (005). Four shooting targets stand north of the start (005).
+- `res://scenes/test/robot_test.tscn` is the robots' test level (006): a small one-deck wreck with a turret and a
+  drone that show their state above them.
 - TBD: how levels are loaded, scene transitions.
 
 ### Global singletons (autoloads)
@@ -122,8 +126,10 @@ Settled in [003](features/003-content-registry.md):
   one kind sorted by ID. Duplicate IDs, content folders with zero or several definitions, and definitions with
   problems are logged as errors, kept in `ContentRegistry.errors` and skipped; the rest still loads.
   `load_content(root)` takes the folder of packs, so tests run a fresh registry on fixture packs.
-- **Kinds so far.** `SectionDefinition` (003) and `WeaponDefinition` (005). A weapon definition holds all its
-  numbers (damage, heat, charge, kick, spread, zoom, reload and raise times), so a new weapon is a new folder.
+- **Kinds so far.** `SectionDefinition` (003), `WeaponDefinition` (005) and `EnemyDefinition` (006). A weapon
+  definition holds all its numbers (damage, heat, charge, kick, spread, zoom, reload and raise times), so a new
+  weapon is a new folder. An enemy definition holds its scene, the marker mount it needs and the robot brain's
+  numbers; how a kind moves is exported on its scene. Neither needed a change to the registry.
 
 ### Player controller
 
@@ -156,8 +162,8 @@ player peeks from wherever they stand.
   frames like the body, and a sideways lean rolls the view (up to 8°).
 - `Player.peek_state` (`PeekRules.State`: `NONE`, `PEEK`, `AIM_OUT`) and `peek_state_changed` tell other systems
   what the player is doing. A peek can't shoot, so weapons (005) must not fire while `peek_state` is `PEEK`.
-  Aim out is decided when `aim` is pressed: off-centre while peeking aims out until it is released, otherwise it
-  stays plain aim down sights.
+  Holding `peek` and `aim` together aims out, in either order, as soon as the head is off-centre, and stays out
+  until either is released; with the head still centred it is a peek.
 - Hitboxes are `Hitbox` areas on the `hitbox` layer under `Player/Hitboxes`, moved by the player every physics
   frame: a head sphere (radius 0.12 m) at the eyes, a body cylinder (radius 0.25 m) from the feet to 0.1 m below
   the eyes, and an arm box (0.14 × 0.14 × 0.6 m) reaching forward along the view from 0.2 m below the eyes, which
@@ -211,9 +217,11 @@ Physics engine: Jolt, at the default 60 ticks per second.
 | 1     | world  | Static level geometry, door panels, elevator platforms. Blocks movement, sight and the interact ray |
 | 2     | player | The player body (collides with `world`) |
 | 3     | interactable | `Interactable` areas (buttons), found by the player's interact ray |
-| 4     | hitbox | `Hitbox` areas of anything that can be damaged: the player (head, body, arm), shooting targets, robots (006). They collide with nothing; shots cast rays against `world` and `hitbox` |
+| 4     | hitbox | `Hitbox` areas of anything that can be damaged: the player (head, body, arm), shooting targets, robots (eye, body). They collide with nothing; shots cast rays against `world` and `hitbox` |
+| 5     | enemy  | Drone bodies (006). The player and drones collide with it; shots and sight ignore it. Turrets, out of reach, are on no layer; destroyed robots move to `world` |
 
-Trigger areas (door proximity and doorways, the elevator's "aboard" area) sit on no layer and mask `player`.
+Trigger areas sit on no layer: door proximity and doorway areas mask `player` and `enemy` (so doors open for
+drones), the elevator's "aboard" area and a drone's contact area mask `player`.
 
 ### Wreck sections and assembly
 
@@ -240,20 +248,28 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
   node-free `WreckAssembly`: loose ends, mismatched kinds, sockets off the grid and overlapping sections are
   logged as errors and kept in `Wreck.assembly_errors`. A section whose scene is not a registered
   `SectionDefinition` is an assembly error too.
-- **Markers.** `SectionMarker`s (enemy or loot) mark where a mission may place things (006, 007).
+- **Markers.** `SectionMarker`s (enemy or loot) mark where a mission may place things. An enemy marker's `mount`
+  says what fits: a drone post on the floor, or a turret mount on the ceiling, facing the middle of the turret's
+  arc. The wreck's `enemies` list (marker path to enemy ID) fills enemy markers (006); missions will fill it by
+  difficulty later. Loot markers wait for 007.
+- **Navigation.** After assembly the wreck bakes the drones' navigation, one region per deck (see
+  [Robots](#robots-senses-and-navigation)). `Section.navigable` is off for sections drones can't use (vents, the
+  elevator).
 - **Adding a section:** create `content/base/sections/<name>/` with the scene and a `SectionDefinition`
   (`<name>.tres`) pointing at it. Fill whole cells, put a socket at the centre of every edge that can connect,
   and keep geometry inside the footprint (wall sockets build the walls on their edges). Static parts go under one
   `CSGCombiner3D` with collision. Shared parts (doors, lamps, buttons) and materials stay in `scenes/sections/`.
+  Add a turret mount where a turret could cover the space, clear of pillars, and turn `navigable` off if drones
+  can't use the section.
 
 ### Doors and elevators
 
 - `SlidingDoor`: an `AnimatableBody3D` panel that slides sideways into the wall. A doorway area holds a closing
   door open while the player stands in it, but never opens a closed one. Automatic doors also have a proximity
-  area (1.5 m either side) and close 2 s after the player leaves.
+  area (1.5 m either side) and close 2 s after the player leaves. Drones open and hold doors the same way.
 - `Elevator` (a `Section` spanning two decks): call buttons on each deck, a send button on the platform, doors
   driven by the elevator that only open at the deck where the platform is, and a `dinged(deck, sound_position)`
-  signal on arrival for enemy hearing later.
+  signal on arrival. The ding is also a noise robots hear (006).
 
 ### Weapons, health and damage
 
@@ -279,6 +295,37 @@ Built in [005](features/005-weapon-and-health.md).
   (`viewmodel`), which decals leave out so scorch marks never land on the weapon in view.
 - **Death.** The player's `died` signal ends the run. Until 008 the level reloads after 4 s.
 
+### Robots, senses and navigation
+
+Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later enemy types reuse the senses.
+
+- **Brain and bodies.** `Robot` (`scenes/enemies/`) is the brain every robot shares: each physics frame it senses
+  the player, lets its `RobotMind` (node-free) decide its state (idle, investigating, attacking, searching,
+  destroyed) and lock-on, and fires once locked; `RobotHeat` makes it vent. Its fire starts wide and walks in the
+  longer it keeps the player in sight (`RobotRules.aim_spread`), and it aims where the player was a moment ago
+  (`AimTrail`), so moving draws misses. `Turret` and `Drone` extend it for how
+  they move. A robot scene's root is the robot, with unique nodes `%Eye` (faces −Z; it sees and fires from there),
+  `%Searchlight`, `%Health`, `%Model` and its sounds. Robots join the `robots` group and find the player through the
+  `player` group. They wake a physics frame after the end of their first frame, once the wreck's CSG walls have
+  rebuilt; before that they would see through walls.
+- **Sight.** Exposure stays physical: a robot sees the player's active hitbox sample points inside its view cone and
+  range with nothing on `world` in between, and only shoots at points it sees. In the dark its range drops (5 m):
+  `Player.is_part_lit()` asks `LightLevel` (`scenes/combat/`) once per physics frame whether light from the visible
+  lights in the `sight_lights` group reaches each hitbox (Godot's attenuation and spot cone, weighted by the
+  colour's luminance, shadowed by `world`). The flashlight lights the whole player. A light that should show the
+  player up joins `sight_lights` in its scene.
+- **Hearing.** `Hearing.make_noise(source, position, loudness, kind)` is the one way to make a noise: it reaches
+  every Node3D in the `noise_listeners` group within `loudness` metres on the same deck (through walls, never
+  between decks), which reacts in `hear_noise()`. Sources so far: shots (loudness on the weapon definition),
+  footsteps (per movement state, on the player), the elevator's ding, robot shots and crashes.
+- **Navigation.** Navigation is baked per wreck at load, deferred to the end of its first frame (after the CSG
+  rebuild), one region per deck from a slice around that deck's floor, from the collision faces of the navigable
+  sections' CSG shapes. Doors and platforms are bodies, so they never block it. The agent (2 m tall, 0.375 m radius)
+  can't fit vents. The navigation cell size is 0.125 m (project setting), so doorways stay open. Flying enemies ask
+  for paths from the floor point below them and hold their height themselves.
+- **Combat music.** `CombatMusic`, in the player scene, plays while any robot is attacking and fades out a few
+  seconds after the last one stops.
+
 ### Interaction and HUD
 
 - `Interactable` is an `Area3D` on the `interactable` layer with a `prompt` and an `interacted` signal.
@@ -297,7 +344,8 @@ Built in [005](features/005-weapon-and-health.md).
   little glow. There is no sun.
 - Lamps are shadow-casting `SpotLight3D`s pointing down, so walls stop their light and nothing leaks between
   sections. Ceiling lamps are cold white; emergency lamps (same `CeilingLamp` script) are red. Whether a lamp
-  flickers is seeded from its position, so it is the same on every run.
+  flickers is seeded from its position, so it is the same on every run. Lamps are in the `sight_lights` group,
+  so what they light, robots see from afar (006).
 - The flashlight is a shadow-casting `SpotLight3D` on the player camera, toggled by `flashlight`.
 
 ## 6. Asset pipeline (Blender → Godot)
@@ -318,7 +366,8 @@ Built in [005](features/005-weapon-and-health.md).
 - Units: 1 Blender unit = 1 metre; apply scale and rotation before export.
 - Orientation: models face -Y in Blender (toward the Front view camera). This arrives as +Z in Godot, which is Godot's model front (`Vector3.MODEL_FRONT`).
 - Naming: a content model is named after its content folder (`laser_pistol.glb`). Objects and materials that
-  code looks up get fixed names in the script (the pistol's `Clip`, `Emitter` and `ClipHeat`). Otherwise TBD.
+  code looks up get fixed names in the script (the pistol's `Clip`, `Emitter` and `ClipHeat`; the turret's `Ring`
+  and `Head`; every robot's `Eye` and `Vents` materials). Otherwise TBD.
 - Animations: TBD (actions naming, NLA usage, root motion or not).
 - Collision: TBD (Godot import hints such as `-col` / `-colonly` suffixes, or collision built in Godot).
 - Textures: TBD (resolution budget, PBR or not).
@@ -361,13 +410,13 @@ Built in [005](features/005-weapon-and-health.md).
 - **Scope.** One developer working on an extraction shooter with crafting, a star map and procedural ships. Mitigate by
   sticking to the MVP cut in the roadmap and the one-feature-at-a-time rule.
 - **Content architecture.** If the registry and definition format are wrong, every later system pays for it.
-  003 settled and tested the registry with sections only. 005's weapon was the first kind with gameplay data and
-  fitted without changes to the registry; the robot and items (006, 007) are the next test.
+  003 settled and tested the registry with sections only. 005's weapon and 006's robots fitted without changes to
+  the registry; items (007) are the next test.
 - **Section assembly.** Sections must connect cleanly (sockets, alignment, no gaps), and navigation and lighting
-  must work across the seams. 002 proved the sockets, alignment and lighting by hand; navigation across seams is
-  still open and gets settled with the first enemy that moves (006).
+  must work across the seams. 002 proved the sockets, alignment and lighting by hand; 006 bakes navigation across
+  the seams at load. Wrecks assembled from blueprints will need the same bake to stay fast as they grow.
 - **Scripted art.** Hard-surface assets suit Blender scripting, but animated characters may need another source.
 - **Free peek and hit exposure.** 004 made exposure physical (hitboxes plus line of sight to their sample
-  points) and checks it with debug watchers. Whether it feels fair against enemies that shoot back is settled with
-  the robots in 006.
+  points) and checks it with debug watchers. The robots (006) see and shoot by the same rules, with a lock-on delay
+  that decides who shoots first; whether it feels fair is for the playtests to tune.
 - Minimum hardware is TBD (see [Performance targets](#7-performance-targets)).

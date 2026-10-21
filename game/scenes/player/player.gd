@@ -2,7 +2,8 @@ class_name Player
 extends CharacterBody3D
 ## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
 ## riding elevators, the flashlight, using interactables by looking at them, peeking and aiming out of cover, the
-## hitboxes enemies can hit, the weapon (aim down sights zoom, kick) and health (hit feedback, death).
+## hitboxes enemies can hit, the weapon (aim down sights zoom, kick) and health (hit feedback, death), and what
+## enemies sense of the player: footsteps they can hear, and which parts are lit so they can be seen from afar.
 ## MovementRules and PeekRules make the decisions; this script applies them to the body, head and camera. The
 ## Weapon fires and reloads, and Health counts the damage.
 
@@ -17,6 +18,8 @@ signal died
 const INTERACT_MASK := 0b101
 ## Physics layer that stops the head while peeking: world (1).
 const HEAD_MASK := 0b1
+## The group enemies find the player by.
+const GROUP := &"player"
 
 ## The camera stops this many degrees short of looking straight up or down.
 const PITCH_LIMIT_DEGREES := 89.0
@@ -111,13 +114,22 @@ const DEATH_FADE_TIME := 2.5
 ## Fresh thermal clips carried besides the loaded one (until 007 and 008 decide the real loadout).
 @export var starting_spare_clips: int = 4
 ## At or below this much health one more body hit could kill, so the screen edges stay faintly red.
-@export var critical_health: float = 35.0
+@export var critical_health: float = 10.0
 ## Degrees the view flinches when hit.
 @export var flinch_degrees: float = 1.5
 ## Seconds from death until the run ends.
 @export var death_restart_delay: float = 4.0
 ## Reload the level when the run ends, standing in for waking up as a new clone on the ship (008). Tests turn it off.
 @export var reload_on_death: bool = true
+
+@export_group("Footsteps")
+## Metres a footstep carries as noise, so enemies hear it: sprinting is loud, walking quieter, crouching quietest.
+@export var sprint_step_loudness: float = 10.0
+@export var walk_step_loudness: float = 4.0
+@export var crouch_step_loudness: float = 1.5
+@export var sprint_step_sound: AudioStream
+@export var walk_step_sound: AudioStream
+@export var crouch_step_sound: AudioStream
 
 var movement_state: MovementRules.State = MovementRules.State.IDLE
 var is_crouched: bool = false
@@ -155,6 +167,11 @@ var _zoom := 0.0
 ## How far a shot's kick or a hit's flinch has turned the view, in radians (x up, y left); it settles back to zero.
 var _view_kick := Vector2.ZERO
 var _death_time := 0.0
+## Metres walked since the last footstep.
+var _step_distance := 0.0
+## Which hitboxes are lit, worked out at most once per physics frame (_lit_frame).
+var _lit_parts := {}
+var _lit_frame := -1
 
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _camera: Camera3D = $Camera3D
@@ -166,9 +183,11 @@ var _death_time := 0.0
 @onready var _health: Health = $Health
 @onready var _weapon: Weapon = $Camera3D/Weapon
 @onready var _hit_sound: AudioStreamPlayer = $HitSound
+@onready var _footstep_sound: AudioStreamPlayer = $FootstepSound
 
 
 func _ready() -> void:
+	add_to_group(GROUP)
 	# Each player gets its own shape, because crouching changes its height.
 	_body_shape = (_collision_shape.shape as CylinderShape3D).duplicate()
 	_collision_shape.shape = _body_shape
@@ -231,6 +250,7 @@ func _physics_process(delta: float) -> void:
 	_update_velocity(input_dir, delta)
 	_try_step_up(delta)
 	_move_and_follow_floor()
+	_update_footsteps(delta)
 	_update_head(delta)
 	_update_interact_target()
 	if Input.is_action_just_pressed("interact") and interact_target:
@@ -293,6 +313,21 @@ func set_flashlight(on: bool) -> void:
 	Log.info("🏃 Flashlight %s: position=%s" % ["on" if on else "off", global_position])
 
 
+## Whether a hitbox is lit, so enemies see it from their full sight range rather than only up close: light from a
+## lamp, a searchlight or a muzzle flash reaches its centre, or the flashlight is on, which shows all of the player.
+## Worked out at most once per physics frame, however many enemies ask.
+func is_part_lit(hitbox: Hitbox) -> bool:
+	if is_flashlight_on():
+		return true
+	var frame := Engine.get_physics_frames()
+	if frame != _lit_frame:
+		_lit_frame = frame
+		_lit_parts.clear()
+	if not _lit_parts.has(hitbox):
+		_lit_parts[hitbox] = LightLevel.is_lit(get_world_3d().direct_space_state, get_tree(), hitbox.sample_points()[0])
+	return _lit_parts[hitbox]
+
+
 func _setup_head() -> void:
 	var head_shape := SphereShape3D.new()
 	head_shape.radius = head_radius
@@ -334,7 +369,7 @@ func _setup_combat() -> void:
 func _update_peek_state() -> void:
 	var centred := PeekRules.is_centred(_peek_target, peek_side_reach, peek_up_reach, peek_down_reach)
 	var next := PeekRules.next_state(peek_state, Input.is_action_pressed("peek"), Input.is_action_pressed("aim"),
-		Input.is_action_just_pressed("aim"), centred)
+		centred)
 	if next == peek_state:
 		return
 	var previous := peek_state
@@ -512,6 +547,31 @@ func _snap_down_off_edge() -> void:
 			and landing.get_normal().angle_to(up_direction) <= floor_max_angle:
 		global_position += up_direction * landing.get_travel().dot(up_direction)
 		apply_floor_snap()
+
+
+## A footstep every half stride while moving on the floor, as loud as the movement: a sound for the player and a
+## noise for enemies. Runs every physics frame; Hearing logs the steps someone hears.
+func _update_footsteps(delta: float) -> void:
+	var stepping := movement_state != MovementRules.State.IDLE and movement_state != MovementRules.State.CROUCH_IDLE
+	if not is_on_floor() or not stepping:
+		return
+	_step_distance += Vector2(velocity.x, velocity.z).length() * delta
+	if _step_distance < bob_stride_length / 2.0:
+		return
+	_step_distance -= bob_stride_length / 2.0
+	var loudness := walk_step_loudness
+	var sound := walk_step_sound
+	if movement_state == MovementRules.State.SPRINT:
+		loudness = sprint_step_loudness
+		sound = sprint_step_sound
+	elif movement_state == MovementRules.State.CROUCH_WALK:
+		loudness = crouch_step_loudness
+		sound = crouch_step_sound
+	if sound:
+		_footstep_sound.stream = sound
+		_footstep_sound.pitch_scale = randf_range(0.9, 1.1)
+		_footstep_sound.play()
+	Hearing.make_noise(self, global_position, loudness, Hearing.FOOTSTEP)
 
 
 ## Keeps the camera where it was when the body moves up or down a step, then lets it catch up smoothly.
