@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://ui/hit_markers.gd" id="4_hit_markers"]
 [ext_resource type="Script" path="res://ui/health_bar.gd" id="5_health_bar"]
 [ext_resource type="Script" path="res://ui/heat_gauge.gd" id="6_heat_gauge"]
+[ext_resource type="Script" path="res://ui/inventory_screen.gd" id="7_inventory"]
 
 [sub_resource type="SystemFont" id="SystemFont_placard"]
 font_names = PackedStringArray("Bahnschrift", "DIN Alternate", "Arial Narrow")
@@ -121,6 +122,26 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_charge_ring")
 
+[node name="HoldRing" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_charge_ring")
+track_color = Color(0.862745, 0.901961, 0.941176, 0.2)
+fill_color = Color(0.862745, 0.901961, 0.941176, 0.95)
+full_color = Color(0.862745, 0.901961, 0.941176, 1)
+radius = 15.0
+
 [node name="HitMarkers" type="Control" parent="Root"]
 layout_mode = 1
 anchors_preset = 15
@@ -142,6 +163,16 @@ grow_horizontal = 2
 mouse_filter = 2
 theme_override_constants/separation = 10
 alignment = 1
+
+[node name="Hold" type="Label" parent="Root/Prompt"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
+theme_override_colors/font_outline_color = Color(0.0196078, 0.0313726, 0.0431373, 0.8)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = SubResource("FontVariation_label")
+theme_override_font_sizes/font_size = 11
+text = "HOLD"
 
 [node name="KeyCap" type="PanelContainer" parent="Root/Prompt"]
 layout_mode = 2
@@ -265,6 +296,16 @@ theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
 theme_override_fonts/font = SubResource("SystemFont_action")
 theme_override_font_sizes/font_size = 13
 text = "4 fresh  ·  0 spent"
+
+[node name="InventoryScreen" type="Control" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_inventory")
 
 [node name="DeathFade" type="ColorRect" parent="Root"]
 layout_mode = 1

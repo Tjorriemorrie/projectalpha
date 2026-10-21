@@ -13,6 +13,43 @@
 [ext_resource type="PackedScene" path="res://content/base/sections/room_large/room_large.tscn" id="11_s11sq"]
 [ext_resource type="PackedScene" path="res://content/base/sections/corridor_straight/corridor_straight.tscn" id="12_m8qtd"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="13_gx28g"]
+[ext_resource type="Script" path="res://scenes/loot/loot_placement.gd" id="14_loot"]
+
+[sub_resource type="Resource" id="Resource_StoreRoomLocker"]
+script = ExtResource("14_loot")
+marker = "Deck1/StoreRoom/LootSpotWest"
+container = "base:locker"
+items = PackedStringArray("base:gyroscope", "base:power_cell", "base:conduit", "base:circuit_board", "base:thermal_clip", "base:thermal_clip")
+
+[sub_resource type="Resource" id="Resource_StoreRoomCrate"]
+script = ExtResource("14_loot")
+marker = "Deck1/StoreRoom/LootSpotEast"
+container = "base:supply_crate"
+items = PackedStringArray("base:hull_plating", "base:servo_motor", "base:circuit_board")
+
+[sub_resource type="Resource" id="Resource_DeadEndCase"]
+script = ExtResource("14_loot")
+marker = "Deck1/DeadEnd/LootSpot"
+container = "base:small_case"
+items = PackedStringArray("base:circuit_board", "base:data_drive", "base:thermal_clip")
+
+[sub_resource type="Resource" id="Resource_HoldLocker"]
+script = ExtResource("14_loot")
+marker = "Deck2/Hold/LootSpotNorth"
+container = "base:locker"
+items = PackedStringArray("base:plasma_coil", "base:gyroscope", "base:hull_plating", "base:conduit", "base:data_drive")
+
+[sub_resource type="Resource" id="Resource_HoldCrate"]
+script = ExtResource("14_loot")
+marker = "Deck2/Hold/LootSpotWest"
+container = "base:supply_crate"
+items = PackedStringArray("base:power_cell", "base:servo_motor", "base:thermal_clip", "base:thermal_clip")
+
+[sub_resource type="Resource" id="Resource_VentCase"]
+script = ExtResource("14_loot")
+marker = "Deck2/VentDeck2/LootSpot"
+container = "base:small_case"
+items = PackedStringArray("base:plasma_coil")
 
 [node name="SmallWreck" type="Node3D" unique_id=1261040855]
 script = ExtResource("1_yaaoo")
@@ -22,6 +59,7 @@ enemies = Dictionary[String, String]({
 "Deck2/Hold/EnemySpotNorthEast": "base:drone",
 "Deck2/Hold/TurretMount": "base:turret"
 })
+loot = Array[ExtResource("14_loot")]([SubResource("Resource_StoreRoomLocker"), SubResource("Resource_StoreRoomCrate"), SubResource("Resource_DeadEndCase"), SubResource("Resource_HoldLocker"), SubResource("Resource_HoldCrate"), SubResource("Resource_VentCase")])
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=874958639]
 environment = ExtResource("2_bteqj")

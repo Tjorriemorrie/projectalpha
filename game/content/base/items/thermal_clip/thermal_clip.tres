@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/loot/item_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Thermal clip"
+shape = PackedStringArray("#")
+value = 25
+description = "Soaks up a laser's heat: about 20 shots from the pistol. Reloads take clips from the pockets."
+model = "res://content/base/items/thermal_clip/thermal_clip.glb"

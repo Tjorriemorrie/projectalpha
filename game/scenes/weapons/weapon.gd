@@ -71,8 +71,10 @@ func is_equipped() -> bool:
 
 
 ## Runs the weapon for one physics frame. can_shoot is false while the player can't fire (peeking); lowered is true
-## while sprinting. Runs every physics frame, so it only logs when something happens.
-func physics_update(delta: float, can_shoot: bool, lowered: bool) -> void:
+## while sprinting or sorting the inventory. has_input is false while the inventory is open: the shoot, aim and
+## reload actions are ignored (they work the grids then), but a reload under way still finishes. Runs every physics
+## frame, so it only logs when something happens.
+func physics_update(delta: float, can_shoot: bool, lowered: bool, has_input: bool = true) -> void:
 	if not is_equipped() or not _enabled:
 		return
 	_cooldown = maxf(_cooldown - delta, 0.0)
@@ -80,6 +82,10 @@ func physics_update(delta: float, can_shoot: bool, lowered: bool) -> void:
 	_bloom = move_toward(_bloom, 0.0, definition.bloom_recovery * delta)
 	raise = move_toward(raise, 0.0 if lowered else 1.0, delta / maxf(definition.raise_time, 0.001))
 	_update_reload(delta)
+	if not has_input:
+		_ignore_input()
+		_viewmodel.set_state(raise, is_aiming, charge, reload_progress(), clips.heat)
+		return
 	is_aiming = Input.is_action_pressed("aim") and not is_reloading and not lowered
 	_update_trigger(delta, can_shoot)
 	if Input.is_action_just_pressed("reload"):
@@ -104,14 +110,15 @@ func start_reload() -> bool:
 			is_equipped(), _enabled, is_reloading, charge >= 0.0])
 		return false
 	if not clips.can_reload():
-		Log.info("🔫 Reload not started: fresh=%d, heat=%.0f%% (needs a fresh clip and a used one loaded)" % [
-			clips.fresh, clips.heat * 100.0])
+		Log.info(("🔫 Reload not started: fresh=%d, packed=%d, heat=%.0f%% (needs a fresh clip in the pockets and "
+			+ "a used one loaded)") % [clips.fresh, clips.packed, clips.heat * 100.0])
 		return false
+	var cell := clips.take_fresh()
 	is_reloading = true
 	_reload_left = definition.reload_time
 	_trigger_wait = -1.0
-	Log.info("🔫 Reload started: heat=%.0f%% (wasted), fresh=%d, spent=%d, time=%.1f s" % [
-		clips.heat * 100.0, clips.fresh, clips.spent, definition.reload_time])
+	Log.info("🔫 Reload started: heat=%.0f%% (wasted), pocket_cell=%s, fresh=%d, packed=%d, spent=%d, time=%.1f s" % [
+		clips.heat * 100.0, cell, clips.fresh, clips.packed, clips.spent, definition.reload_time])
 	reload_started.emit()
 	return true
 
@@ -160,8 +167,21 @@ func _update_reload(delta: float) -> void:
 		return
 	is_reloading = false
 	clips.swap()
-	Log.info("🔫 Reload finished: fresh=%d, spent=%d" % [clips.fresh, clips.spent])
+	Log.info("🔫 Reload finished: fresh=%d, packed=%d, spent=%d" % [clips.fresh, clips.packed, clips.spent])
 	reload_finished.emit()
+
+
+## While the inventory is open the buttons work the grids: a charge is dropped with no heat used, aiming stops, and
+## the trigger is ignored until it is released after the inventory closes. Runs every physics frame while it is
+## open, so it only logs when it drops a charge or a waiting pull.
+func _ignore_input() -> void:
+	if charge >= 0.0 or _trigger_wait >= 0.0:
+		Log.info("🔫 Charge and trigger dropped, inventory open: charge=%.2f, pull_waiting=%s" % [
+			charge, _trigger_wait >= 0.0])
+	charge = -1.0
+	_trigger_wait = -1.0
+	is_aiming = false
+	_trigger_suppressed = true
 
 
 ## Holding the trigger charges the shot and releasing it fires. A pull waits briefly while the weapon is being
@@ -204,14 +224,17 @@ func _on_trigger_pulled(can_shoot: bool) -> void:
 	_trigger_wait = maxf(TRIGGER_WAIT, definition.raise_time + 0.05)
 
 
+## A charge is kept for as long as the trigger is held, also through a peek, so the player can charge behind cover,
+## peek and aim out to fire. Released while the player can shoot it fires; released during a peek, which can't
+## fire, it is dropped with no heat used.
 func _update_charge(delta: float, can_shoot: bool, pressed: bool) -> void:
-	if not can_shoot:
-		Log.info("🔫 Charge cancelled, can't shoot: charge=%.2f, held=%.2f s" % [charge, _held_time])
-		charge = -1.0
-		return
 	if pressed:
 		_held_time += delta
 		charge = minf(WeaponRules.charge_for_hold(definition, _held_time), WeaponRules.max_charge(definition, clips))
+		return
+	if not can_shoot:
+		Log.info("🔫 Charge dropped, released while unable to shoot: charge=%.2f, held=%.2f s" % [charge, _held_time])
+		charge = -1.0
 		return
 	_fire(charge)
 

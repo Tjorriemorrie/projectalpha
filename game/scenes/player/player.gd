@@ -1,11 +1,13 @@
 class_name Player
 extends CharacterBody3D
 ## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
-## riding elevators, the flashlight, using interactables by looking at them, peeking and aiming out of cover, the
-## hitboxes enemies can hit, the weapon (aim down sights zoom, kick) and health (hit feedback, death), and what
-## enemies sense of the player: footsteps they can hear, and which parts are lit so they can be seen from afar.
-## MovementRules and PeekRules make the decisions; this script applies them to the body, head and camera. The
-## Weapon fires and reloads, and Health counts the damage.
+## riding elevators, the flashlight, using interactables by looking at them (pressing interact, or holding it to pry
+## a container open), peeking and aiming out of cover, the hitboxes enemies can hit, the weapon (aim down sights
+## zoom, kick) and health (hit feedback, death), the inventory (pockets and backpack, searching containers, picking
+## up and dropping items), and what enemies sense of the player: footsteps they can hear, and which parts are lit so
+## they can be seen from afar. MovementRules and PeekRules make the decisions; this script applies them to the body,
+## head and camera. The Weapon fires and reloads, Health counts the damage, and the HUD's InventoryScreen moves the
+## items. While the inventory is open the player stands still: no moving, looking, peeking or shooting.
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
@@ -53,6 +55,8 @@ const DEATH_PITCH := -20.0
 ## Seconds after death before the screen starts fading to black, and how long the fade takes.
 const DEATH_FADE_DELAY := 0.6
 const DEATH_FADE_TIME := 2.5
+## Metres to either side that a dropped item may land.
+const DROP_SCATTER := 0.2
 
 @export_group("Speeds")
 @export var walk_speed: float = 1.5
@@ -111,8 +115,6 @@ const DEATH_FADE_TIME := 2.5
 @export_group("Combat")
 ## The weapon the player carries, by content ID.
 @export var weapon_id := "base:laser_pistol"
-## Fresh thermal clips carried besides the loaded one (until 007 and 008 decide the real loadout).
-@export var starting_spare_clips: int = 4
 ## At or below this much health one more body hit could kill, so the screen edges stay faintly red.
 @export var critical_health: float = 10.0
 ## Degrees the view flinches when hit.
@@ -121,6 +123,22 @@ const DEATH_FADE_TIME := 2.5
 @export var death_restart_delay: float = 4.0
 ## Reload the level when the run ends, standing in for waking up as a new clone on the ship (008). Tests turn it off.
 @export var reload_on_death: bool = true
+
+@export_group("Inventory")
+## Cells of the pockets, for things at hand (a reload takes its clips from there), and of the backpack.
+@export var pocket_size := Vector2i(4, 1)
+@export var backpack_size := Vector2i(6, 5)
+## Fresh thermal clips the player starts with besides the loaded one, in the pockets and in the backpack (until 008
+## decides the real loadout).
+@export var starting_pocket_clips: int = 2
+@export var starting_backpack_clips: int = 2
+## Metres an item dropped on the floor carries as noise, so enemies hear it clatter.
+@export var drop_loudness: float = 3.0
+## Metres in front of the feet where dropped items land.
+@export var drop_distance: float = 0.5
+## Metres from the feet within which dropped items in sight show on the inventory screen's floor.
+@export var floor_reach: float = 1.5
+@export var drop_sound: AudioStream = preload("res://assets/audio/loot/item_drop.wav")
 
 @export_group("Footsteps")
 ## Metres a footstep carries as noise, so enemies hear it: sprinting is loud, walking quieter, crouching quietest.
@@ -139,8 +157,10 @@ var interact_target: Interactable
 var peek_state: PeekRules.State = PeekRules.State.NONE
 ## Where the head is relative to its normal position, in metres in the body's frame (x right, y up).
 var head_offset := Vector2.ZERO
-## The thermal clips the player carries; the weapon fires from them.
+## The thermal clips the player carries; the weapon fires from them. The clips themselves are items in the inventory.
 var clips: ThermalClips
+## What the player carries: the pockets and the backpack.
+var inventory: Inventory
 var is_dead := false
 
 var _crouch_toggled := false
@@ -153,6 +173,10 @@ var _bob_phase := 0.0
 var _bob_amplitude := 0.0
 var _body_shape: CylinderShape3D
 var _shown_prompt := ""
+var _shown_hold := false
+## The interactable interact is being held on, and for how many seconds; -1 when nothing is held.
+var _held_target: Interactable
+var _hold := -1.0
 ## Where the mouse has moved the peek to; the head follows it unless a wall is in the way.
 var _peek_target := Vector2.ZERO
 ## head_offset at the previous physics frame, so the camera can interpolate the head between frames.
@@ -184,6 +208,7 @@ var _lit_frame := -1
 @onready var _weapon: Weapon = $Camera3D/Weapon
 @onready var _hit_sound: AudioStreamPlayer = $HitSound
 @onready var _footstep_sound: AudioStreamPlayer = $FootstepSound
+@onready var _inventory_screen: InventoryScreen = _hud.get_inventory_screen()
 
 
 func _ready() -> void:
@@ -200,6 +225,8 @@ func _ready() -> void:
 	_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_setup_head()
 	_setup_combat()
+	_inventory_screen.dropped_on_floor.connect(_on_dropped_on_floor)
+	_inventory_screen.taken_from_floor.connect(_on_taken_from_floor)
 	_update_camera()
 	_set_mouse_captured(true)
 	Log.info(("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°, "
@@ -223,6 +250,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var pitch_limit := deg_to_rad(PITCH_LIMIT_DEGREES)
 		_yaw = wrapf(_yaw - turn.x, -PI, PI)
 		_pitch = clampf(_pitch - turn.y, -pitch_limit, pitch_limit)
+	elif is_inventory_open():
+		# Esc closes the inventory (read in _physics_process), and the mouse stays free for the grids.
+		return
 	elif event.is_action_pressed("pause") and mouse_captured:
 		_set_mouse_captured(false)
 	elif event is InputEventMouseButton and event.is_pressed() and not mouse_captured:
@@ -239,6 +269,9 @@ func _physics_process(delta: float) -> void:
 		_update_velocity(Vector2.ZERO, delta)
 		_move_and_follow_floor()
 		return
+	if is_inventory_open():
+		_update_while_sorting(delta)
+		return
 	_update_peek_state()
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var sprint_blocked := peek_state != PeekRules.State.NONE or _weapon.blocks_sprint()
@@ -253,12 +286,13 @@ func _physics_process(delta: float) -> void:
 	_update_footsteps(delta)
 	_update_head(delta)
 	_update_interact_target()
-	if Input.is_action_just_pressed("interact") and interact_target:
-		interact_target.interact()
+	_update_interact(delta)
 	if Input.is_action_just_pressed("flashlight"):
 		set_flashlight(not is_flashlight_on())
 	# A peek can't shoot; aiming out can.
 	_weapon.physics_update(delta, peek_state != PeekRules.State.PEEK, movement_state == MovementRules.State.SPRINT)
+	if Input.is_action_just_pressed("inventory") and not is_inventory_open():
+		open_inventory()
 
 
 func _process(delta: float) -> void:
@@ -304,6 +338,44 @@ func get_weapon() -> Weapon:
 	return _weapon
 
 
+func get_inventory_screen() -> InventoryScreen:
+	return _inventory_screen
+
+
+func is_inventory_open() -> bool:
+	return _inventory_screen.is_open
+
+
+## Opens the inventory screen with the dropped items within reach on its floor, searching a container when one is
+## given. picked is a dropped item the player looked at, which is on the floor even if it is a little out of reach.
+## The player stands still until it closes.
+func open_inventory(loot: Lootable = null, picked: DroppedItem = null) -> void:
+	if is_dead or is_inventory_open():
+		Log.info("🏃 Inventory not opened: dead=%s, already_open=%s" % [is_dead, is_inventory_open()])
+		return
+	_end_hold()
+	interact_target = null
+	_shown_prompt = ""
+	_shown_hold = false
+	_hud.set_prompt("", "")
+	_set_mouse_captured(false)
+	var floor := _gather_floor(picked)
+	_inventory_screen.open(inventory, loot, floor)
+	Log.info("🏃 Inventory opened: loot=%s, floor_items=%d, position=%s, crouched=%s" % [
+		loot.title if loot else "none", floor.items.size(), global_position, is_crouched])
+
+
+func close_inventory() -> void:
+	if not is_inventory_open():
+		return
+	_inventory_screen.close()
+	# The button that dragged items must not fire when the view comes back.
+	_weapon.suppress_trigger()
+	if not is_dead:
+		_set_mouse_captured(true)
+	Log.info("🏃 Inventory closed: position=%s" % global_position)
+
+
 func is_flashlight_on() -> bool:
 	return _flashlight.visible
 
@@ -345,31 +417,45 @@ func _setup_head() -> void:
 	_update_hitboxes()
 
 
-## Arms the player with the weapon from the content registry and the clips they start with, and listens for hits.
+## Arms the player with the weapon from the content registry, fills the inventory with the clips they start with,
+## and listens for hits.
 func _setup_combat() -> void:
-	clips = ThermalClips.new(starting_spare_clips)
+	inventory = Inventory.new(pocket_size, backpack_size)
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
 	_weapon.fired.connect(_on_weapon_fired)
 	var definition := ContentRegistry.get_definition(weapon_id) as WeaponDefinition
 	if definition == null:
 		Log.error("🏃 No weapon equipped, not a registered weapon: weapon_id=%s" % weapon_id)
+		clips = ThermalClips.new(inventory)
 	else:
+		var fresh_clip := ContentRegistry.get_definition(definition.clip_item) as ItemDefinition
+		var spent_clip := ContentRegistry.get_definition(definition.spent_clip_item) as ItemDefinition
+		if fresh_clip == null or spent_clip == null:
+			Log.error("🏃 Weapon clips are not registered items: weapon=%s, clip_item=%s, spent_clip_item=%s" % [
+				weapon_id, definition.clip_item, definition.spent_clip_item])
+		else:
+			for i in starting_pocket_clips:
+				inventory.pockets.add(Item.new(fresh_clip))
+			for i in starting_backpack_clips:
+				inventory.backpack.add(Item.new(fresh_clip))
+		clips = ThermalClips.new(inventory, fresh_clip, spent_clip)
 		var own_hitboxes: Array[RID] = []
 		for hitbox in get_hitboxes():
 			own_hitboxes.append(hitbox.get_rid())
 		_weapon.equip(definition, clips, own_hitboxes)
 	_hud.set_health(_health.health, _health.max_health, false)
-	Log.info("🏃 Combat ready: health=%.0f, weapon=%s, fresh_clips=%d, critical_health=%.0f" % [
-		_health.health, weapon_id if _weapon.is_equipped() else "none", clips.fresh, critical_health])
+	Log.info(("🏃 Combat ready: health=%.0f, weapon=%s, pockets=%s, backpack=%s, fresh=%d, packed=%d, "
+		+ "critical_health=%.0f") % [_health.health, weapon_id if _weapon.is_equipped() else "none", pocket_size,
+		backpack_size, clips.fresh, clips.packed, critical_health])
 
 
 ## The peek follows the peek and aim actions (see PeekRules.next_state). Releasing peek centres the peek target,
 ## so the next peek starts from the body. Runs every physics frame, so it only logs when the state changes.
-func _update_peek_state() -> void:
+func _update_peek_state(allowed: bool = true) -> void:
 	var centred := PeekRules.is_centred(_peek_target, peek_side_reach, peek_up_reach, peek_down_reach)
 	var next := PeekRules.next_state(peek_state, Input.is_action_pressed("peek"), Input.is_action_pressed("aim"),
-		centred)
+		centred) if allowed else PeekRules.State.NONE
 	if next == peek_state:
 		return
 	var previous := peek_state
@@ -429,14 +515,148 @@ func _update_interact_target() -> void:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	var target: Interactable = hit.get("collider") as Interactable if not hit.is_empty() else null
 	var action := target.prompt if target else ""
+	var dropped := target.get_parent() as DroppedItem if target else null
+	if dropped:
+		action = "Pick up %s" % dropped.item.definition.display_name.to_lower()
+	var hold := target != null and target.hold_time > 0.0
 	if target != interact_target:
 		interact_target = target
 		Log.info("🏃 Interact target changed: target=%s, prompt=%s" % [
 			"%s/%s" % [target.get_parent().name, target.name] if target else "none", action])
 	# The prompt can change while looking at the same target (the elevator's "Ride up" becomes "Ride down").
-	if action != _shown_prompt:
+	if action != _shown_prompt or hold != _shown_hold:
 		_shown_prompt = action
-		_hud.set_prompt(Hud.key_label(&"interact"), action)
+		_shown_hold = hold
+		_hud.set_prompt(Hud.key_label(&"interact"), action, hold)
+
+
+## Uses the interactable looked at: on the press, or, for one with a hold time (prying a container open), once
+## interact has been held on it that long. Letting go or looking away cancels a hold. Runs every physics frame, so
+## it only logs (through the interactable) when a hold starts or stops.
+func _update_interact(delta: float) -> void:
+	var target := interact_target
+	if _held_target and (target != _held_target or not Input.is_action_pressed("interact")):
+		_end_hold()
+	if target == null:
+		return
+	if target.hold_time <= 0.0:
+		if Input.is_action_just_pressed("interact"):
+			_use(target)
+		return
+	if _held_target == null:
+		if Input.is_action_just_pressed("interact"):
+			_held_target = target
+			_hold = 0.0
+			target.set_held(true)
+		return
+	_hold += delta
+	if _hold >= target.hold_time:
+		_end_hold()
+		_use(target)
+
+
+func _end_hold() -> void:
+	if _held_target and is_instance_valid(_held_target):
+		_held_target.set_held(false)
+	_held_target = null
+	_hold = -1.0
+
+
+## Uses an interactable: a dropped item opens the inventory with it on the floor, to be dragged into a grid; loot is
+## searched once it is open; anything else is interacted with.
+func _use(target: Interactable) -> void:
+	var dropped := target.get_parent() as DroppedItem
+	if dropped:
+		target.interact()
+		open_inventory(null, dropped)
+		return
+	target.interact()
+	var loot := target as Lootable
+	if loot and loot.is_open:
+		open_inventory(loot)
+
+
+## The floor for the inventory screen: the dropped items in sight within floor_reach of the feet (and picked, if
+## given), nearest first, laid out in a grid InventoryScreen.FLOOR_COLUMNS wide that grows to hold them all.
+func _gather_floor(picked: DroppedItem) -> ItemGrid:
+	var space := get_world_3d().direct_space_state
+	var eye := _camera.global_position
+	var nearby: Array[DroppedItem] = []
+	for node in get_tree().get_nodes_in_group(DroppedItem.GROUP):
+		var dropped := node as DroppedItem
+		if dropped == null or dropped.is_queued_for_deletion():
+			continue
+		var offset := dropped.global_position - global_position
+		var in_reach := Vector2(offset.x, offset.z).length() <= floor_reach and absf(offset.y) <= 1.0
+		if dropped != picked and not in_reach:
+			continue
+		var sight := PhysicsRayQueryParameters3D.create(eye, dropped.global_position + Vector3.UP * 0.05, HEAD_MASK)
+		if dropped != picked and not space.intersect_ray(sight).is_empty():
+			continue
+		nearby.append(dropped)
+	nearby.sort_custom(func(a: DroppedItem, b: DroppedItem) -> bool:
+		return a.global_position.distance_squared_to(global_position) \
+			< b.global_position.distance_squared_to(global_position))
+	var floor := ItemGrid.new(Vector2i(InventoryScreen.FLOOR_COLUMNS, InventoryScreen.FLOOR_SPARE_ROWS))
+	for dropped in nearby:
+		if not floor.add(dropped.item):
+			floor.grow_to(floor.size.y + ItemShape.size_of(dropped.item.definition.get_cells()).y)
+			floor.add(dropped.item)
+	Log.info("🏃 Gathered the floor: items=%d, reach=%.1f m, picked=%s" % [
+		floor.items.size(), floor_reach, picked.item.definition.id if picked else "none"])
+	return floor
+
+
+## While the inventory is open the player stands still in their stance and can't look, peek or shoot; Tab, Esc and
+## interact close it. The world keeps going, and a reload under way still finishes.
+func _update_while_sorting(delta: float) -> void:
+	if Input.is_action_just_pressed("inventory") or Input.is_action_just_pressed("pause") \
+			or Input.is_action_just_pressed("interact"):
+		close_inventory()
+	_update_peek_state(false)
+	_set_movement_state(MovementRules.State.CROUCH_IDLE if is_crouched else MovementRules.State.IDLE)
+	_update_velocity(Vector2.ZERO, delta)
+	_move_and_follow_floor()
+	_update_footsteps(delta)
+	_update_head(delta)
+	_weapon.physics_update(delta, false, true, false)
+
+
+## An item was dragged onto the inventory screen's floor (or out of the inventory): it lands in front of the
+## player's feet (at their feet when a wall is in the way), and clatters, a noise enemies hear.
+func _on_dropped_on_floor(item: Item) -> void:
+	var forward := -global_basis.z
+	var chest := global_position + up_direction * 0.5
+	var query := PhysicsRayQueryParameters3D.create(chest, chest + forward * (drop_distance + 0.15), HEAD_MASK,
+		[get_rid()])
+	var distance := drop_distance
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		distance = maxf(chest.distance_to(hit["position"]) - 0.2, 0.0)
+	var body := DroppedItem.create(item, drop_sound)
+	get_parent().add_child(body, true)
+	# A little to either side, so things dropped one after another don't land in a stack.
+	var aside := global_basis.x * randf_range(-DROP_SCATTER, DROP_SCATTER)
+	body.global_position = global_position + forward * distance + aside + up_direction * 0.3
+	body.rotation.y = randf() * TAU
+	body.linear_velocity = forward * 0.4
+	Log.info("🏃 Dropped item: item=%s, position=%s, distance=%.2f m, wall_in_front=%s" % [
+		item.definition.id, body.global_position, distance, not hit.is_empty()])
+	Hearing.make_noise(body, body.global_position, drop_loudness, &"item_drop")
+
+
+## An item was dragged off the inventory screen's floor into a grid: it leaves the world.
+func _on_taken_from_floor(item: Item) -> void:
+	for node in get_tree().get_nodes_in_group(DroppedItem.GROUP):
+		var dropped := node as DroppedItem
+		if dropped and dropped.item == item:
+			Log.info("🏃 Picked up item: item=%s, position=%s, into=%s" % [
+				item.definition.id, dropped.global_position, "pockets" if inventory.grid_of(item) == inventory.pockets
+				else "backpack" if inventory.grid_of(item) else "container"])
+			dropped.remove_from_group(DroppedItem.GROUP)
+			dropped.queue_free()
+			return
+	Log.warning("🏃 Item taken from the floor had no dropped item in the world: item=%s" % item.definition.id)
 
 
 func _update_crouch(wants_crouch: bool) -> void:
@@ -609,9 +829,11 @@ func _on_died() -> void:
 	_peek_target = Vector2.ZERO
 	_head_offset_previous = Vector2.ZERO
 	head_offset = Vector2.ZERO
+	_end_hold()
+	close_inventory()
 	_hud.fade_out(DEATH_FADE_TIME, DEATH_FADE_DELAY)
-	Log.info("🏃 Player died: position=%s, restart_in=%.1f s, reload_on_death=%s, fresh=%d, spent=%d" % [
-		global_position, death_restart_delay, reload_on_death, clips.fresh, clips.spent])
+	Log.info("🏃 Player died: position=%s, restart_in=%.1f s, reload_on_death=%s, fresh=%d, spent=%d, value=%d" % [
+		global_position, death_restart_delay, reload_on_death, clips.fresh, clips.spent, inventory.value()])
 	died.emit()
 	get_tree().create_timer(death_restart_delay).timeout.connect(_end_run)
 
@@ -643,9 +865,10 @@ func _update_hud() -> void:
 	var definition := _weapon.definition
 	var charge_heat := WeaponRules.shot_heat(definition, _weapon.charge) if _weapon.charge >= 0.0 else 0.0
 	var saturated := not clips.has_room_for(definition.shot_heat)
-	_hud.set_clips(clips.heat, charge_heat, clips.fresh, clips.spent, _weapon.is_clip_low(), saturated,
+	_hud.set_clips(clips.heat, charge_heat, clips.fresh, clips.packed, clips.spent, _weapon.is_clip_low(), saturated,
 		_weapon.reload_progress())
 	_hud.set_charge(_weapon.charge)
+	_hud.set_hold(_hold / _held_target.hold_time if _held_target and _held_target.hold_time > 0.0 else -1.0)
 
 
 ## The head doesn't bob while peeking, so the peek holds steady.

@@ -6,6 +6,8 @@
 script = ExtResource("1_definition")
 display_name = "Laser pistol"
 viewmodel = "res://content/base/weapons/laser_pistol/laser_pistol.tscn"
+clip_item = "base:thermal_clip"
+spent_clip_item = "base:spent_thermal_clip"
 damage = 25.0
 shot_range = 100.0
 fire_interval = 0.333

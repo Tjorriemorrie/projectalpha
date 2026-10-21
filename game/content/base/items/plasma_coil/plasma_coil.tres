@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/loot/item_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Plasma coil"
+shape = PackedStringArray("###", ".#.")
+value = 180
+description = "A weapon-grade coil with its core still live. The richest find for its size."
+model = "res://content/base/items/plasma_coil/plasma_coil.glb"

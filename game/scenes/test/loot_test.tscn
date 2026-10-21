@@ -1,0 +1,60 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/wreck/wreck.gd" id="1_wreck"]
+[ext_resource type="Environment" path="res://scenes/wreck/wreck_environment.tres" id="2_environment"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_end/corridor_end.tscn" id="3_corridor_end"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_straight/corridor_straight.tscn" id="4_corridor_straight"]
+[ext_resource type="PackedScene" path="res://content/base/sections/room_small/room_small.tscn" id="5_room_small"]
+[ext_resource type="PackedScene" path="res://content/base/sections/vent_straight/vent_straight.tscn" id="6_vent_straight"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="7_player"]
+[ext_resource type="Script" path="res://scenes/loot/loot_placement.gd" id="8_loot"]
+
+[sub_resource type="Resource" id="Resource_locker"]
+script = ExtResource("8_loot")
+marker = "Sections/Store/LootSpotWest"
+container = "base:locker"
+items = PackedStringArray("base:gyroscope", "base:power_cell", "base:thermal_clip", "base:thermal_clip")
+
+[sub_resource type="Resource" id="Resource_crate"]
+script = ExtResource("8_loot")
+marker = "Sections/Store/LootSpotEast"
+container = "base:supply_crate"
+items = PackedStringArray("base:hull_plating", "base:servo_motor", "base:circuit_board")
+
+[sub_resource type="Resource" id="Resource_entrance_case"]
+script = ExtResource("8_loot")
+marker = "Sections/Entrance/LootSpot"
+container = "base:small_case"
+items = PackedStringArray("base:data_drive", "base:thermal_clip")
+
+[sub_resource type="Resource" id="Resource_vent_case"]
+script = ExtResource("8_loot")
+marker = "Sections/Vent/LootSpot"
+container = "base:small_case"
+items = PackedStringArray("base:plasma_coil")
+
+[node name="LootTest" type="Node3D"]
+script = ExtResource("1_wreck")
+loot = Array[ExtResource("8_loot")]([SubResource("Resource_locker"), SubResource("Resource_crate"), SubResource("Resource_entrance_case"), SubResource("Resource_vent_case")])
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_environment")
+
+[node name="Sections" type="Node3D" parent="."]
+
+[node name="Entrance" parent="Sections" instance=ExtResource("3_corridor_end")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 8)
+
+[node name="Corridor" parent="Sections" instance=ExtResource("4_corridor_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
+
+[node name="Store" parent="Sections" instance=ExtResource("5_room_small")]
+
+[node name="Vent" parent="Sections" instance=ExtResource("6_vent_straight")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 4, 0, 0)
+
+[node name="Closet" parent="Sections" instance=ExtResource("5_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0)
+
+[node name="Player" parent="." instance=ExtResource("7_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)

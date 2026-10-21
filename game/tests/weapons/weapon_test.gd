@@ -48,7 +48,9 @@ func test_player_starts_armed_with_five_clips() -> void:
 	assert_bool(_weapon.is_equipped()).is_true()
 	assert_str(_weapon.definition.id).is_equal("base:laser_pistol")
 	assert_float(_player.clips.heat).is_equal(0.0)
-	assert_int(_player.clips.fresh).is_equal(4)
+	# One loaded, two in the pockets and two in the backpack.
+	assert_int(_player.clips.fresh).is_equal(2)
+	assert_int(_player.clips.packed).is_equal(2)
 	assert_int(_player.clips.spent).is_equal(0)
 	assert_float(_player.get_health().health).is_equal(100.0)
 
@@ -107,6 +109,42 @@ func test_peek_cannot_shoot() -> void:
 	assert_float(_player.clips.heat).is_equal(0.0)
 
 
+func test_a_charge_is_kept_through_a_peek_and_fires_once_aimed_out() -> void:
+	await _face_target()
+	Input.action_press(&"shoot")
+	await _physics_frames(roundi(0.5 * FRAMES_PER_SECOND))
+	# With aim held, peek is a plain peek until the head moves, and a peek can't shoot: the charge waits.
+	Input.action_press(&"peek")
+	await _physics_frames(3)
+	assert_int(_player.peek_state).is_equal(PeekRules.State.PEEK)
+	assert_float(_weapon.charge).is_greater(0.0)
+	_player.move_head(Vector2(1000.0, 0.0))
+	await _physics_frames(10)
+	assert_int(_player.peek_state).is_equal(PeekRules.State.AIM_OUT)
+	var charge := _weapon.charge
+	assert_float(charge).is_greater(0.3)
+	Input.action_release(&"shoot")
+	await _physics_frames(2)
+	assert_int(_weapon.shots_fired).is_equal(1)
+	assert_float(_player.clips.heat).is_equal_approx(WeaponRules.shot_heat(_weapon.definition, charge), 0.02)
+
+
+func test_a_charge_released_during_a_peek_is_dropped() -> void:
+	await _face_target()
+	Input.action_release(&"aim")
+	Input.action_press(&"shoot")
+	await _physics_frames(roundi(0.5 * FRAMES_PER_SECOND))
+	Input.action_press(&"peek")
+	await _physics_frames(3)
+	assert_int(_player.peek_state).is_equal(PeekRules.State.PEEK)
+	assert_float(_weapon.charge).is_greater(0.0)
+	Input.action_release(&"shoot")
+	await _physics_frames(3)
+	assert_float(_weapon.charge).is_less(0.0)
+	assert_int(_weapon.shots_fired).is_equal(0)
+	assert_float(_player.clips.heat).is_equal(0.0)
+
+
 func test_saturated_clip_cannot_fire() -> void:
 	await _face_target()
 	_player.clips.heat = 1.0
@@ -127,10 +165,13 @@ func test_reload_takes_its_time_and_swaps_the_clip() -> void:
 	assert_int(_weapon.shots_fired).is_equal(1)
 	await _physics_frames(roundi(2.5 * FRAMES_PER_SECOND))
 	assert_bool(_weapon.is_reloading).is_true()
-	assert_int(_player.clips.fresh).is_equal(4)
+	# The fresh clip left the pockets when the reload started; its cell waits for the spent one.
+	assert_int(_player.clips.fresh).is_equal(1)
+	assert_int(_player.clips.spent).is_equal(0)
 	await _physics_frames(FRAMES_PER_SECOND)
 	assert_bool(_weapon.is_reloading).is_false()
-	assert_int(_player.clips.fresh).is_equal(3)
+	assert_int(_player.clips.fresh).is_equal(1)
+	assert_int(_player.clips.packed).is_equal(2)
 	assert_int(_player.clips.spent).is_equal(1)
 	assert_float(_player.clips.heat).is_equal(0.0)
 
@@ -140,7 +181,7 @@ func test_reload_with_an_unused_clip_does_nothing() -> void:
 	Input.action_press(&"reload")
 	await _physics_frames(2)
 	assert_bool(_weapon.is_reloading).is_false()
-	assert_int(_player.clips.fresh).is_equal(4)
+	assert_int(_player.clips.fresh).is_equal(2)
 
 
 func test_reloading_blocks_sprint() -> void:

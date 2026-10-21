@@ -1,8 +1,8 @@
 class_name Wreck
 extends Node3D
 ## A wreck assembled from kit sections. On load it joins the sockets of its sections, opens up the walls they
-## join, and reports everything that doesn't fit (see WreckAssembly). Then it bakes the navigation drones fly by,
-## one region per deck, and places the robots of its enemy list on their markers.
+## join, and reports everything that doesn't fit (see WreckAssembly). Then it places the robots of its enemy list
+## and the containers of its loot list on their markers, and bakes the navigation drones fly by, one region per deck.
 
 ## The drones' navigation agent: its radius keeps paths off the walls, and its height keeps them out of vents.
 const AGENT_RADIUS := 0.375
@@ -16,6 +16,9 @@ const NAVIGATION_ABOVE := 2.4
 ## The robots to place: the path of an enemy marker (from the wreck) and the ID of the enemy that goes there.
 ## Missions will fill markers by difficulty later; until then each wreck lists its own.
 @export var enemies: Dictionary[String, String] = {}
+## The containers to place on loot markers and exactly what is inside each. Missions will fill markers from loot
+## tables later; until then each wreck lists its own.
+@export var loot: Array[LootPlacement] = []
 ## Show the robots' state above them, for test levels.
 @export var debug_robots := false
 
@@ -25,12 +28,15 @@ var assembly_errors := PackedStringArray()
 var plan: WreckAssembly.Plan
 ## The robots the wreck placed, in the order of its enemy list.
 var robots: Array[Robot] = []
+## The containers the wreck placed, in the order of its loot list.
+var containers: Array[LootContainer] = []
 var navigation_regions: Array[NavigationRegion3D] = []
 
 
 func _ready() -> void:
 	assemble()
 	place_enemies()
+	place_loot()
 	# CSG shapes rebuild at the end of the frame, so the walls the sockets changed are only there to bake from then.
 	# Drones wait for the navigation.
 	bake_navigation.call_deferred()
@@ -84,7 +90,7 @@ func assemble() -> void:
 ## Bakes one navigation region per deck from the static level geometry of the navigable sections: the collision
 ## faces of their CSG shapes, including the walls the sockets built, so doorways the assembly opened are open. Door
 ## panels and the elevator platform are bodies, not CSG, so they never block it; vents and elevators aren't
-## navigable.
+## navigable. The containers' footprints are cut out, so drones fly round them rather than into a locker.
 func bake_navigation() -> void:
 	var decks := {}
 	var source := NavigationMeshSourceGeometryData3D.new()
@@ -105,8 +111,11 @@ func bake_navigation() -> void:
 				continue
 			source.add_faces(faces, shape.global_transform)
 			shapes += 1
-	Log.info("🧩 Baking navigation: wreck=%s, decks=%d, shapes=%d, faces=%d" % [
-		name, decks.size(), shapes, source.get_vertices().size() / 3])
+	for container in containers:
+		var footprint := container.get_footprint()
+		source.add_projected_obstruction(footprint, footprint[0].y, container.get_height(), false)
+	Log.info("🧩 Baking navigation: wreck=%s, decks=%d, shapes=%d, faces=%d, container_footprints=%d" % [
+		name, decks.size(), shapes, source.get_vertices().size() / 3, containers.size()])
 	var deck_list := decks.keys()
 	deck_list.sort()
 	for deck: int in deck_list:
@@ -161,6 +170,64 @@ func place_enemies() -> void:
 	assembly_errors.append_array(problems)
 	Log.info("🧩 Robots placed: wreck=%s, robots=%d, listed=%d, problems=%d" % [
 		name, robots.size(), enemies.size(), problems.size()])
+
+
+## Places a container on every marker of the loot list and packs its items into it in order. Markers that aren't
+## loot markers, unknown containers and items, containers too big for a tight marker, and items that don't fit are
+## assembly errors; those containers (or items) are left out.
+func place_loot() -> void:
+	if loot.is_empty():
+		Log.info("🧩 No loot to place: wreck=%s" % name)
+		return
+	var parent := Node3D.new()
+	parent.name = "Loot"
+	add_child(parent)
+	var problems := PackedStringArray()
+	var items_packed := 0
+	for placement in loot:
+		if placement == null:
+			problems.append("Empty loot placement")
+			continue
+		var marker := get_node_or_null(NodePath(placement.marker)) as SectionMarker
+		if marker == null or marker.kind != SectionMarker.Kind.LOOT:
+			problems.append("Not a loot marker: marker=%s, container=%s" % [placement.marker, placement.container])
+			continue
+		var definition := ContentRegistry.get_definition(placement.container) as ContainerDefinition
+		if definition == null:
+			problems.append("Not a registered container: marker=%s, container=%s" % [
+				placement.marker, placement.container])
+			continue
+		if marker.space == SectionMarker.Space.TIGHT and not definition.fits_tight:
+			problems.append("Container doesn't fit its marker: marker=%s, container=%s, space=TIGHT" % [
+				placement.marker, placement.container])
+			continue
+		var items: Array[ItemDefinition] = []
+		for id in placement.items:
+			var item := ContentRegistry.get_definition(id) as ItemDefinition
+			if item == null:
+				problems.append("Not a registered item: marker=%s, item=%s" % [placement.marker, id])
+				continue
+			items.append(item)
+		var container := (load(definition.get_scene_path()) as PackedScene).instantiate() as LootContainer
+		if container == null:
+			problems.append("Container scene root is not a LootContainer: marker=%s, container=%s" % [
+				placement.marker, placement.container])
+			continue
+		container.name = "%s_%s" % [definition.id.get_slice(":", 1).to_pascal_case(), marker.get_parent().name]
+		container.definition = definition
+		container.transform = parent.global_transform.affine_inverse() * marker.global_transform
+		parent.add_child(container, true)
+		var left_out := container.fill(items)
+		for item in left_out:
+			problems.append("Item doesn't fit its container: marker=%s, container=%s, item=%s" % [
+				placement.marker, placement.container, item.id])
+		items_packed += items.size() - left_out.size()
+		containers.append(container)
+	for problem in problems:
+		Log.error("🧩 Wreck assembly problem: wreck=%s, %s" % [name, problem])
+	assembly_errors.append_array(problems)
+	Log.info("🧩 Loot placed: wreck=%s, containers=%d, listed=%d, items=%d, problems=%d" % [
+		name, containers.size(), loot.size(), items_packed, problems.size()])
 
 
 ## A navigation mesh for the drones on one deck, baked only from the slice of the wreck around that deck's floor.

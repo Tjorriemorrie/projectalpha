@@ -35,6 +35,8 @@ script = ExtResource("1_script")
 investigate_chirp = ExtResource("6_investigate")
 alarm_chirp = ExtResource("7_alarm")
 lost_chirp = ExtResource("8_lost")
+salvage_box = Vector3(0.6, 0.6, 0.6)
+salvage_offset = Vector3(0, -0.3, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.21, 0)

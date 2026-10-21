@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ContainerDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/loot/container_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Locker"
+scene = "res://content/base/containers/locker/locker.tscn"
+grid_size = Vector2i(4, 5)

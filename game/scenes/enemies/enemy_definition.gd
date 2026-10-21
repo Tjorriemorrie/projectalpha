@@ -72,6 +72,12 @@ extends ContentDefinition
 ## Metres the crash of its wreckage carries when it is destroyed.
 @export var crash_loudness: float = 15.0
 
+@export_group("Salvage")
+## Columns and rows of the grid its wreckage holds its salvage in.
+@export var salvage_grid := Vector2i(3, 3)
+## The parts the player can pry out of its wreckage, by content ID, packed into the grid in this order.
+@export var salvage := PackedStringArray()
+
 
 ## The scene's res:// path, also when the inspector stored a uid://.
 func get_scene_path() -> String:

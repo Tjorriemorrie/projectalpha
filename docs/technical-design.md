@@ -25,7 +25,7 @@ Pin the Godot version and only upgrade deliberately, between features.
 - Logging goes through `Log` (`game/scripts/log.gd`): `Log.info`, `Log.warning` and `Log.error` only, never a
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
   🧩 wreck assembly and navigation, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers,
-  🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music).
+  🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music, 🎒 inventory, loot and items).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -47,7 +47,9 @@ projectalpha/
     │   └── base/
     │       ├── sections/  # One self-contained folder per kit section
     │       ├── weapons/   # One self-contained folder per weapon (definition, viewmodel, model, sounds)
-    │       └── enemies/   # One self-contained folder per enemy (definition, scene, model, own sounds)
+    │       ├── enemies/   # One self-contained folder per enemy (definition, scene, model, own sounds)
+    │       ├── items/     # One self-contained folder per item (definition, model)
+    │       └── containers/ # One self-contained folder per loot container (definition, scene, model)
     ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, combat, weapons,
     │                      # enemies, sections, wreck, test)
     ├── scripts/           # Shared / standalone scripts
@@ -62,10 +64,12 @@ projectalpha/
 ### Scene organization
 
 - Main scene: `res://scenes/wreck/small_wreck.tscn`, the wreck built by hand in 002, with two turrets and two
-  drones since 006.
+  drones since 006, and six loot containers since 007.
 - `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests. Its
   south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004), which
   also shoot at the player (005). Four shooting targets stand north of the start (005).
+- `res://scenes/test/loot_test.tscn` is the loot test level (007): a small one-deck wreck with no robots, a locker
+  and a supply crate in a room, and a small case in the entrance stub and in a vent.
 - `res://scenes/test/robot_test.tscn` is the robots' test level (006): a small one-deck wreck with a turret and a
   drone that show their state above them.
 - TBD: how levels are loaded, scene transitions.
@@ -75,6 +79,7 @@ projectalpha/
 | Autoload | Responsibility |
 |----------|----------------|
 | ContentRegistry | Discovers and registers all content definitions by ID (see [Content and modding](#content-and-modding)) |
+| ItemIcons | Renders every registered item's grid icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
 
 ### Communication between nodes
 
@@ -126,10 +131,15 @@ Settled in [003](features/003-content-registry.md):
   one kind sorted by ID. Duplicate IDs, content folders with zero or several definitions, and definitions with
   problems are logged as errors, kept in `ContentRegistry.errors` and skipped; the rest still loads.
   `load_content(root)` takes the folder of packs, so tests run a fresh registry on fixture packs.
-- **Kinds so far.** `SectionDefinition` (003), `WeaponDefinition` (005) and `EnemyDefinition` (006). A weapon
-  definition holds all its numbers (damage, heat, charge, kick, spread, zoom, reload and raise times), so a new
-  weapon is a new folder. An enemy definition holds its scene, the marker mount it needs and the robot brain's
-  numbers; how a kind moves is exported on its scene. Neither needed a change to the registry.
+- **Kinds so far.** `SectionDefinition` (003), `WeaponDefinition` (005), `EnemyDefinition` (006), and
+  `ItemDefinition` and `ContainerDefinition` (007). A weapon definition holds all its numbers (damage, heat, charge,
+  kick, spread, zoom, reload and raise times) and the items it loads and unloads, so a new weapon is a new folder.
+  An enemy definition holds its scene, the marker mount it needs, the robot brain's numbers and the salvage in its
+  wreckage; how a kind moves is exported on its scene. An item definition holds its shape (rows of text), value and
+  model, so a new item is a folder with a `.tres` and a `.glb` and no icon to draw. None needed a change to the
+  registry.
+- **Content referring to content** does it by ID (`"base:thermal_clip"`), looked up through the registry when it is
+  used, never when it registers, so the order packs and kinds load in doesn't matter.
 
 ### Player controller
 
@@ -202,6 +212,12 @@ so WASD keeps its position on other keyboard layouts.
 | `aim` | Right mouse button (hold): aims down sights, and aims out of cover while peeking |
 | `shoot` | Left mouse button: a click fires, holding charges and releasing fires |
 | `reload` | R |
+| `inventory` | Tab: opens and closes the inventory (Esc and `interact` also close it) |
+| `inventory_drag` | Left mouse button (hold): drags an item in the inventory |
+| `inventory_rotate` | Right mouse button: turns the dragged item a quarter turn |
+| `inventory_mirror` | Middle mouse button and the wheel: mirrors the dragged item |
+
+The inventory actions share buttons with `shoot` and `aim`; while the inventory is open the weapon takes no input.
 
 Prompts show the bound key by reading the Input Map (`as_text_physical_keycode()`), never a hard-coded letter.
 
@@ -219,6 +235,7 @@ Physics engine: Jolt, at the default 60 ticks per second.
 | 3     | interactable | `Interactable` areas (buttons), found by the player's interact ray |
 | 4     | hitbox | `Hitbox` areas of anything that can be damaged: the player (head, body, arm), shooting targets, robots (eye, body). They collide with nothing; shots cast rays against `world` and `hitbox` |
 | 5     | enemy  | Drone bodies (006). The player and drones collide with it; shots and sight ignore it. Turrets, out of reach, are on no layer; destroyed robots move to `world` |
+| 6     | item   | Dropped items (007). They collide with `world` and each other only, so the player walks through them and shots and sight ignore them; their `PickUp` interactable is on `interactable`. Loot containers are on `world` |
 
 Trigger areas sit on no layer: door proximity and doorway areas mask `player` and `enemy` (so doors open for
 drones), the elevator's "aboard" area and a drone's contact area mask `player`.
@@ -251,7 +268,14 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 - **Markers.** `SectionMarker`s (enemy or loot) mark where a mission may place things. An enemy marker's `mount`
   says what fits: a drone post on the floor, or a turret mount on the ceiling, facing the middle of the turret's
   arc. The wreck's `enemies` list (marker path to enemy ID) fills enemy markers (006); missions will fill it by
-  difficulty later. Loot markers wait for 007.
+  difficulty later. A loot marker stands on the floor at the foot of a wall, facing (−Z) away from it, and its
+  `space` says what fits: `ROOM` takes any container, `TIGHT` (vents, dead ends) only containers that
+  `fits_tight`. The wreck's `loot` list of `LootPlacement`s (marker, container ID, item IDs) fills them (007).
+  Markers are placed clear of every socket's possible doorway or vent mouth (1.2 m wide, centred on the socket, plus
+  its trim), since a section doesn't know which sockets a wreck will open.
+- **Transforms in scene files.** A `.tscn` writes `Transform3D(...)` row by row: the x axis is the 1st, 4th and
+  7th numbers and the z axis the 3rd, 6th and 9th, so `Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, ...)` has its −Z
+  pointing −X. Scripts that write scenes must write rows.
 - **Navigation.** After assembly the wreck bakes the drones' navigation, one region per deck (see
   [Robots](#robots-senses-and-navigation)). `Section.navigable` is off for sections drones can't use (vents, the
   elevator).
@@ -259,8 +283,8 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
   (`<name>.tres`) pointing at it. Fill whole cells, put a socket at the centre of every edge that can connect,
   and keep geometry inside the footprint (wall sockets build the walls on their edges). Static parts go under one
   `CSGCombiner3D` with collision. Shared parts (doors, lamps, buttons) and materials stay in `scenes/sections/`.
-  Add a turret mount where a turret could cover the space, clear of pillars, and turn `navigable` off if drones
-  can't use the section.
+  Add a turret mount where a turret could cover the space, clear of pillars, loot markers at the foot of walls
+  clear of the openings, and turn `navigable` off if drones can't use the section.
 
 ### Doors and elevators
 
@@ -285,10 +309,11 @@ Built in [005](features/005-weapon-and-health.md).
   enemies red). Scorch marks are permanent for the run: each is a `Decal` child of the surface it hit (so it moves
   with doors and elevators), at most 256 at once with the oldest removed first, fading out beyond 25 m.
 - **Weapons and thermal clips.** `Weapon` (under the player's camera) runs a `WeaponDefinition` with the clips
-  the player carries (`ThermalClips`: the loaded clip's heat as a fraction, and fresh and spent counts, until the
-  grid inventory in 007). `WeaponRules` holds the decisions. `Weapon.blocks_sprint()` and `Weapon.is_aiming` feed
-  the player's sprint block and speed cap; the player passes in whether it can shoot (not while peeking) and
-  whether it is sprinting (the weapon lowers).
+  the player carries (`ThermalClips`: the loaded clip's heat as a fraction; the fresh and spent clips are items in
+  the player's inventory since 007, and a reload takes a fresh one from the pockets). `WeaponRules` holds the
+  decisions. `Weapon.blocks_sprint()` and `Weapon.is_aiming` feed the player's sprint block and speed cap; the
+  player passes in whether it can shoot (not while peeking), whether it is lowered (sprinting or sorting the
+  inventory) and whether it takes input (not while the inventory is open).
 - **Viewmodels.** A weapon's viewmodel scene has a `WeaponViewmodel` root whose origin is the rear sight. Its
   materials are swapped for `viewmodel.gdshader`, which pulls depth towards the near plane so weapons never poke
   into walls while still being lit by the world; viewmodels cast no shadows. They draw on visual layer 20
@@ -328,15 +353,47 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
 
 ### Interaction and HUD
 
-- `Interactable` is an `Area3D` on the `interactable` layer with a `prompt` and an `interacted` signal.
-  The player casts a 2 m ray from the camera every physics frame against `world` and `interactable`, so walls
-  block it, and calls `interact()` when `interact` is pressed.
+- `Interactable` is an `Area3D` on the `interactable` layer with a `prompt`, an `interacted` signal and a
+  `hold_time` (0 for a press). The player casts a 2 m ray from the camera every physics frame against `world` and
+  `interactable`, so walls block it, and calls `interact()` when `interact` is pressed, or, for one with a hold
+  time, once it has been held that long since a press on it (`set_held()` tells it when a hold starts or stops).
+  An interactable sitting on a solid body needs an area a little bigger than the body, or the ray hits the body.
 - The HUD (`game/ui/hud.tscn`, owned by the player scene) shows a centre dot and the prompt as a key cap plus
   action. It uses the Windows system font Bahnschrift (DIN-style signage), falling back to Godot's default font.
   Corner placards (005): health bottom left, the loaded clip's heat bottom right as one segment per uncharged
   shot. Red (`#FF1F14`) means danger everywhere, the laser's blue (`#9ED1FF`) means charging, and heat orange
   matches the clip's glowing band. Custom readouts are small `Control`s that draw themselves and only redraw when
-  their state changes. `Hud.key_label(action)` gives the bound key for any prompt.
+  their state changes. A screen that handles the mouse itself sets everything it holds to ignore the mouse (a
+  `PanelContainer` stops clicks by default) and reads the pointer from its events, not from the window, so headless
+  tests can push real mouse events. `Hud.key_label(action)` gives the bound key for any prompt; a held action shows "HOLD"
+  before the key cap and fills a second ring, in the placards' ink, round the centre dot. The inventory screen
+  (007) is part of the HUD.
+
+### Loot and inventory
+
+Built in [007](features/007-loot-and-grid-inventory.md).
+
+- **Grids and shapes.** Items take up shapes of cells (`ItemShape`: rows of text, eight orientations: quarter turns
+  clockwise, then the same mirrored). `ItemGrid` (node-free) holds `Item`s (definition, orientation, cell) with no
+  overlaps, finds space in reading order and any orientation, and can reserve cells. The player's `Inventory` is
+  two grids, pockets (4×1) and backpack (6×5). Loot only moves by being dragged: nothing is ever sorted into a grid
+  by itself (only level set-up packs containers, and a reload puts its spent clip in the fresh clip's cell).
+  Node-free classes don't log; the nodes that change them log the outcome.
+- **Loot.** A `Lootable` (`Interactable` with an `ItemGrid`) is anything the player pries open by holding interact
+  and then searches: container scenes (`LootContainer` root on `world`, its model's `Lid` node swung open on its
+  hinge) and destroyed robots' wreckage (`Robot.get_salvage()`, from `EnemyDefinition.salvage`). Prying open is a
+  noise (4 m).
+- **The screen.** The `InventoryScreen` overlays the running game, which keeps going while it is open; the player
+  stands still and the weapon takes no input. The container and the floor are on the left half, the player's
+  grids on the right. Items are dragged, turned and mirrored with the mouse; pressing one selects it, and the one
+  under the pointer shows its item card. The screen always shows the floor: the dropped items within reach and in sight, in a grid that grows to keep two empty rows.
+  Dragging an item onto it, or releasing one outside the placards, makes a `DroppedItem` (a rigid body on the
+  `item` layer, one box per cell) that clatters as a 3 m noise; dragging one off it frees the body. Its calls
+  (`begin_drag`, `drop_drag` and so on) are what its mouse input makes, so tests call them directly.
+- **Icons.** `ItemIcons` renders each item's model from straight above at startup, fitted to its shape at 64 px a
+  cell, with glow capped so colours read. Item models are built to their shapes (0.15 m a cell, origin in the
+  middle of the footprint, rows along +Z). Headless runs have no renderer, so no icons: the grid tints the cells
+  instead.
 
 ### Lighting
 
@@ -367,7 +424,9 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
 - Orientation: models face -Y in Blender (toward the Front view camera). This arrives as +Z in Godot, which is Godot's model front (`Vector3.MODEL_FRONT`).
 - Naming: a content model is named after its content folder (`laser_pistol.glb`). Objects and materials that
   code looks up get fixed names in the script (the pistol's `Clip`, `Emitter` and `ClipHeat`; the turret's `Ring`
-  and `Head`; every robot's `Eye` and `Vents` materials). Otherwise TBD.
+  and `Head`; every robot's `Eye` and `Vents` materials; every container's `Lid`). Otherwise TBD.
+- One script may build many pieces of content of one kind when they share their helpers (`items.py` and
+  `containers.py` build every item and container, each with `--only <name>`).
 - Animations: TBD (actions naming, NLA usage, root motion or not).
 - Collision: TBD (Godot import hints such as `-col` / `-colonly` suffixes, or collision built in Godot).
 - Textures: TBD (resolution budget, PBR or not).
@@ -410,6 +469,7 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
 - **Scope.** One developer working on an extraction shooter with crafting, a star map and procedural ships. Mitigate by
   sticking to the MVP cut in the roadmap and the one-feature-at-a-time rule.
 - **Content architecture.** If the registry and definition format are wrong, every later system pays for it.
+  Items and containers (007) fitted without a change to the registry either.
   003 settled and tested the registry with sections only. 005's weapon and 006's robots fitted without changes to
   the registry; items (007) are the next test.
 - **Section assembly.** Sections must connect cleanly (sockets, alignment, no gaps), and navigation and lighting

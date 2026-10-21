@@ -120,6 +120,20 @@ func test_destroyed_drone_drops_to_the_floor_and_stays() -> void:
 		assert_bool(hitbox.is_active()).is_false()
 
 
+func test_wreckage_holds_its_salvage() -> void:
+	_hide_player()
+	_drone.get_health().take_damage(500.0, BY_THE_DOOR)
+	await _physics_frames(3 * FRAMES_PER_SECOND)
+	var salvage := _drone.get_salvage()
+	assert_object(salvage).is_not_null()
+	assert_str(salvage.prompt).is_equal("Pry open security drone wreckage")
+	assert_float(salvage.hold_time).is_equal(salvage.pry_time)
+	# Its area moved down with the wreckage and covers it on the floor.
+	assert_float(salvage.global_position.y).is_between(0.0, 0.5)
+	var parts := salvage.grid.items.map(func(item: Item) -> String: return item.definition.id)
+	assert_array(parts).contains_exactly_in_any_order(["base:power_cell", "base:servo_motor"])
+
+
 ## Puts the player where no robot can see them: their hitboxes are what robots look for.
 func _hide_player() -> void:
 	for hitbox in _player.get_hitboxes():

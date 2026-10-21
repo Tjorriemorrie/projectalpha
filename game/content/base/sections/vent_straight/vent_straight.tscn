@@ -44,4 +44,6 @@ script = ExtResource("4_pcmlf")
 kind = 1
 
 [node name="LootSpot" type="Marker3D" parent="." unique_id=261127897]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0.6, 0, 0)
 script = ExtResource("5_n06pg")
+space = 1

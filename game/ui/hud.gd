@@ -1,10 +1,11 @@
 class_name Hud
 extends CanvasLayer
 ## The player's heads-up display, styled like equipment placards: a centre dot that shows where the player is
-## looking, with a ring that fills while a shot charges; under it the prompt for the interactable they are looking
-## at ("[E]  Call elevator"); health in the bottom left and the loaded clip's heat in the bottom right. Hits flash
-## the screen edges red and point to where they came from, the edges stay faintly red while health is critical, and
-## death fades to black. The player calls it; it decides nothing.
+## looking, with a ring that fills while a shot charges and a wider one that fills while interact is held (prying
+## a container open); under it the prompt for the interactable they are looking at ("[E]  Call elevator", or
+## "HOLD [E]  Pry open supply crate"); health in the bottom left and the loaded clip's heat in the bottom right; and
+## the inventory screen. Hits flash the screen edges red and point to where they came from, the edges stay faintly
+## red while health is critical, and death fades to black. The player calls it; it decides nothing.
 
 ## Seconds the prompt takes to fade in.
 const FADE_TIME := 0.12
@@ -20,7 +21,7 @@ const INK_COLOR := Color(0.862745, 0.901961, 0.941176)
 const DIM_COLOR := Color(0.721569, 0.768627, 0.815686)
 
 var prompt_text := ""
-## What the corner readouts say, for tests: e.g. "100" and "35% 4 fresh · 1 spent".
+## What the corner readouts say, for tests: e.g. "100" and "35% 2 fresh · 2 packed · 1 spent".
 var health_text := ""
 var clips_text := ""
 
@@ -35,6 +36,9 @@ var _edge_intensity := 0.0
 var _shown_clips := []
 
 @onready var _prompt: Control = $Root/Prompt
+@onready var _hold: Label = $Root/Prompt/Hold
+@onready var _hold_ring: ChargeRing = $Root/HoldRing
+@onready var _inventory_screen: InventoryScreen = $Root/InventoryScreen
 @onready var _key: Label = $Root/Prompt/KeyCap/Key
 @onready var _action: Label = $Root/Prompt/Action
 @onready var _screen_edges: ColorRect = $Root/ScreenEdges
@@ -67,9 +71,15 @@ static func key_label(action: StringName) -> String:
 	return "?"
 
 
-## Shows the key and what it does, or hides the prompt when action is empty.
-func set_prompt(key: String, action: String) -> void:
-	prompt_text = "" if action.is_empty() else "%s %s" % [key, action]
+func get_inventory_screen() -> InventoryScreen:
+	return _inventory_screen
+
+
+## Shows the key and what it does, or hides the prompt when action is empty. hold marks an action that is used by
+## holding the key.
+func set_prompt(key: String, action: String, hold: bool = false) -> void:
+	prompt_text = "" if action.is_empty() else "%s%s %s" % ["Hold " if hold else "", key, action]
+	_hold.visible = hold
 	if _fade:
 		_fade.kill()
 	if action.is_empty():
@@ -96,22 +106,30 @@ func set_health(health: float, max_health: float, critical: bool) -> void:
 	_critical = critical and health > 0.0
 
 
-## The loaded clip's heat (0 to 1), the heat the shot being charged would add, the clips carried, whether the clip
-## has no room left for a full charge (low) or for any shot (saturated), and the reload's progress (-1 when not
-## reloading). Called every frame; the gauge only redraws when something changes.
-func set_clips(heat: float, charge_heat: float, fresh: int, spent: int, low: bool, saturated: bool,
+## The loaded clip's heat (0 to 1), the heat the shot being charged would add, the clips carried (fresh ones in the
+## pockets, which a reload uses, fresh ones packed in the backpack, and spent ones), whether the clip has no room left
+## for a full charge (low) or for any shot (saturated), and the reload's progress (-1 when not reloading). Called
+## every frame; the gauge only redraws when something changes.
+func set_clips(heat: float, charge_heat: float, fresh: int, packed: int, spent: int, low: bool, saturated: bool,
 		reload_progress: float) -> void:
 	_clips.visible = true
 	_heat_gauge.set_state(heat, charge_heat, low, reload_progress)
 	var label := "HEAT"
 	var value := "%d%%" % roundi(heat * 100.0)
 	var count := "%d fresh  ·  %d spent" % [fresh, spent]
+	if packed > 0:
+		count = "%d fresh  ·  %d packed  ·  %d spent" % [fresh, packed, spent]
 	if reload_progress >= 0.0:
 		label = "RELOADING"
 		value = ""
 	elif saturated:
 		label = "SATURATED"
-		count = "Reload  %s  ·  %d fresh" % [key_label(&"reload"), fresh] if fresh > 0 else "No fresh clips"
+		if fresh > 0:
+			count = "Reload  %s  ·  %d fresh" % [key_label(&"reload"), fresh]
+		elif packed > 0:
+			count = "Move a clip to your pockets"
+		else:
+			count = "No fresh clips"
 	var warn := (low or saturated) and reload_progress < 0.0
 	var shown := [label, value, count, warn, fresh == 0]
 	if shown == _shown_clips:
@@ -128,6 +146,11 @@ func set_clips(heat: float, charge_heat: float, fresh: int, spent: int, low: boo
 
 func set_charge(charge: float) -> void:
 	_charge_ring.set_charge(charge)
+
+
+## How far a held interact has got, from 0 to 1, or -1 when nothing is being held.
+func set_hold(progress: float) -> void:
+	_hold_ring.set_charge(progress)
 
 
 ## Flashes the screen edges red and points a marker at where the hit came from.

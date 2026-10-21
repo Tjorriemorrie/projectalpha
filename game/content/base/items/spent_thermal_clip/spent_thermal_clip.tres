@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/loot/item_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Spent thermal clip"
+shape = PackedStringArray("#")
+value = 10
+description = "A saturated thermal clip. Salvage: it can be re-cooled or sold later."
+model = "res://content/base/items/spent_thermal_clip/spent_thermal_clip.glb"

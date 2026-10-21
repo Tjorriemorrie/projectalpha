@@ -57,6 +57,12 @@ const SMOKE_TIME := 20.0
 ## The falling tone when it loses the player and starts searching.
 @export var lost_chirp: AudioStream
 
+@export_group("Salvage")
+## Size and centre of the area round its wreckage that the player pries open for its salvage, a little bigger than
+## the wreckage so the look ray finds it first.
+@export var salvage_box := Vector3(0.8, 0.8, 0.8)
+@export var salvage_offset := Vector3.ZERO
+
 @export_group("Glow")
 @export var eye_glow: float = 4.0
 ## Emission energy of the vents at full heat while venting.
@@ -394,10 +400,42 @@ func _on_died() -> void:
 	_label.visible = false
 	LaserEffects.impact(self, get_eye_position(), Vector3.UP, SPARK_COLOR, null)
 	_start_smoke()
+	_add_salvage()
 	Log.info("🤖 Destroyed: robot=%s, enemy=%s, position=%s, shots_fired=%d" % [
 		name, definition.id, global_position, shots_fired])
 	_destroy_body()
 	destroyed.emit()
+
+
+## The wreckage becomes loot: an area round it that the player pries open, holding the salvage from its definition.
+func get_salvage() -> Lootable:
+	return get_node_or_null("Salvage") as Lootable
+
+
+func _add_salvage() -> void:
+	var salvage := Lootable.new()
+	salvage.name = "Salvage"
+	var box := BoxShape3D.new()
+	box.size = salvage_box
+	var shape := CollisionShape3D.new()
+	shape.shape = box
+	shape.position = salvage_offset
+	salvage.add_child(shape)
+	add_child(salvage)
+	salvage.setup("%s wreckage" % definition.display_name, definition.salvage_grid)
+	var parts: Array[ItemDefinition] = []
+	for id in definition.salvage:
+		var part := ContentRegistry.get_definition(id) as ItemDefinition
+		if part == null:
+			Log.error("🤖 Salvage is not a registered item: robot=%s, item=%s" % [name, id])
+			continue
+		parts.append(part)
+	var left_out := salvage.fill(parts)
+	if not left_out.is_empty():
+		Log.error("🤖 Salvage doesn't fit the wreckage's grid: robot=%s, grid=%s, left_out=%d" % [
+			name, definition.salvage_grid, left_out.size()])
+	Log.info("🤖 Wreckage holds salvage: robot=%s, parts=%d, value=%d" % [name, salvage.grid.items.size(),
+		salvage.grid.value()])
 
 
 ## The searchlight and eye take the state's colour, turning red as a lock-on builds; the vents glow while venting.

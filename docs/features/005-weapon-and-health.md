@@ -62,8 +62,11 @@ next clone, so the hits add up. Supports *Lose it all*.
 - [x] The pistol is lowered while sprinting. Pulling the trigger ends the sprint and raises the pistol, and
       charging or firing starts once it is up (about 0.25 s). Sprint stays blocked while the trigger is held and
       for a moment after a shot.
-- [x] A peek can't shoot (004): the trigger does nothing while peeking. A charge is cancelled, with no heat used,
-      whenever the player stops being able to shoot (dropping back from aiming out to a peek, or dying).
+- [x] A peek can't shoot (004): the trigger does nothing while peeking. A charge being held is kept through a peek
+      and keeps building, so the player can charge behind cover, peek and aim out to fire; released while the
+      player can shoot it fires, released during a peek it is dropped with no heat used. Dying drops it. (Changed
+      in 007's playtest: a charge used to be cancelled the moment the player couldn't shoot, and pressing peek with
+      aim held is a peek until the head moves, so pre-charging and aiming out lost the charge.)
 
 ### Player health
 

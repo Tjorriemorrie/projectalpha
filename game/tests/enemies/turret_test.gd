@@ -1,13 +1,13 @@
 extends GdUnitTestSuite
 ## Plays the turret in the robot test level: lock-on times, peeking, firing and how its fire walks in, venting, a
-## charged shot to the eye, the wreckage, the combat music, and seeing in the dark. The drone is taken out so it
+## charged shot to the eye, the wreckage and the salvage pried out of it, the combat music, and seeing in the dark. The drone is taken out so it
 ## can't interfere.
 ## Positions refer to the layout of res://scenes/test/robot_test.tscn: the turret hangs from the hall's ceiling at
 ## (0, 3, -5.5), facing south down the lit hall towards the door at (0, 0, 2), clear of the pillar in the middle of
 ## the hall; the entrance stub south of the corridor is dark and out of its sight.
 
 const TEST_SCENE := "res://scenes/test/robot_test.tscn"
-const ACTIONS: Array[StringName] = [&"shoot", &"aim", &"flashlight"]
+const ACTIONS: Array[StringName] = [&"shoot", &"aim", &"flashlight", &"interact"]
 ## Physics frames per second of game time at the runner's time factor.
 const FRAMES_PER_SECOND := 60
 ## In the lit hall under a lamp, 5.5 m in front of the turret.
@@ -16,6 +16,8 @@ const IN_SIGHT := Vector3(0.0, 0.0, 0.0)
 const UNDER_THE_TURRET := Vector3(0.0, 0.0, -3.5)
 ## In the dark entrance stub behind the closed door.
 const OUT_OF_SIGHT := Vector3(0.0, 0.0, 8.0)
+## Almost under the turret, within reach of its wreckage.
+const BELOW_THE_TURRET := Vector3(0.0, 0.0, -4.7)
 
 var _runner: GdUnitSceneRunner
 var _wreck: Wreck
@@ -142,6 +144,24 @@ func test_destroyed_turret_stays_as_wreckage() -> void:
 		assert_bool(hitbox.is_active()).is_false()
 	assert_int(_turret.shots_fired).is_equal(0)
 	assert_float(_player.get_health().health).is_equal(100.0)
+
+
+func test_wreckage_can_be_pried_open_for_its_salvage() -> void:
+	_turret.get_health().take_damage(500.0, IN_SIGHT)
+	await _place(BELOW_THE_TURRET)
+	await _physics_frames(2 * FRAMES_PER_SECOND)
+	var salvage := _turret.get_salvage()
+	assert_object(salvage).is_not_null()
+	_look_at(salvage.global_position + _turret.salvage_offset)
+	await _physics_frames(3)
+	assert_object(_player.interact_target).is_same(salvage)
+	assert_str((_player.get_node("Hud") as Hud).prompt_text).is_equal("Hold E Pry open ceiling turret wreckage")
+	Input.action_press(&"interact")
+	await _physics_frames(roundi(1.6 * FRAMES_PER_SECOND))
+	assert_bool(salvage.is_open).is_true()
+	assert_object(_player.get_inventory_screen().loot).is_same(salvage)
+	var parts := salvage.grid.items.map(func(item: Item) -> String: return item.definition.id)
+	assert_array(parts).contains_exactly_in_any_order(["base:plasma_coil", "base:circuit_board"])
 
 
 func test_combat_music_plays_only_while_it_attacks() -> void:

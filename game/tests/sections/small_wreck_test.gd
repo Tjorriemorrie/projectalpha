@@ -1,6 +1,7 @@
 extends GdUnitTestSuite
-## Plays the small wreck with simulated keys and checks its doors, vents, elevator and interaction. Its robots are
-## noted and then taken out, so they don't shoot the player or hold doors open; the robot suites test them.
+## Plays the small wreck with simulated keys and checks its doors, vents, elevator and interaction, and the loot it
+## places. Its robots are noted and then taken out, so they don't shoot the player or hold doors open; the robot
+## suites test them.
 ## Positions refer to the layout of res://scenes/wreck/small_wreck.tscn: cell centres sit on multiples of 4 m,
 ## deck 1 has its floor at y = 0 and deck 2 at y = 4.
 
@@ -53,6 +54,38 @@ func test_assembles_without_errors() -> void:
 func test_places_two_turrets_and_two_drones() -> void:
 	assert_array(_placed_robots).contains_exactly_in_any_order([
 		"base:drone on JunctionEast", "base:turret on StoreRoom", "base:drone on Hold", "base:turret on Hold"])
+
+
+func test_places_its_loot() -> void:
+	var names := _wreck.containers.map(func(container: LootContainer) -> String: return container.name)
+	assert_array(names).contains_exactly_in_any_order(["Locker_StoreRoom", "SupplyCrate_StoreRoom",
+		"SmallCase_DeadEnd", "Locker_Hold", "SupplyCrate_Hold", "SmallCase_VentDeck2"])
+	var items := 0
+	var value := 0
+	for container in _wreck.containers:
+		items += container.get_lootable().grid.items.size()
+		value += container.get_lootable().grid.value()
+	assert_int(items).is_equal(22)
+	assert_int(value).is_equal(1805)
+
+
+func test_containers_stand_clear_of_walls_facing_the_room() -> void:
+	var space := _wreck.get_world_3d().direct_space_state
+	for container in _wreck.containers:
+		var body := container.get_node("CollisionShape3D") as CollisionShape3D
+		var box := BoxShape3D.new()
+		box.size = (body.shape as BoxShape3D).size - Vector3.ONE * 0.04
+		var query := PhysicsShapeQueryParameters3D.new()
+		query.shape = box
+		query.transform = body.global_transform
+		query.collision_mask = 1
+		query.exclude = [container.get_rid()]
+		assert_array(space.intersect_shape(query)).override_failure_message(
+			"%s overlaps the level" % container.name).is_empty()
+		var front := container.global_transform * Vector3(0.0, 0.1, -box.size.z - 0.05)
+		var ray := PhysicsRayQueryParameters3D.create(front, front - container.global_basis.z * 0.4, 1)
+		assert_dict(space.intersect_ray(ray)).override_failure_message(
+			"%s faces a wall" % container.name).is_empty()
 
 
 func test_bakes_navigation_for_both_decks() -> void:

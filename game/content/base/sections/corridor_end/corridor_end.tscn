@@ -62,5 +62,6 @@ wall_height = 2.5
 wall_inset = 0.8
 
 [node name="LootSpot" type="Marker3D" parent="." unique_id=783257427]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.6)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1, 0, 1.2)
 script = ExtResource("5_6nphl")
+space = 1

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/loot/item_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Servo motor"
+shape = PackedStringArray("#.", "##")
+value = 70
+description = "A compact actuator from a door mechanism or a robot's joint."
+model = "res://content/base/items/servo_motor/servo_motor.glb"

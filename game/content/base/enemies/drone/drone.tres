@@ -30,3 +30,5 @@ investigate_time = 5.0
 search_time = 8.0
 shot_loudness = 20.0
 crash_loudness = 15.0
+salvage_grid = Vector2i(3, 3)
+salvage = PackedStringArray("base:power_cell", "base:servo_motor")

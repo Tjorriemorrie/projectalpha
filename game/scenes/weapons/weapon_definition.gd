@@ -8,6 +8,12 @@ extends ContentDefinition
 ## The viewmodel scene, whose root is a WeaponViewmodel. A res:// path, or a uid:// when picked in the inspector.
 @export_file("*.tscn") var viewmodel := ""
 
+@export_group("Clips")
+## The item, by content ID, that a reload loads from the pockets: a fresh thermal clip.
+@export var clip_item := ""
+## The item, by content ID, that the loaded clip becomes when a reload takes it out: a spent thermal clip.
+@export var spent_clip_item := ""
+
 @export_group("Shots")
 ## Damage of an uncharged shot, before the multiplier of the part it hits.
 @export var damage: float = 25.0
@@ -69,6 +75,8 @@ func get_problems() -> PackedStringArray:
 		problems.append("Weapon has no viewmodel")
 	elif not ResourceLoader.exists(get_viewmodel_path()):
 		problems.append("Weapon viewmodel not found: viewmodel=%s" % viewmodel)
+	if clip_item.is_empty() or spent_clip_item.is_empty():
+		problems.append("Weapon has no clip items: clip_item=%s, spent_clip_item=%s" % [clip_item, spent_clip_item])
 	if shot_heat <= 0.0 or full_charge_heat < shot_heat or full_charge_heat > 1.0:
 		problems.append("Weapon heats are out of range: shot_heat=%.3f, full_charge_heat=%.3f" % [
 			shot_heat, full_charge_heat])

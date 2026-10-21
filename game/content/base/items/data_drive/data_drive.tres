@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/loot/item_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Data drive"
+shape = PackedStringArray("#")
+value = 150
+description = "A sealed storage drive. Whatever is on it, traders pay well for it."
+model = "res://content/base/items/data_drive/data_drive.glb"

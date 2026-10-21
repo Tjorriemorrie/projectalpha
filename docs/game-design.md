@@ -69,8 +69,8 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 | Flashlight | Lights up dark wrecks, but lights you up for enemies too; toggled on and off, no battery | [002](features/002-wreck-section-kit.md), [006](features/006-robot-enemy.md) |
 | Elevators | The only way between decks: call with a button, ride, and the arrival ding can be heard | [002](features/002-wreck-section-kit.md) |
 | Enemy senses | Enemies see, hear and feel the player. In the dark they only see you up close, unless you are lit by a lamp, your flashlight or your own muzzle flash. Shots, sprinting and the elevator's ding carry far; walking is quieter and crouching quietest. Moving fast, shooting and lighting the way are risks you choose | [006](features/006-robot-enemy.md) |
-| Looting | Find and carry items out | [007](features/007-loot-and-grid-inventory.md) |
-| Grid inventory | Items take up different shapes and sizes in a grid; the player arranges them to fit more loot | [007](features/007-loot-and-grid-inventory.md) |
+| Looting | Pry open containers and robot wreckage, in real time while the wreck is still dangerous, and carry the items out | [007](features/007-loot-and-grid-inventory.md) |
+| Grid inventory | Items take up tetris-like shapes in a backpack grid and a strip of pockets for things at hand (reloads take thermal clips from the pockets); the player rotates, mirrors and arranges them to fit more loot, and drops what isn't worth the space. Every item is moved by dragging it, with no quick-move shortcuts, can be selected, and shows an item card (value, size, description) under the pointer; dropped items lie on the floor, which the inventory shows as a grid of its own | [007](features/007-loot-and-grid-inventory.md) |
 | Trader hubs | Menu-based stations for selling loot and buying anything in the game | — |
 | Breakdown | Break any item down into components (like Arc Raiders) | — |
 | Crafting and upgrades | Craft any item from components; upgrade gear | — |
@@ -103,13 +103,18 @@ Gamepad is supported. There is no jump, prone or slide.
 | Shoot: tap to fire, hold to charge a stronger shot | Left click | Right trigger |
 | Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
-| Interact / loot | E | A / Cross |
+| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory | E | A / Cross |
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
 | Aim out of cover: hold together with peek, in either order, to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
-| Inventory | Tab | View / Select |
+| Inventory: open and close (Esc and interact also close it) | Tab | View / Select (B also closes it) |
+| In the inventory: move the cursor | Mouse | Left stick / D-pad |
+| In the inventory: drag an item | Left click (hold) | A (hold) |
+| In the inventory: rotate the dragged item 90° | Right click | Right bumper |
+| In the inventory: mirror the dragged item | Middle click or mouse wheel | Left bumper |
+| In the inventory: drop an item on the floor | Drag it onto the floor grid, or release it outside the inventory | Y / Triangle |
 | Pause | Esc | Menu / Start |
 
 Gamepad bindings are a first draft.
