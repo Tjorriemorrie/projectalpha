@@ -60,5 +60,11 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
   fits next to the lasers.
 - Saving the game to disk (the stash, what the player carries, the clone number), with a main menu and a new game;
   008 keeps the session in memory only.
+- Swap the clone fiction in the game for the android link (008 built clones: the clone pod, `NEW_CLONE`,
+  "Clone 3 activated"): the clone pod becomes the android's charging cradle, with the man's body in a link chair.
+  Update the README, technical design and 008 spec that describe it.
 - Loot tables: container contents rolled each run (bigger containers rolling better loot), with missions filling
   loot markers by difficulty; 007 keeps every wreck's loot fixed.
+- Missions that need the man himself to board instead of an android (nice to have).
+- A way through (nice to have, much later; it needs a cutscene): the last stretch to her is cut off by a nebula,
+  minefield, anomaly or blockade, and charts, codes or a drive upgrade get the player past it.

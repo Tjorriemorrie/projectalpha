@@ -1,8 +1,10 @@
 # projectalpha
 
 Learning to write a game: an offline, single-player, first-person sci-fi extraction shooter in Godot. You are a
-cloned salvager who boards derelict wrecks, fights their robot defenses from cover, loots into a grid inventory and
-gets out alive, or dies, loses everything carried and wakes up as the next clone on your ship.
+salvager who sends mind-controlled androids aboard derelict wrecks to fight their robot defenses from cover, loot into
+a grid inventory and get out alive, or lose the android and everything it carried, all to find the cure for
+your wife and reach her before her time runs out ([story](docs/game-design.md#3-world-and-story)). The build still uses the older fiction,
+where you are a clone who wakes up again on your ship.
 
 ## Status
 
