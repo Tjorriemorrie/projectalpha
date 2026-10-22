@@ -7,3 +7,14 @@ script = ExtResource("1_definition")
 display_name = "Locker"
 scene = "res://content/base/containers/locker/locker.tscn"
 grid_size = Vector2i(4, 5)
+budget = 350
+loot = Dictionary[String, float]({
+"base:thermal_clip": 2.0,
+"base:circuit_board": 2.0,
+"base:servo_motor": 2.0,
+"base:power_cell": 2.0,
+"base:data_drive": 1.0,
+"base:gyroscope": 1.0,
+"base:plasma_coil": 1.0,
+"base:laser_pistol": 0.25
+})

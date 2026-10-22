@@ -12,9 +12,10 @@ extends Wreck
 ## A warm fill light under every lamp, so the walls are lit too, not only the floor under the lamp.
 @export var fill_energy := 0.7
 @export var fill_range := 4.5
-## What cycling the airlock does here, its sign, and how long interact is held.
-@export var board_prompt := "Board the wreck"
-@export var board_sign := "WRECK DOCKED"
+## What cycling the airlock does here and its sign, filled in with the docked wreck's layout and what the scan says
+## about its robots, and how long interact is held.
+@export var board_prompt := "Board the %s · %s"
+@export var board_sign := "%s DOCKED"
 @export var board_time := 1.0
 
 @onready var _clone_pod: ClonePod = %ClonePod
@@ -34,12 +35,27 @@ func _ready() -> void:
 		fill.omni_range = fill_range
 		fill.position = Vector3(0.0, -0.5, 0.0)
 		lamp.add_child(fill)
-	for airlock in airlocks:
-		airlock.set_purpose(board_prompt, board_sign, board_time)
+	_show_docked()
 	_place_player()
 	Log.info("🚀 Ship ready: ship=%s, lamps=%d, airlocks=%d, arrival=%s, clone=%d, stash_items=%d" % [
 		name, lamps.size(), airlocks.size(), GameSession.Arrival.keys()[GameSession.arrival], GameSession.clone_number,
 		GameSession.stash.items.size()])
+
+
+## The airlock says which wreck is docked and what the scan says about its robots: "Board the hauler · about 4 robots
+## active" under a "HAULER DOCKED" sign.
+func _show_docked() -> void:
+	var docked := GameSession.docked
+	var layout := docked.definition.display_name if docked else "wreck"
+	var prompt := board_prompt % [layout.to_lower(), docked.robots_estimate() if docked else "no scan"]
+	var sign_text := board_sign % layout.to_upper()
+	for airlock in airlocks:
+		airlock.set_purpose(prompt, sign_text, board_time)
+	if docked == null:
+		Log.warning("🚀 No wreck docked to show at the airlock: ship=%s" % name)
+		return
+	Log.info("🚀 Docked wreck shown at the airlock: ship=%s, layout=%s, prompt=%s, sign=%s" % [
+		name, docked.definition.id, prompt, sign_text])
 
 
 ## A new clone wakes up in the clone pod; a player back from the wreck stands in the airlock, facing into the ship.

@@ -1,5 +1,5 @@
 extends GdUnitTestSuite
-## Assembles wrecks built in code, for the checks the hand-built small wreck can't show: unregistered sections,
+## Assembles wrecks built in code, for the checks the hand-built layouts can't show: unregistered sections,
 ## and placing robots and loot on markers, with the problems each can report.
 
 const UNREGISTERED_SCENE := "res://tests/autoload/content_fixtures/valid/alpha/sections/hall/hall.tscn"

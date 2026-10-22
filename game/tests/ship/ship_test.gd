@@ -3,7 +3,8 @@ extends GdUnitTestSuite
 ## kit, a clone after a death wakes empty-handed and arms by dragging a gun from the stash into the weapon slot (which
 ## takes nothing else), and a player back from the wreck arrives in the airlock with what they carried; the stash
 ## opens with the session's grid and takes items dragged with the mouse, there is no floor, the pistol is holstered but
-## reloads, and holding interact on the airlock's outer door boards the wreck with the kit handed over.
+## reloads, the airlock says which wreck is docked and what the scan says about its robots, and holding interact on
+## its outer door boards that wreck with the kit and the wreck's roll handed over.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: one deck at y = 0, the cockpit at the origin, a
 ## corridor east along z = 0 to x = 12, the clone bay south of x = 4 with the pod at (4, 0, 5), the bedroom north of
 ## x = 8, the stash room south of x = 12 with the stash against its south wall at z = 5.8, and the airlock north of
@@ -196,10 +197,27 @@ func test_the_pistol_is_holstered_but_reloads() -> void:
 	assert_int(_player.clips.fresh).is_equal(1)
 
 
-func test_holding_interact_on_the_outer_door_boards_the_wreck() -> void:
+func test_the_airlock_shows_the_docked_wreck() -> void:
+	GameSession.docked = WreckRoll.new(ContentRegistry.get_definition("base:hauler") as WreckDefinition, 2, 7)
 	await _load_ship()
 	await _look_at_outer_door()
-	assert_str(_hud().prompt_text).is_equal("Hold E Board the wreck")
+	assert_str(_hud().prompt_text).is_equal("Hold E Board the hauler · about 4 robots active")
+	var sign_label := _ship.airlocks[0].get_node("%Sign") as Label3D
+	assert_str(sign_label.text).is_equal("HAULER DOCKED")
+
+
+func test_the_airlock_counts_one_robot_without_a_plural() -> void:
+	GameSession.docked = WreckRoll.new(ContentRegistry.get_definition("base:courier") as WreckDefinition, 1, 7)
+	await _load_ship()
+	await _look_at_outer_door()
+	assert_str(_hud().prompt_text).is_equal("Hold E Board the courier · about 1 robot active")
+
+
+func test_holding_interact_on_the_outer_door_boards_the_wreck() -> void:
+	var docked := GameSession.docked
+	await _load_ship()
+	await _look_at_outer_door()
+	assert_str(_hud().prompt_text).starts_with("Hold E Board the %s" % docked.definition.display_name.to_lower())
 	Input.action_press(&"interact")
 	await _physics_frames(roundi(0.8 * FRAMES_PER_SECOND))
 	assert_bool(_player.is_leaving).is_false()
@@ -208,8 +226,9 @@ func test_holding_interact_on_the_outer_door_boards_the_wreck() -> void:
 	assert_bool(_player.is_leaving).is_true()
 	assert_array(_travelled).is_empty()
 	await _physics_frames(roundi((_player.leave_fade_time + 0.2) * FRAMES_PER_SECOND))
-	assert_array(_travelled).is_equal([GameSession.WRECK_SCENE])
+	assert_array(_travelled).is_equal([docked.definition.get_scene_path()])
 	assert_object(GameSession.take_carried()).is_same(_player.inventory)
+	assert_object(GameSession.take_boarding(docked.definition)).is_same(docked)
 	assert_int(GameSession.runs).is_equal(1)
 
 

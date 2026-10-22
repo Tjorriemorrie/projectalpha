@@ -1,14 +1,14 @@
 extends GdUnitTestSuite
-## Plays the end of a run on the small wreck with travel turned off and its robots taken out: holding interact on the
+## Plays the end of a run on the hauler with travel turned off and its robots taken out: holding interact on the
 ## airlock's outer door extracts after its time, letting go cancels, cycling is a noise robots hear, the run summary
 ## shows on the black screen and a real key press continues to the ship with the kit handed over; a death shows its
 ## summary and the next clone wakes empty-handed; and a player boarding from the ship arrives with what they carried,
 ## their gun's loaded clip keeping its heat. The player starts with the basic kit: the laser pistol (₿200) in the
 ## weapon slot and two thermal clips (₿25 each) in the pockets.
-## Positions refer to the layout of res://scenes/wreck/small_wreck.tscn: the player starts in the airlock at
+## Positions refer to the layout of res://content/base/wrecks/hauler/hauler.tscn: the player starts in the airlock at
 ## (-0.6, 0, 4), facing east into the wreck, with the outer door behind them at x = -1.72.
 
-const WRECK_SCENE := "res://scenes/wreck/small_wreck.tscn"
+const WRECK_SCENE := "res://content/base/wrecks/hauler/hauler.tscn"
 const ACTIONS: Array[StringName] = [&"interact", &"move_forward"]
 const FRAMES_PER_SECOND := 60
 const WEST := PI / 2.0
@@ -128,8 +128,11 @@ func test_a_player_boarding_from_the_ship_arrives_with_what_they_carried() -> vo
 	var gun := Item.new(_item("base:laser_pistol"))
 	gun.clip_heat = 0.3
 	carried.weapon.add(gun)
+	var hauler := ContentRegistry.get_definition("base:hauler") as WreckDefinition
+	GameSession.docked = WreckRoll.new(hauler, 2, 7)
 	GameSession.board(carried)
 	await _load_wreck()
+	assert_object(_wreck.roll).is_same(GameSession.docked)
 	assert_object(_player.inventory).is_same(carried)
 	assert_bool(_player.get_weapon().is_equipped()).is_true()
 	assert_float(_player.clips.heat).is_equal_approx(0.3, 0.001)

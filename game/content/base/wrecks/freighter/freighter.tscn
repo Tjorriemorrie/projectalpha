@@ -1,0 +1,103 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/wreck/wreck.gd" id="1_wreck"]
+[ext_resource type="Environment" path="res://scenes/wreck/wreck_environment.tres" id="2_environment"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://content/base/sections/airlock/airlock.tscn" id="4_airlock"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_cross/corridor_cross.tscn" id="5_corridor_cross"]
+[ext_resource type="PackedScene" path="res://content/base/sections/room_small/room_small.tscn" id="6_room_small"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_straight/corridor_straight.tscn" id="7_corridor_straight"]
+[ext_resource type="PackedScene" path="res://content/base/sections/vent_straight/vent_straight.tscn" id="8_vent_straight"]
+[ext_resource type="PackedScene" path="res://content/base/sections/room_large/room_large.tscn" id="9_room_large"]
+[ext_resource type="PackedScene" path="res://content/base/sections/elevator/elevator.tscn" id="10_elevator"]
+[ext_resource type="PackedScene" path="res://content/base/sections/cargo_bay/cargo_bay.tscn" id="11_cargo_bay"]
+[ext_resource type="PackedScene" path="res://content/base/sections/corridor_end/corridor_end.tscn" id="12_corridor_end"]
+[ext_resource type="PackedScene" path="res://content/base/sections/vent_corner/vent_corner.tscn" id="13_vent_corner"]
+
+[node name="Freighter" type="Node3D"]
+script = ExtResource("1_wreck")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_environment")
+
+[node name="Deck1" type="Node3D" parent="."]
+
+[node name="Airlock" parent="Deck1" instance=ExtResource("4_airlock")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 0)
+
+[node name="CrossingFore" parent="Deck1" instance=ExtResource("5_corridor_cross")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+
+[node name="Quarters" parent="Deck1" instance=ExtResource("6_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, -4)
+
+[node name="Mess" parent="Deck1" instance=ExtResource("6_room_small")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 4, 0, 4)
+
+[node name="SpineFore" parent="Deck1" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8, 0, 0)
+
+[node name="VentMess" parent="Deck1" instance=ExtResource("8_vent_straight")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8, 0, 4)
+
+[node name="CrossingMid" parent="Deck1" instance=ExtResource("5_corridor_cross")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 0)
+
+[node name="NorthArm" parent="Deck1" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -4)
+
+[node name="Workshop" parent="Deck1" instance=ExtResource("9_room_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, -10)
+
+[node name="SouthArm" parent="Deck1" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 4)
+
+[node name="Elevator" parent="Deck1" instance=ExtResource("10_elevator")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 8)
+
+[node name="SpineAft" parent="Deck1" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 16, 0, 0)
+
+[node name="CargoBay" parent="Deck1" instance=ExtResource("11_cargo_bay")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0, 0)
+
+[node name="DeadEnd" parent="Deck1" instance=ExtResource("12_corridor_end")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 20, 0, 8)
+
+[node name="Deck2" type="Node3D" parent="."]
+
+[node name="UpperHall" parent="Deck2" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4, 4)
+
+[node name="CrossingUpper" parent="Deck2" instance=ExtResource("5_corridor_cross")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4, 0)
+
+[node name="UpperSpine" parent="Deck2" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8, 4, 0)
+
+[node name="Office" parent="Deck2" instance=ExtResource("6_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 4, 0)
+
+[node name="StorageHall" parent="Deck2" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 16, 4, 0)
+
+[node name="Storage" parent="Deck2" instance=ExtResource("9_room_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 4, -2)
+
+[node name="UpperNorth" parent="Deck2" instance=ExtResource("7_corridor_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4, -4)
+
+[node name="Armory" parent="Deck2" instance=ExtResource("6_room_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4, -8)
+
+[node name="VentOffice" parent="Deck2" instance=ExtResource("8_vent_straight")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 4, -4)
+
+[node name="VentCorner" parent="Deck2" instance=ExtResource("13_vent_corner")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 4, -8)
+
+[node name="VentArmory" parent="Deck2" instance=ExtResource("8_vent_straight")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8, 4, -8)
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -0.6, 0, 0)

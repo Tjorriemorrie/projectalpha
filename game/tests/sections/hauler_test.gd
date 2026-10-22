@@ -1,11 +1,14 @@
 extends GdUnitTestSuite
-## Plays the small wreck with simulated keys and checks its doors, vents, elevator and interaction, and the loot it
-## places. Its robots are noted and then taken out, so they don't shoot the player or hold doors open; the robot
-## suites test them.
-## Positions refer to the layout of res://scenes/wreck/small_wreck.tscn: cell centres sit on multiples of 4 m,
-## deck 1 has its floor at y = 0 and deck 2 at y = 4.
+## Plays the hauler, boarded at level 2 from a fixed seed, with simulated keys and checks its doors, vents, elevator
+## and interaction, and that it places the robots and containers its roll says. Its robots are noted and then taken
+## out, so they don't shoot the player or hold doors open; the robot suites test them. layouts_test checks what every
+## layout shares (markers, containers clear of the walls, navigation).
+## Positions refer to the layout of res://content/base/wrecks/hauler/hauler.tscn: cell centres sit on multiples of
+## 4 m, deck 1 has its floor at y = 0 and deck 2 at y = 4.
 
-const WRECK_SCENE := "res://scenes/wreck/small_wreck.tscn"
+const WRECK_SCENE := "res://content/base/wrecks/hauler/hauler.tscn"
+const LEVEL := 2
+const SEED := 41
 const ACTIONS: Array[StringName] = [
 	&"move_forward", &"move_back", &"move_left", &"move_right", &"sprint", &"crouch_hold", &"crouch_toggle",
 	&"interact", &"flashlight"]
@@ -21,19 +24,28 @@ var _runner: GdUnitSceneRunner
 var _wreck: Wreck
 var _player: Player
 var _elevator: Elevator
-## The robots the wreck placed, as "enemy ID on marker section", before they were taken out.
-var _placed_robots: Array[String] = []
+var _roll: WreckRoll
+## The robots the wreck placed, as their enemy definitions and where they stood, before they were taken out.
+var _placed_robots: Array[EnemyDefinition] = []
+var _robot_positions: Array[Vector3] = []
 
 
 func before_test() -> void:
+	GameSession.new_game()
+	GameSession.travel_enabled = false
+	_roll = WreckRoll.new(ContentRegistry.get_definition("base:hauler") as WreckDefinition, LEVEL, SEED)
+	GameSession.docked = _roll
+	GameSession.board(Inventory.new())
 	_runner = scene_runner(WRECK_SCENE)
 	_runner.set_time_factor(5.0)
 	_wreck = _runner.scene() as Wreck
 	_player = _runner.find_child("Player") as Player
 	_elevator = _runner.find_child("Elevator") as Elevator
 	_placed_robots.clear()
+	_robot_positions.clear()
 	for robot in _wreck.robots:
-		_placed_robots.append("%s on %s" % [robot.definition.id, robot.name.get_slice("_", 1)])
+		_placed_robots.append(robot.definition)
+		_robot_positions.append(robot.global_position)
 		robot.queue_free()
 	await _runner.simulate_frames(2)
 
@@ -41,6 +53,8 @@ func before_test() -> void:
 func after_test() -> void:
 	for action in ACTIONS:
 		Input.action_release(action)
+	GameSession.travel_enabled = true
+	GameSession.new_game()
 
 
 func test_assembles_without_errors() -> void:
@@ -51,41 +65,36 @@ func test_assembles_without_errors() -> void:
 	assert_int(_wreck.plan.count_openings(Socket.Opening.VENT_MOUTH)).is_equal(4)
 
 
-func test_places_two_turrets_and_two_drones() -> void:
-	assert_array(_placed_robots).contains_exactly_in_any_order([
-		"base:drone on JunctionEast", "base:turret on StoreRoom", "base:drone on Hold", "base:turret on Hold"])
+func test_takes_the_roll_handed_over_when_boarding() -> void:
+	assert_object(_wreck.roll).is_same(_roll)
+	assert_int(_wreck.roll.level).is_equal(LEVEL)
 
 
-func test_places_its_loot() -> void:
-	var names := _wreck.containers.map(func(container: LootContainer) -> String: return container.name)
-	assert_array(names).contains_exactly_in_any_order(["Locker_StoreRoom", "SupplyCrate_StoreRoom",
-		"SmallCase_DeadEnd", "Locker_Hold", "SupplyCrate_Hold", "SmallCase_VentDeck2"])
-	var items := 0
+func test_places_the_robots_it_rolled_clear_of_the_airlock() -> void:
+	assert_int(_placed_robots.size()).is_equal(_roll.robots)
+	assert_int(_roll.robots).is_between(3, 5)
+	var door := _wreck.airlocks[0].get_sockets()[0].global_position
+	for index in _placed_robots.size():
+		assert_float(_robot_positions[index].distance_to(door)).is_greater_equal(Wreck.AIRLOCK_CLEARANCE)
+
+
+func test_places_the_containers_it_rolled() -> void:
+	assert_int(_wreck.containers.size()).is_equal(6)
 	var value := 0
 	for container in _wreck.containers:
-		items += container.get_lootable().grid.items.size()
 		value += container.get_lootable().grid.value()
-	assert_int(items).is_equal(23)
-	assert_int(value).is_equal(2005)
+	assert_int(value).is_equal(_roll.loot_value)
+	assert_int(value).is_greater(0)
 
 
-func test_containers_stand_clear_of_walls_facing_the_room() -> void:
-	var space := _wreck.get_world_3d().direct_space_state
-	for container in _wreck.containers:
-		var body := container.get_node("CollisionShape3D") as CollisionShape3D
-		var box := BoxShape3D.new()
-		box.size = (body.shape as BoxShape3D).size - Vector3.ONE * 0.04
-		var query := PhysicsShapeQueryParameters3D.new()
-		query.shape = box
-		query.transform = body.global_transform
-		query.collision_mask = 1
-		query.exclude = [container.get_rid()]
-		assert_array(space.intersect_shape(query)).override_failure_message(
-			"%s overlaps the level" % container.name).is_empty()
-		var front := container.global_transform * Vector3(0.0, 0.1, -box.size.z - 0.05)
-		var ray := PhysicsRayQueryParameters3D.create(front, front - container.global_basis.z * 0.4, 1)
-		assert_dict(space.intersect_ray(ray)).override_failure_message(
-			"%s faces a wall" % container.name).is_empty()
+func test_the_same_roll_places_the_same_wreck() -> void:
+	var first := _wreck.loot.map(func(placement: LootPlacement) -> String:
+		return "%s %s %s" % [placement.marker, placement.container, placement.items])
+	var again := WreckRoll.new(_roll.definition, LEVEL, SEED)
+	_wreck.apply_roll(again)
+	var second := _wreck.loot.map(func(placement: LootPlacement) -> String:
+		return "%s %s %s" % [placement.marker, placement.container, placement.items])
+	assert_array(second).is_equal(first)
 
 
 func test_bakes_navigation_for_both_decks() -> void:

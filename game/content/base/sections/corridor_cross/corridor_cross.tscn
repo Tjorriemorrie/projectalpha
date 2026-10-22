@@ -1,0 +1,111 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_section"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_floor"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_wall"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="4_socket"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/ceiling_lamp.tscn" id="5_lamp"]
+[ext_resource type="Script" path="res://scenes/sections/section_marker.gd" id="6_marker"]
+
+[node name="CorridorCross" type="Node3D"]
+script = ExtResource("1_section")
+
+[node name="Geometry" type="CSGCombiner3D" parent="."]
+use_collision = true
+
+[node name="FloorEastWest" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+size = Vector3(4, 0.2, 2.4)
+material = ExtResource("2_floor")
+
+[node name="CeilingEastWest" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
+size = Vector3(4, 0.2, 2.4)
+material = ExtResource("3_wall")
+
+[node name="FloorNorth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, -1.6)
+size = Vector3(2.4, 0.2, 0.8)
+material = ExtResource("2_floor")
+
+[node name="CeilingNorth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, -1.6)
+size = Vector3(2.4, 0.2, 0.8)
+material = ExtResource("3_wall")
+
+[node name="FloorSouth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 1.6)
+size = Vector3(2.4, 0.2, 0.8)
+material = ExtResource("2_floor")
+
+[node name="CeilingSouth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 1.6)
+size = Vector3(2.4, 0.2, 0.8)
+material = ExtResource("3_wall")
+
+[node name="WallNorthWest" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1.25, -1.1)
+size = Vector3(1, 2.5, 0.2)
+material = ExtResource("3_wall")
+
+[node name="WallWestNorth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, 1.25, -1.6)
+size = Vector3(0.2, 2.5, 0.8)
+material = ExtResource("3_wall")
+
+[node name="WallNorthEast" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1.25, -1.1)
+size = Vector3(1, 2.5, 0.2)
+material = ExtResource("3_wall")
+
+[node name="WallEastNorth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 1.25, -1.6)
+size = Vector3(0.2, 2.5, 0.8)
+material = ExtResource("3_wall")
+
+[node name="WallSouthWest" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1.25, 1.1)
+size = Vector3(1, 2.5, 0.2)
+material = ExtResource("3_wall")
+
+[node name="WallWestSouth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, 1.25, 1.6)
+size = Vector3(0.2, 2.5, 0.8)
+material = ExtResource("3_wall")
+
+[node name="WallSouthEast" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1.25, 1.1)
+size = Vector3(1, 2.5, 0.2)
+material = ExtResource("3_wall")
+
+[node name="WallEastSouth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 1.25, 1.6)
+size = Vector3(0.2, 2.5, 0.8)
+material = ExtResource("3_wall")
+
+[node name="SocketNorth" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
+script = ExtResource("4_socket")
+kind = 0
+
+[node name="SocketEast" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 2, 0, 0)
+script = ExtResource("4_socket")
+kind = 0
+
+[node name="SocketSouth" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 2)
+script = ExtResource("4_socket")
+kind = 0
+
+[node name="SocketWest" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -2, 0, 0)
+script = ExtResource("4_socket")
+kind = 0
+
+[node name="Lamp1" parent="." instance=ExtResource("5_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+
+[node name="EnemySpot" type="Marker3D" parent="."]
+script = ExtResource("6_marker")
+kind = 0

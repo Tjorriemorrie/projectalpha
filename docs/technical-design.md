@@ -65,9 +65,10 @@ projectalpha/
 ### Scene organization
 
 - Main scene: `res://scenes/ship/ship.tscn`, the player's ship (008), where the game starts with the first clone
-  waking up. `res://scenes/wreck/small_wreck.tscn` is the wreck built by hand in 002, with two turrets and two
-  drones since 006 and six loot containers since 007; every run boards it. Either can be run on its own: the player
-  then starts with the basic kit.
+  waking up. The wrecks are three hand-built layouts in `res://content/base/wrecks/` (010): the courier, the hauler
+  (the small wreck built in 002) and the freighter; every run boards the one docked at the ship, with its robots and
+  loot rolled. Any of them can be run on its own: the player then starts with the basic kit, and a layout rolls its
+  own level.
 - `res://scenes/test/player_test.tscn` stays as the greybox test level for the player controller's tests. Its
   south-east corner is a cover area (a 1 m crate, a pillar, a doorframe) with debug exposure watchers (004), which
   also shoot at the player (005). Four shooting targets stand north of the start (005).
@@ -85,7 +86,7 @@ projectalpha/
 |----------|----------------|
 | ContentRegistry | Discovers and registers all content definitions by ID (see [Content and modding](#content-and-modding)) |
 | ItemIcons | Renders every registered item's grid icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
-| GameSession | The session between scenes: the stash, the wallet, the system's trader hub and its sell crate, the clone number, the kit handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session) and [Trading](#trading)) |
+| GameSession | The session between scenes: the stash, the wallet, the system's trader hub and its sell crate, the clone number, the docked wreck, the kit and the wreck's roll handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session), [Trading](#trading) and [Wreck layouts and rolls](#wreck-layouts-and-rolls)) |
 
 ### Communication between nodes
 
@@ -95,7 +96,8 @@ projectalpha/
 ### Game state and saving
 
 The session lives in memory in `GameSession` (008): the stash, the clone number, the runs boarded and the kit
-handed between scenes, and since 009 the wallet, the hub's price seed and the sell crate. Nothing is saved yet, so
+handed between scenes, since 009 the wallet, the hub's price seed and the sell crate, and since 010 the docked
+wreck's roll. Nothing is saved yet, so
 quitting starts a new game. TBD: what is saved, file format, where
 (`user://`).
 
@@ -144,7 +146,9 @@ Settled in [003](features/003-content-registry.md):
   `ItemDefinition` and `ContainerDefinition` (007). A weapon definition holds all its numbers (damage, heat, charge,
   kick, spread, zoom, reload and raise times) and the items it loads and unloads, so a new weapon is a new folder.
   Since 009 `WeaponDefinition` extends `ItemDefinition`: a gun is an item (shape, value, a model lying flat), so it
-  registers once and `get_all(ItemDefinition)` lists it with the other items.
+  registers once and `get_all(ItemDefinition)` lists it with the other items. `WreckDefinition` (010) is a wreck
+  layout: its scene, level range, expected robots per level and number of containers. Since 010 a container
+  definition also holds its loot table, budget and roll weight.
   An enemy definition holds its scene, the marker mount it needs, the robot brain's numbers and the salvage in its
   wreckage; how a kind moves is exported on its scene. An item definition holds its shape (rows of text), value and
   model, so a new item is a folder with a `.tres` and a `.glb` and no icon to draw. None needed a change to the
@@ -281,10 +285,11 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
   `SectionDefinition` is an assembly error too.
 - **Markers.** `SectionMarker`s (enemy or loot) mark where a mission may place things. An enemy marker's `mount`
   says what fits: a drone post on the floor, or a turret mount on the ceiling, facing the middle of the turret's
-  arc. The wreck's `enemies` list (marker path to enemy ID) fills enemy markers (006); missions will fill it by
-  difficulty later. A loot marker stands on the floor at the foot of a wall, facing (−Z) away from it, and its
-  `space` says what fits: `ROOM` takes any container, `TIGHT` (vents, dead ends) only containers that
-  `fits_tight`. The wreck's `loot` list of `LootPlacement`s (marker, container ID, item IDs) fills them (007).
+  arc. The wreck's `enemies` list (marker path to enemy ID) fills enemy markers (006). A loot marker stands on the
+  floor at the foot of a wall, facing (−Z) away from it, and its `space` says what fits: `ROOM` takes any
+  container, `TIGHT` (vents, dead ends) only containers that `fits_tight`. The wreck's `loot` list of
+  `LootPlacement`s (marker, container ID, item IDs) fills them (007). A registered layout fills both lists from its
+  roll (010); the ship and the test levels list their own.
   Markers are placed clear of every socket's possible doorway or vent mouth (1.2 m wide, centred on the socket, plus
   its trim), since a section doesn't know which sockets a wreck will open.
 - **Transforms in scene files.** A `.tscn` writes `Transform3D(...)` row by row: the x axis is the 1st, 4th and
@@ -433,7 +438,8 @@ Built in [008](features/008-extraction-and-clone-loop.md).
 - **Airlocks.** The airlock section (`Airlock`) has an outer door (`%OuterDoor`, an `Interactable` with a hold time)
   and a sign above it. While interact is held on it, it loops a cycling sound and makes an `airlock` noise (10 m)
   every second; a full hold emits `cycled`. Every `Wreck` connects its airlocks (`Wreck.airlocks`): on a wreck
-  cycling extracts ("Return to ship", 3 s), and the `Ship` sets "Board the wreck", 1 s.
+  cycling extracts ("Return to ship", 3 s), and the `Ship` sets "Board the hauler · about 4 robots active", 1 s, under
+  a "HAULER DOCKED" sign, from the docked wreck (010).
 - **Leaving.** `Player.extract()` and `Player.board()` stop the player without the death's slump: a reload under way
   finishes, the weapon and hitboxes go (nothing can see or hit them), and the screen fades to black over the docking
   sound (`leave_fade_time`). Boarding then travels; extracting and dying show the run summary, and interact (read in
@@ -472,6 +478,31 @@ Built in [009](features/009-trader-hub.md).
   (`scripts/bitcoin.gd`): the ₿ symbol, commas between thousands, and a sign for changes (`₿1,240`, `−₿50`,
   `+₿154`). At home the HUD shows the wallet in the top left: the ship's player has `shows_wallet` on, calls
   `Hud.show_wallet()` and feeds it `GameSession.bitcoin_changed`; the readout hides while the hub's screen is open.
+
+### Wreck layouts and rolls
+
+Built in [010](features/010-wreck-variety.md).
+
+- **Layouts.** A layout is content: `content/<pack>/wrecks/<name>/` holds its scene (root `Wreck`: kit sections and
+  the player in the airlock, no robots or loot) and a `WreckDefinition` with its level range (1–5, `MAX_LEVEL`), the
+  expected robots at each level, and its number of containers. Adding a layout needs no code. The base layouts:
+  courier (1 deck, levels 1–2), hauler (2 decks, 1–3) and freighter (2 decks with the cargo bay, 2–3).
+- **Hidden difficulty.** The level is never shown. The player sees the expected robot count ("about 4 robots
+  active"); the wreck holds that give or take one (`WreckRoll.ROBOT_SPREAD`).
+- **The roll.** `WreckRoll` (node-free) is a layout, a level and a seed; the robots aboard come from the seed when it
+  is made. `GameSession.docked` is rolled (`roll_docked()`) in `new_game()` and when a run ends; `board()` travels to
+  its scene and the wreck takes it once with `GameSession.take_boarding(layout)`. In `_ready()`, a wreck whose scene
+  is a registered layout fills its `enemies` and `loot` lists from that roll (or its own at a random level when run on
+  its own) with `apply_roll()`, then places them as any wreck does. The same roll on the same layout always gives the
+  same wreck.
+- **What it rolls.** Robots go on random enemy markers at least `Wreck.AIRLOCK_CLEARANCE` (5 m) from an airlock's
+  inner door, each of a registered enemy kind whose `mount` fits. Containers go on random loot markers, each of a
+  kind that fits, by `ContainerDefinition.weight` (locker 1, crate 2, case 1). At level 1 the cheapest registered gun
+  goes into a random container first. Then `LootRoll.draw()` fills each container from its `loot` table (item ID to
+  weight) up to `LootRoll.budget_for(budget, level)` (×1, ×1.5, ×2 at levels 1–3), drawing only items that fit the
+  budget left and the grid, packed as `Lootable.fill()` packs them. Unknown item IDs are skipped and logged.
+  `Dice` (`scripts/`) does the random picks, always from the roll's own generator.
+- **Robot salvage** stays fixed per enemy kind (`EnemyDefinition.salvage`).
 
 ### Lighting
 

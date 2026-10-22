@@ -1,0 +1,163 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/sections/section.gd" id="1_section"]
+[ext_resource type="Material" path="res://scenes/sections/materials/floor.tres" id="2_floor"]
+[ext_resource type="Material" path="res://scenes/sections/materials/wall.tres" id="3_wall"]
+[ext_resource type="Material" path="res://scenes/sections/materials/door.tres" id="4_cargo"]
+[ext_resource type="Script" path="res://scenes/sections/socket.gd" id="5_socket"]
+[ext_resource type="PackedScene" path="res://scenes/sections/parts/ceiling_lamp.tscn" id="6_lamp"]
+[ext_resource type="Script" path="res://scenes/sections/section_marker.gd" id="7_marker"]
+
+[node name="CargoBay" type="Node3D"]
+script = ExtResource("1_section")
+size = Vector3i(2, 1, 3)
+
+[node name="Geometry" type="CSGCombiner3D" parent="."]
+use_collision = true
+
+[node name="Floor" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+size = Vector3(8, 0.2, 12)
+material = ExtResource("2_floor")
+
+[node name="Ceiling" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.1, 0)
+size = Vector3(8, 0.2, 12)
+material = ExtResource("3_wall")
+
+[node name="StackTallNorth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 1.1, -2.2)
+size = Vector3(1.2, 2.2, 1.2)
+material = ExtResource("4_cargo")
+
+[node name="CratesMiddle" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.5, 0.6)
+size = Vector3(2.4, 1, 1)
+material = ExtResource("4_cargo")
+
+[node name="StackTallSouth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 1.1, 3)
+size = Vector3(1.2, 2.2, 1.2)
+material = ExtResource("4_cargo")
+
+[node name="CratesNorthWest" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 0.5, -3.6)
+size = Vector3(1, 1, 1.4)
+material = ExtResource("4_cargo")
+
+[node name="SocketNorthWest" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, -6)
+script = ExtResource("5_socket")
+
+[node name="SocketNorthEast" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -6)
+script = ExtResource("5_socket")
+
+[node name="SocketSouthWest" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2, 0, 6)
+script = ExtResource("5_socket")
+
+[node name="SocketSouthEast" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2, 0, 6)
+script = ExtResource("5_socket")
+
+[node name="SocketEastNorth" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 4, 0, -4)
+script = ExtResource("5_socket")
+
+[node name="SocketEastMiddle" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 4, 0, 0)
+script = ExtResource("5_socket")
+
+[node name="SocketEastSouth" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 4, 0, 4)
+script = ExtResource("5_socket")
+
+[node name="SocketWestNorth" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4, 0, -4)
+script = ExtResource("5_socket")
+
+[node name="SocketWestMiddle" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4, 0, 0)
+script = ExtResource("5_socket")
+
+[node name="SocketWestSouth" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4, 0, 4)
+script = ExtResource("5_socket")
+
+[node name="Lamp1" parent="." instance=ExtResource("6_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 3, -4)
+
+[node name="Lamp2" parent="." instance=ExtResource("6_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 3, -4)
+
+[node name="Lamp3" parent="." instance=ExtResource("6_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 3, 0)
+
+[node name="Lamp4" parent="." instance=ExtResource("6_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 3, 0)
+
+[node name="Lamp5" parent="." instance=ExtResource("6_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 3, 4)
+
+[node name="Lamp6" parent="." instance=ExtResource("6_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 3, 4)
+
+[node name="LootSpotNorth" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -5.8)
+script = ExtResource("7_marker")
+
+[node name="LootSpotNorthEast" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 3.1, 0, -5.8)
+script = ExtResource("7_marker")
+
+[node name="LootSpotSouth" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.8)
+script = ExtResource("7_marker")
+
+[node name="LootSpotSouthWest" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.1, 0, 5.8)
+script = ExtResource("7_marker")
+
+[node name="LootSpotEastNorth" type="Marker3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 3.8, 0, -2)
+script = ExtResource("7_marker")
+
+[node name="LootSpotEastSouth" type="Marker3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 3.8, 0, 2)
+script = ExtResource("7_marker")
+
+[node name="LootSpotWestNorth" type="Marker3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -3.8, 0, -2)
+script = ExtResource("7_marker")
+
+[node name="LootSpotWestSouth" type="Marker3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -3.8, 0, 2)
+script = ExtResource("7_marker")
+
+[node name="EnemySpotWest" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0, -1.6)
+script = ExtResource("7_marker")
+kind = 0
+
+[node name="EnemySpotEast" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4, 0, 0.8)
+script = ExtResource("7_marker")
+kind = 0
+
+[node name="EnemySpotSouth" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0, 3.6)
+script = ExtResource("7_marker")
+kind = 0
+
+[node name="TurretMountNorth" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1.5, 3, -5)
+script = ExtResource("7_marker")
+kind = 0
+mount = 1
+
+[node name="TurretMountSouth" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 3, 5)
+script = ExtResource("7_marker")
+kind = 0
+mount = 1

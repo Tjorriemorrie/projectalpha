@@ -42,7 +42,7 @@ Ordered, but only roughly. Re-order freely once the MVP is played.
 | #   | Feature | Status |
 |-----|---------|--------|
 | 009 | [Trader hub](features/009-trader-hub.md) | done |
-| 010 | [Wreck variety](features/010-wreck-variety.md) | planned |
+| 010 | [Wreck variety](features/010-wreck-variety.md) | done |
 | 011 | [System map](features/011-system-map.md) | planned |
 | 012 | [Star map and travel](features/012-star-map-and-travel.md) | planned |
 
@@ -75,9 +75,13 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
   when the 10×8 stash is full.
 - Armor and gear (e.g. body armor, helmets), found on wrecks and sold at the hubs like everything else.
 - Tuning pass, once a full playthrough is possible: tweak all the control variables together. So far: the hubs'
-  sell and buy rates and per-hub price variance (009), item values, starting bitcoin (009), fuel prices and
-  antimatter procurement days, ingredient and android prices, decryption delay, how quickly the pings narrow, the
-  countdown's length, and run difficulty (aiming at about half of all runs extracting).
+  sell and buy rates and per-hub price variance (009), item values, starting bitcoin (009), container budgets, loot
+  tables, container weights and the expected robots per level of each layout (010), fuel prices and antimatter
+  procurement days, ingredient and android prices, decryption delay, how quickly the pings narrow, the countdown's
+  length, and run difficulty (aiming at about half of all runs extracting).
+- Blueprint-based wreck generation: a blueprint per ship class and a generator that snaps sections together on the
+  grid every run; 010 builds its layouts by hand.
+- The ship's window shows the docked wreck's own hull (010 keeps one dark hull for every layout).
 - Missions that need the man himself to board instead of an android (nice to have).
 - A way through (nice to have, much later; it needs a cutscene): the last stretch to her is cut off by a nebula,
   minefield, anomaly or blockade, and charts, codes or a drive upgrade get the player past it.

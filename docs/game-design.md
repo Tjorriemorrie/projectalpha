@@ -91,7 +91,7 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 | Travel and fuel | Two fuels, bought at the trader hubs: antimatter for the jump drive, to jump to the next star system (a day per jump), and hydrogen to fly to the ships and stations within a system. Antimatter takes days to procure, which keeps the player boarding ships while he waits (see [Travel and fuel](#travel-and-fuel)) | [011](features/011-system-map.md), [012](features/012-star-map-and-travel.md) |
 | Star map | A dynamic map under fog of war: the player only sees up to a certain distance (about two jumps), with 5-6 systems in jump range, and pre-made systems are added as the fog lifts. Every system has a trader hub, and no system is riskier or richer than another. The player plans his route through the systems that have the cure's ingredients | [012](features/012-star-map-and-travel.md) |
 | Triangulation | In every system the player can measure a ping to her ship; combined, the pings give a search area on the star map that shrinks with every ping. Vague at first, clearer as the game goes on (see [Finding her](#finding-her)) | — |
-| System map | The ships and stations to board in a star system, found at its planets, moons, asteroids, anomalies and battlefields. Inspect one to see its difficulty, wreck type and required gear; choosing which ones to board is how the player chooses the risk. Includes job-board leads | [011](features/011-system-map.md) |
+| System map | The ships and stations to board in a star system, found at its planets, moons, asteroids, anomalies and battlefields. Inspect one to see what makes it dangerous, never a difficulty level: its wreck type, how many robots are still active in its security system, how many human enemies are aboard, how quickly it escalates, and the gear it requires. Choosing which ones to board is how the player chooses the risk. Includes job-board leads | [011](features/011-system-map.md) |
 | Location requirements | Some locations need specific gear or technology to enter (e.g. an oxygen supply for breached wrecks) | — |
 | Wreck timer | A countdown until the wreck is destroyed | — |
 | Oxygen | Limited air supply aboard breached wrecks | — |
@@ -285,8 +285,11 @@ the kinds can be introduced gradually as the game goes on.
 
 ### Progression and difficulty
 
-- **The player chooses the risk.** Every ship and station in a star system shows its difficulty and requirements up
-  front, so the player decides how much to gamble. No location is forced on them. Star systems themselves are no
+- **The player chooses the risk.** Every ship and station in a star system shows up front what makes it dangerous
+  and what it requires, so the player decides how much to gamble. It never shows a difficulty level: the game rolls
+  each location's difficulty (five levels) behind the scenes, and the player sees its details instead, such as how
+  many robots are still active in its security system, how many human enemies are aboard or how quickly rival
+  salvagers arrive, and judges what he can handle. No location is forced on them. Star systems themselves are no
   riskier or richer than each other: the risk lies only in which ships and stations the player boards. The other
   risk is time: every run costs a day of her pod.
 - Difficulty is tuned so that about half of all runs end in a successful extraction. The hidden pacing never changes
@@ -391,7 +394,7 @@ and the largest stations take up to 30.
 |--------------|---------|--------------------------|---------|
 | Blueprint-based generation | Builds each wreck's layout from its class blueprint | — | — |
 | Star systems | Pre-made systems (a trader hub, plus ships and stations at planets, moons, asteroids, anomalies and battlefields), picked from a pool of about 25 and added to the star map as the fog lifts | — | [012](features/012-star-map-and-travel.md) |
-| Small ships | Early game, about 5-minute runs | Core loop | [002](features/002-wreck-section-kit.md) |
+| Small ships | Early game, about 5-minute runs: hand-built layouts (courier, hauler, freighter) with robots and loot rolled every run | Core loop | [002](features/002-wreck-section-kit.md), [010](features/010-wreck-variety.md) |
 | Large stations | Late game, runs of up to 30 minutes | TBD | — |
 
 ### Modding

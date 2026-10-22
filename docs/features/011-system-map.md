@@ -22,7 +22,9 @@ dies.
 
 - [ ] A system map shows the system's trader hub and its ships and stations, at its planets, moons, asteroids,
       anomalies and battlefields.
-- [ ] Inspecting a ship or station shows its difficulty, wreck type and required gear.
+- [ ] Inspecting a ship or station shows its details, never a difficulty level: its wreck type, the expected number
+      of robots still active in its security system (010) and the gear it requires; later kinds add human enemies,
+      how quickly it escalates, and so on. The player judges the risk from them.
 - [ ] Hydrogen, bought at the hub and always on the shelf, flies the ship between locations. Flying takes no time.
 - [ ] The day counter: boarding a ship or station takes a day, whether the android extracts or dies, and days only
       pass by boarding (and jumping, in 012).

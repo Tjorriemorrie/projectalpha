@@ -1,10 +1,11 @@
 extends Node
 ## The game session: what lasts while the game runs as the player goes between the ship and the wreck (nothing is
 ## saved yet, so quitting starts a new game). It keeps the ship's stash, the bitcoin wallet, the system's trader hub
-## and its sell crate, the clone number and the runs boarded; hands what the player carries (the kit: their inventory,
-## whose gun keeps its loaded clip's heat) from one scene's player to the next; records how each run ended
-## (RunSummary); and changes the scene between the ship and the wreck, playing the travel sounds itself so they carry
-## on through the change. Only the first clone of a new game gets the basic kit: a death hands no kit over, and the
+## and its sell crate, the clone number, the runs boarded and the wreck docked at the airlock (a WreckRoll, rolled
+## when the game starts and whenever a run ends, until the system map lets the player choose); hands what the player
+## carries (the kit: their inventory, whose gun keeps its loaded clip's heat) from one scene's player to the next, and
+## the docked wreck's roll to the wreck boarded; records how each run ended (RunSummary); and changes the scene
+## between the ship and the wreck, playing the travel sounds itself so they carry on through the change. Only the first clone of a new game gets the basic kit: a death hands no kit over, and the
 ## next clone wakes empty-handed and arms from the stash. Selling and buying at the hub go through here, since the
 ## stash and the wallet live here. Autoloaded as GameSession, after ItemIcons. It has no class_name, which would clash
 ## with the autoload's name.
@@ -18,7 +19,6 @@ signal bitcoin_changed(bitcoin: int)
 enum Arrival { NEW_CLONE, EXTRACTED }
 
 const SHIP_SCENE := "res://scenes/ship/ship.tscn"
-const WRECK_SCENE := "res://scenes/wreck/small_wreck.tscn"
 const STASH_SIZE := Vector2i(10, 8)
 ## The trader hub's sell crate, where items wait to be sold.
 const CRATE_SIZE := Vector2i(6, 4)
@@ -45,6 +45,9 @@ var arrival := Arrival.NEW_CLONE
 var basic_kit_next := true
 ## How the last run ended, or null before any has.
 var last_run: RunSummary
+## The wreck docked at the ship's airlock, boarded next: rolled when the game starts and whenever a run ends. Null
+## only when no wreck layout is registered.
+var docked: WreckRoll
 ## Whether the next scene's player fades in from black: a new game wakes up, and every travel arrives.
 var fade_in_next := true
 ## Off in tests, so ending a run never changes the scene under the test runner; travelled is still emitted.
@@ -52,6 +55,8 @@ var travel_enabled := true
 
 ## The inventory handed to the next scene's player, or null when it gets the basic kit or nothing.
 var _carried: Inventory
+## The roll of the wreck being boarded, until that wreck takes it.
+var _boarding: WreckRoll
 var _value_in := 0
 var _sound: AudioStreamPlayer
 
@@ -77,9 +82,11 @@ func new_game() -> void:
 	last_run = null
 	fade_in_next = true
 	_carried = null
+	_boarding = null
 	_value_in = 0
-	Log.info("🧬 New game: stash=%s, bitcoin=%d, hub_seed=%d, clone=%d" % [
-		STASH_SIZE, bitcoin, trader.price_seed, clone_number])
+	roll_docked()
+	Log.info("🧬 New game: stash=%s, bitcoin=%d, hub_seed=%d, clone=%d, docked=%s" % [
+		STASH_SIZE, bitcoin, trader.price_seed, clone_number, docked.definition.id if docked else "none"])
 
 
 ## The kit handed over from the last scene's player, for this scene's player to carry on with, once; null when there
@@ -98,14 +105,46 @@ func take_carried() -> Inventory:
 	return carried
 
 
-## The player boards the wreck with what they carry, which is now at risk. Travels to the wreck.
+## Rolls a new wreck to dock at the airlock: a random registered layout, at a random level in its range, with a
+## random seed for its robots and loot.
+func roll_docked() -> void:
+	docked = WreckRoll.random(ContentRegistry.get_all(WreckDefinition), RandomNumberGenerator.new())
+	if docked == null:
+		Log.error("🧬 No wreck layouts registered, so no wreck docked")
+		return
+	Log.info("🧬 Wreck docked: layout=%s, level=%d, seed=%d, expected_robots=%d, robots=%d" % [
+		docked.definition.id, docked.level, docked.roll_seed, docked.expected_robots(), docked.robots])
+
+
+## The docked wreck's roll, handed to the wreck being boarded, once; null when there is none for this layout (a
+## layout scene started on its own), so the wreck rolls its own.
+func take_boarding(layout: WreckDefinition) -> WreckRoll:
+	var boarding := _boarding
+	_boarding = null
+	if boarding == null:
+		Log.info("🧬 No wreck roll to hand over: layout=%s" % layout.id)
+		return null
+	if boarding.definition != layout:
+		Log.warning("🧬 The wreck roll is for another layout, not handed over: layout=%s, roll=%s" % [
+			layout.id, boarding.definition.id])
+		return null
+	Log.info("🧬 Wreck roll handed over: layout=%s, level=%d, seed=%d" % [layout.id, boarding.level, boarding.roll_seed])
+	return boarding
+
+
+## The player boards the docked wreck with what they carry, which is now at risk. Travels to the wreck.
 func board(carried: Inventory) -> void:
+	if docked == null:
+		Log.error("🧬 Can't board, no wreck docked: run=%d, clone=%d" % [runs, clone_number])
+		return
 	runs += 1
 	_value_in = carried.value()
 	_carried = carried
-	Log.info("🧬 Boarding the wreck: run=%d, clone=%d, items=%d, value_in=%d, armed=%s, stash_items=%d" % [
-		runs, clone_number, carried.item_count(), _value_in, carried.gun() != null, stash.items.size()])
-	_travel(WRECK_SCENE)
+	_boarding = docked
+	Log.info("🧬 Boarding the wreck: run=%d, clone=%d, layout=%s, level=%d, items=%d, value_in=%d, armed=%s, stash_items=%d" % [
+		runs, clone_number, docked.definition.id, docked.level, carried.item_count(), _value_in,
+		carried.gun() != null, stash.items.size()])
+	_travel(docked.definition.get_scene_path())
 
 
 ## The player got out alive with what they carry: it goes to the ship with them, where they arrive in the airlock.
@@ -114,6 +153,7 @@ func extract(carried: Inventory) -> RunSummary:
 	last_run = RunSummary.make_extracted(carried.item_count(), carried.value(), _value_in, clone_number)
 	arrival = Arrival.EXTRACTED
 	_carried = carried
+	roll_docked()
 	Log.info("🧬 Extracted: run=%d, clone=%d, items=%d, value=%d, gained=%d" % [
 		runs, clone_number, last_run.items, last_run.value, last_run.gained])
 	return last_run
@@ -129,6 +169,7 @@ func die(carried: Inventory) -> RunSummary:
 	arrival = Arrival.NEW_CLONE
 	basic_kit_next = false
 	_carried = null
+	roll_docked()
 	Log.info("🧬 Died, everything carried is lost: run=%d, items_lost=%d, value_lost=%d, next_clone=%d" % [
 		runs, items, value, clone_number])
 	return last_run

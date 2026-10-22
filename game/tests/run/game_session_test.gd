@@ -1,8 +1,9 @@
 extends GdUnitTestSuite
 ## Checks the game session on its own, with travel turned off: a new game, handing the kit the player carries from one
 ## scene to the next (once, the gun keeping its loaded clip's heat), the summaries of an extraction and a death, clone
-## numbers, the basic kit only for the first clone, the stash lasting through runs and deaths, and the wallet: selling
-## the crate, buying into the stash, and the crate going back to the stash.
+## numbers, the basic kit only for the first clone, the stash lasting through runs and deaths, the wallet (selling
+## the crate, buying into the stash, and the crate going back to the stash), and the docked wreck: rolled for a new
+## game and after every run, boarded, and its roll handed to that wreck once.
 
 var _travelled: Array[String] = []
 
@@ -39,7 +40,7 @@ func test_boarding_hands_the_kit_to_the_wreck_once() -> void:
 	gun.clip_heat = 0.4
 	carried.weapon.add(gun)
 	GameSession.board(carried)
-	assert_array(_travelled).is_equal([GameSession.WRECK_SCENE])
+	assert_array(_travelled).is_equal([GameSession.docked.definition.get_scene_path()])
 	assert_int(GameSession.runs).is_equal(1)
 	var taken := GameSession.take_carried()
 	assert_object(taken).is_same(carried)
@@ -49,6 +50,7 @@ func test_boarding_hands_the_kit_to_the_wreck_once() -> void:
 
 func test_extracting_keeps_the_kit_and_sums_up_the_haul() -> void:
 	var carried := _kit(["base:thermal_clip", "base:thermal_clip"])
+	var wreck_scene := GameSession.docked.definition.get_scene_path()
 	GameSession.board(carried)
 	GameSession.take_carried()
 	carried.backpack.add(Item.new(_item("base:plasma_coil")))
@@ -62,7 +64,7 @@ func test_extracting_keeps_the_kit_and_sums_up_the_haul() -> void:
 	assert_int(GameSession.arrival).is_equal(GameSession.Arrival.EXTRACTED)
 	assert_object(GameSession.last_run).is_same(summary)
 	GameSession.continue_to_ship()
-	assert_array(_travelled).is_equal([GameSession.WRECK_SCENE, GameSession.SHIP_SCENE])
+	assert_array(_travelled).is_equal([wreck_scene, GameSession.SHIP_SCENE])
 	assert_object(GameSession.take_carried()).is_same(carried)
 
 
@@ -174,6 +176,41 @@ func test_what_doesnt_fit_in_the_stash_waits_in_the_crate() -> void:
 	GameSession.crate.add(gyroscope)
 	assert_int(GameSession.return_crate()).is_equal(1)
 	assert_bool(GameSession.crate.has(gyroscope)).is_true()
+
+
+func test_a_new_game_docks_a_registered_wreck_at_a_level_in_its_range() -> void:
+	var docked := GameSession.docked
+	assert_object(docked).is_not_null()
+	assert_bool(ContentRegistry.get_all(WreckDefinition).has(docked.definition)).is_true()
+	assert_int(docked.level).is_between(docked.definition.levels.x, docked.definition.levels.y)
+
+
+func test_boarding_hands_the_docked_wrecks_roll_to_that_wreck_once() -> void:
+	var docked := GameSession.docked
+	GameSession.board(_kit([]))
+	assert_object(GameSession.take_boarding(docked.definition)).is_same(docked)
+	assert_object(GameSession.take_boarding(docked.definition)).is_null()
+
+
+func test_another_layout_gets_no_roll() -> void:
+	var hauler := ContentRegistry.get_definition("base:hauler") as WreckDefinition
+	var courier := ContentRegistry.get_definition("base:courier") as WreckDefinition
+	GameSession.docked = WreckRoll.new(hauler, 1, 3)
+	GameSession.board(_kit([]))
+	assert_object(GameSession.take_boarding(courier)).is_null()
+	assert_object(GameSession.take_boarding(hauler)).is_null()
+
+
+func test_every_run_ends_with_a_new_wreck_docked() -> void:
+	var first := GameSession.docked
+	GameSession.board(_kit([]))
+	GameSession.extract(_kit([]))
+	var second := GameSession.docked
+	assert_object(second).is_not_same(first)
+	GameSession.board(_kit([]))
+	GameSession.die(_kit([]))
+	assert_object(GameSession.docked).is_not_same(second)
+	assert_object(GameSession.docked).is_not_null()
 
 
 func test_travel_arrives_fading_in() -> void:

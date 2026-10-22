@@ -2,8 +2,9 @@ extends GdUnitTestSuite
 ## Checks the base game's own content as the ContentRegistry autoload registered it at startup.
 
 const KIT_SECTIONS: Array[String] = [
-	"base:airlock", "base:cockpit", "base:corridor_corner", "base:corridor_end", "base:corridor_straight",
-	"base:corridor_t", "base:elevator", "base:room_large", "base:room_small", "base:vent_corner", "base:vent_straight"]
+	"base:airlock", "base:cargo_bay", "base:cockpit", "base:corridor_corner", "base:corridor_cross", "base:corridor_end",
+	"base:corridor_straight", "base:corridor_t", "base:elevator", "base:room_large", "base:room_small",
+	"base:vent_corner", "base:vent_straight"]
 const ITEMS: Array[String] = [
 	"base:circuit_board", "base:conduit", "base:data_drive", "base:gyroscope", "base:hull_plating",
 	"base:laser_pistol", "base:plasma_coil", "base:power_cell", "base:servo_motor", "base:spent_thermal_clip",
@@ -130,3 +131,40 @@ func test_robot_salvage_fits_their_wreckage() -> void:
 				.is_not_null()
 			assert_bool(grid.add(Item.new(part))).override_failure_message(
 				"%s salvage %s doesn't fit" % [definition.id, id]).is_true()
+
+
+func test_registers_the_wreck_layouts() -> void:
+	var ids := ContentRegistry.get_all(WreckDefinition).map(func(definition: ContentDefinition) -> String:
+		return definition.id)
+	assert_array(ids).is_equal(["base:courier", "base:freighter", "base:hauler"])
+
+
+func test_every_wreck_scene_has_a_wreck_root() -> void:
+	for definition: WreckDefinition in ContentRegistry.get_all(WreckDefinition):
+		assert_str(definition.display_name).override_failure_message(
+			"%s has no display name" % definition.id).is_not_empty()
+		var root: Node = auto_free((load(definition.get_scene_path()) as PackedScene).instantiate())
+		assert_bool(root is Wreck).override_failure_message(
+			"%s's scene root is not a Wreck" % definition.id).is_true()
+
+
+func test_every_loot_table_draws_registered_items_within_reach() -> void:
+	for definition: ContainerDefinition in ContentRegistry.get_all(ContainerDefinition):
+		assert_int(definition.budget).override_failure_message("%s has no budget" % definition.id).is_greater(0)
+		assert_dict(definition.loot).override_failure_message("%s has no loot table" % definition.id).is_not_empty()
+		for id in definition.loot:
+			var item := ContentRegistry.get_definition(id) as ItemDefinition
+			assert_object(item).override_failure_message(
+				"%s's loot table names %s, which isn't an item" % [definition.id, id]).is_not_null()
+			# Every item can turn up at the highest level a wreck reaches today, or the table lies.
+			assert_int(item.value).override_failure_message(
+				"%s's %s never fits its budget" % [definition.id, id]).is_less_equal(
+					LootRoll.budget_for(definition.budget, 3))
+
+
+func test_bigger_containers_get_bigger_budgets() -> void:
+	var case := ContentRegistry.get_definition("base:small_case") as ContainerDefinition
+	var crate := ContentRegistry.get_definition("base:supply_crate") as ContainerDefinition
+	var locker := ContentRegistry.get_definition("base:locker") as ContainerDefinition
+	assert_int(case.budget).is_less(crate.budget)
+	assert_int(crate.budget).is_less(locker.budget)

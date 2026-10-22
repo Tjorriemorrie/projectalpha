@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="WreckDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/wreck/wreck_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Freighter"
+scene = "res://content/base/wrecks/freighter/freighter.tscn"
+levels = Vector2i(2, 3)
+expected_robots = PackedInt32Array(6, 8)
+containers = 9
