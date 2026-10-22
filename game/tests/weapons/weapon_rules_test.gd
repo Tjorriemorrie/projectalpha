@@ -18,14 +18,26 @@ func before_test() -> void:
 	_spent.id = "test:spent_clip"
 
 
-## Clips with this much heat in the loaded one, and fresh clips in the pockets and the backpack.
+## Clips with this much heat in the gun's loaded one, and fresh clips in the pockets and the backpack.
 func _clips(heat: float, in_pockets: int = 0, in_backpack: int = 0) -> ThermalClips:
 	var inventory := Inventory.new()
 	for i in in_pockets:
 		inventory.pockets.add(Item.new(_fresh))
 	for i in in_backpack:
 		inventory.backpack.add(Item.new(_fresh))
-	return ThermalClips.new(inventory, _fresh, _spent, heat)
+	var gun := Item.new(_pistol)
+	gun.clip_heat = heat
+	inventory.weapon.add(gun)
+	return ThermalClips.new(inventory, _fresh, _spent, gun)
+
+
+func test_the_heat_lives_on_the_gun() -> void:
+	var clips := _clips(0.3)
+	clips.add_heat(0.2)
+	assert_float(clips.gun.clip_heat).is_equal_approx(0.5, TOLERANCE)
+	var unarmed := ThermalClips.new(Inventory.new(), _fresh, _spent)
+	unarmed.heat = 0.4
+	assert_float(unarmed.heat).is_equal(0.0)
 
 
 func test_uncharged_shot() -> void:

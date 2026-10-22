@@ -50,8 +50,10 @@ var _bloom := 0.0
 
 
 ## Arms the weapon: loads its viewmodel, takes the clips the player carries, and the RIDs its shots must pass
-## through (the shooter's own hitboxes).
+## through (the shooter's own hitboxes). A weapon already in hand is put away first.
 func equip(weapon: WeaponDefinition, carried_clips: ThermalClips, exclude: Array[RID]) -> void:
+	if is_equipped():
+		unequip()
 	definition = weapon
 	clips = carried_clips
 	_exclude = exclude
@@ -70,6 +72,33 @@ func equip(weapon: WeaponDefinition, carried_clips: ThermalClips, exclude: Array
 
 func is_equipped() -> bool:
 	return definition != null
+
+
+## Puts the weapon away when its gun leaves the weapon slot: a reload under way is called off (the fresh clip goes
+## back into its pocket cell, so putting the gun away never speeds a reload up), a charge is dropped with no heat used,
+## and the viewmodel goes. The player is unarmed until another gun is equipped.
+func unequip() -> void:
+	if not is_equipped():
+		Log.info("🔫 Nothing to put away, no weapon equipped")
+		return
+	var weapon_id := definition.id
+	var reload_cancelled := is_reloading and clips.cancel_swap()
+	is_reloading = false
+	_reload_left = 0.0
+	charge = -1.0
+	is_aiming = false
+	raise = 1.0
+	_trigger_wait = -1.0
+	_cooldown = 0.0
+	_bloom = 0.0
+	if _viewmodel:
+		_viewmodel.queue_free()
+		_viewmodel = null
+	var heat := clips.heat if clips else 0.0
+	definition = null
+	clips = null
+	Log.info("🔫 Weapon put away: weapon=%s, heat=%.0f%%, reload_cancelled=%s" % [
+		weapon_id, heat * 100.0, reload_cancelled])
 
 
 ## Runs the weapon for one physics frame. can_shoot is false while the player can't fire (peeking); lowered is true
@@ -147,8 +176,8 @@ func suppress_trigger() -> void:
 	_trigger_suppressed = true
 
 
-## Finishes a reload under way at once, when the run ends with the player alive: the spent clip goes into the cell
-## the fresh one left. Returns whether there was one.
+## Finishes a reload under way at once, when the run ends with the player alive or the gun is put away: the spent
+## clip goes into the cell the fresh one left. Returns whether there was one.
 func finish_reload() -> bool:
 	if not is_reloading:
 		Log.info("🔫 No reload to finish: heat=%.0f%%" % (clips.heat * 100.0 if clips else 0.0))
@@ -156,8 +185,7 @@ func finish_reload() -> bool:
 	is_reloading = false
 	_reload_left = 0.0
 	clips.swap()
-	Log.info("🔫 Reload finished early, the run is ending: fresh=%d, packed=%d, spent=%d" % [
-		clips.fresh, clips.packed, clips.spent])
+	Log.info("🔫 Reload finished early: fresh=%d, packed=%d, spent=%d" % [clips.fresh, clips.packed, clips.spent])
 	reload_finished.emit()
 	return true
 

@@ -77,9 +77,9 @@ the last tense moment of a run. Completing this feature completes the MVP.
 ### Run summary
 
 - [x] When a run ends, a placard in the HUD's style sums it up on the black screen of the fade:
-      - extracted ("RUN COMPLETE"): the haul, the items and credits carried out, and what the run gained, the
+      - extracted ("RUN COMPLETE"): the haul, the items and bitcoin carried out, and what the run gained, the
         value carried out minus the value carried in when boarding;
-      - died ("SIGNAL LOST"): what was lost, the items and credits carried, and which clone wakes up next
+      - died ("SIGNAL LOST"): what was lost, the items and bitcoin carried, and which clone wakes up next
         ("Clone 3 activated"). Clones are numbered from 1, one more for every death.
 - [x] The player presses interact to continue, and the ship fades in.
 
@@ -131,7 +131,7 @@ the last tense moment of a run. Completing this feature completes the MVP.
 - Saving the game to disk, and menus (main menu, pause menu, new game): quitting starts a new game.
 - Choosing where to go: one wreck, always the small wreck with its fixed robots and loot, and no star map, travel
   or fuel. The cockpit's console is only set dressing.
-- Selling, credits as money, a trader, breakdown and crafting: values are only totalled.
+- Selling, bitcoin as the currency, a trader, breakdown and crafting: values are only totalled.
 - A floor on the ship, ship customization and base building, more stash room or stash upgrades.
 - Healing during a run, med bays and healing items.
 - An animated wake-up (lying in the pod, its doors opening) beyond a fade and a hiss.

@@ -7,7 +7,7 @@ extends RefCounted
 var extracted := false
 ## Items carried out, or lost.
 var items := 0
-## Their value in credits.
+## Their value in bitcoin.
 var value := 0
 ## Extracted only: the value carried out minus the value carried in when boarding.
 var gained := 0

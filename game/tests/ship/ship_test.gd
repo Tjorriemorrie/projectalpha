@@ -1,8 +1,9 @@
 extends GdUnitTestSuite
-## Plays the player's ship with travel turned off: it assembles, a new clone wakes in the clone pod with the basic kit
-## and a player back from the wreck arrives in the airlock with what they carried, the stash opens with the session's
-## grid and takes items dragged with the mouse, there is no floor, the pistol is holstered but reloads, and holding
-## interact on the airlock's outer door boards the wreck with the kit handed over.
+## Plays the player's ship with travel turned off: it assembles, the first clone wakes in the clone pod with the basic
+## kit, a clone after a death wakes empty-handed and arms by dragging a gun from the stash into the weapon slot (which
+## takes nothing else), and a player back from the wreck arrives in the airlock with what they carried; the stash
+## opens with the session's grid and takes items dragged with the mouse, there is no floor, the pistol is holstered but
+## reloads, and holding interact on the airlock's outer door boards the wreck with the kit handed over.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: one deck at y = 0, the cockpit at the origin, a
 ## corridor east along z = 0 to x = 12, the clone bay south of x = 4 with the pod at (4, 0, 5), the bedroom north of
 ## x = 8, the stash room south of x = 12 with the stash against its south wall at z = 5.8, and the airlock north of
@@ -72,15 +73,64 @@ func test_a_new_clone_wakes_in_the_clone_pod_with_the_basic_kit() -> void:
 	assert_float(facing.z).is_equal_approx(-1.0, 0.01)
 	assert_int(_player.clips.fresh).is_equal(2)
 	assert_int(_player.clips.packed).is_equal(0)
-	assert_int(_player.inventory.item_count()).is_equal(2)
+	assert_int(_player.inventory.item_count()).is_equal(3)
+	assert_str(_player.inventory.gun().definition.id).is_equal("base:laser_pistol")
+	assert_bool(_player.get_weapon().is_equipped()).is_true()
 	assert_float(_player.clips.heat).is_equal(0.0)
 	assert_float(_player.get_health().health).is_equal(_player.get_health().max_health)
+
+
+func test_a_clone_after_a_death_wakes_empty_handed_and_unarmed() -> void:
+	GameSession.die(Inventory.new())
+	await _load_ship()
+	assert_float(_player.global_position.distance_to(Vector3(4.0, 0.12, 5.0))).is_less(0.1)
+	assert_int(_player.inventory.item_count()).is_equal(0)
+	assert_bool(_player.get_weapon().is_equipped()).is_false()
+	await _physics_frames(2)
+	assert_str(_hud().clips_text).is_empty()
+	assert_bool((_hud().get_node("Root/Clips") as Control).visible).is_false()
+
+
+func test_a_gun_dragged_from_the_stash_into_the_weapon_slot_arms_the_player() -> void:
+	GameSession.die(Inventory.new())
+	var pistol := Item.new(_item("base:laser_pistol"))
+	pistol.clip_heat = 0.25
+	GameSession.stash.place(pistol, Vector2i(0, 0), 0)
+	await _load_ship()
+	await _look_at_stash()
+	await _press(&"interact")
+	var screen := _player.get_inventory_screen()
+	await _drag(screen, screen.cell_center(GameSession.stash, Vector2i(0, 0)),
+		screen.cell_center(_player.inventory.weapon, Vector2i(0, 0)))
+	assert_object(_player.inventory.gun()).is_same(pistol)
+	assert_bool(_player.get_weapon().is_equipped()).is_true()
+	assert_float(_player.clips.heat).is_equal_approx(0.25, 0.001)
+	# Dragging it back out leaves the player unarmed again.
+	await _drag(screen, screen.cell_center(_player.inventory.weapon, Vector2i(0, 0)),
+		screen.cell_center(GameSession.stash, Vector2i(5, 5)))
+	assert_object(_player.inventory.gun()).is_null()
+	assert_bool(_player.get_weapon().is_equipped()).is_false()
+
+
+func test_only_a_gun_fits_the_weapon_slot() -> void:
+	await _load_ship()
+	await _look_at_stash()
+	await _press(&"interact")
+	var screen := _player.get_inventory_screen()
+	var clip := _player.inventory.pockets.item_at(Vector2i(0, 0))
+	await _drag(screen, screen.cell_center(_player.inventory.pockets, Vector2i(0, 0)),
+		screen.cell_center(_player.inventory.weapon, Vector2i(2, 1)))
+	assert_object(_player.inventory.pockets.item_at(Vector2i(0, 0))).is_same(clip)
+	assert_int(_player.inventory.weapon.items.size()).is_equal(1)
 
 
 func test_a_player_back_from_the_wreck_arrives_in_the_airlock_with_their_kit() -> void:
 	var carried := Inventory.new()
 	carried.backpack.add(Item.new(_item("base:gyroscope")))
-	GameSession.extract(carried, 0.6)
+	var gun := Item.new(_item("base:laser_pistol"))
+	gun.clip_heat = 0.6
+	carried.weapon.add(gun)
+	GameSession.extract(carried)
 	await _load_ship()
 	assert_float(_player.global_position.distance_to(Vector3(12.0, 0.0, -4.9))).is_less(0.1)
 	var facing := -_player.global_basis.z

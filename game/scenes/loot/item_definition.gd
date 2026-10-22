@@ -10,7 +10,7 @@ const CELL_SIZE := 0.15
 
 ## The cells it takes up, as rows: "#" is a cell, "." a gap. ["###", ".#."] is a T. See ItemShape.
 @export var shape := PackedStringArray(["#"])
-## What it is worth, in credits.
+## What it is worth, in bitcoin.
 @export var value: int = 0
 ## A line or two about what it is and what it is good for, shown on its item card.
 @export_multiline var description := ""

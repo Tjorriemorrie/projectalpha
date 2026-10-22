@@ -65,8 +65,8 @@ func test_places_its_loot() -> void:
 	for container in _wreck.containers:
 		items += container.get_lootable().grid.items.size()
 		value += container.get_lootable().grid.value()
-	assert_int(items).is_equal(22)
-	assert_int(value).is_equal(1805)
+	assert_int(items).is_equal(23)
+	assert_int(value).is_equal(2005)
 
 
 func test_containers_stand_clear_of_walls_facing_the_room() -> void:

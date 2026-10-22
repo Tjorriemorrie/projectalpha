@@ -4,8 +4,8 @@ extends GdUnitTestSuite
 ## back what doesn't fit, dropping onto and picking up from the floor, selecting, the item card, and where the
 ## placards and key hints sit. Loot only moves by being dragged. The player searches the store room's locker, which
 ## holds a gyroscope at (0, 0), a power cell at (2, 0) and two thermal clips at (3, 0) and (3, 1); the player carries
-## two fresh clips in the pockets and two in the backpack, at (0, 0) and (1, 0) of each, and stands in the store room
-## with nothing on the floor.
+## the laser pistol (₿200) in the weapon slot and two fresh clips in the pockets and two in the backpack, at (0, 0)
+## and (1, 0) of each, and stands in the store room with nothing on the floor.
 
 const TEST_SCENE := "res://scenes/test/loot_test.tscn"
 
@@ -42,7 +42,7 @@ func after_test() -> void:
 
 func test_shows_what_is_carried_and_an_empty_floor() -> void:
 	assert_bool(_screen.is_open).is_true()
-	assert_str(_screen.carried_text).is_equal("CARRIED  100 CR   ·   30 FREE CELLS")
+	assert_str(_screen.carried_text).is_equal("CARRIED  ₿300   ·   30 FREE CELLS")
 	assert_array(_screen.floor_grid.items).is_empty()
 	assert_vector(Vector2(_screen.floor_grid.size)).is_equal(Vector2(6, 2))
 
@@ -55,7 +55,7 @@ func test_drags_an_item_into_the_backpack() -> void:
 	assert_bool(_screen.drop_drag(_inventory.backpack, Vector2i(3, 3))).is_true()
 	assert_object(_inventory.backpack.item_at(Vector2i(2, 2))).is_same(gyroscope)
 	assert_object(_screen.dragged).is_null()
-	assert_str(_screen.carried_text).is_equal("CARRIED  260 CR   ·   26 FREE CELLS")
+	assert_str(_screen.carried_text).is_equal("CARRIED  ₿460   ·   26 FREE CELLS")
 
 
 func test_an_item_that_doesnt_fit_goes_back() -> void:

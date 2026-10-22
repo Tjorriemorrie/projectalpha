@@ -6,7 +6,8 @@ const KIT_SECTIONS: Array[String] = [
 	"base:corridor_t", "base:elevator", "base:room_large", "base:room_small", "base:vent_corner", "base:vent_straight"]
 const ITEMS: Array[String] = [
 	"base:circuit_board", "base:conduit", "base:data_drive", "base:gyroscope", "base:hull_plating",
-	"base:plasma_coil", "base:power_cell", "base:servo_motor", "base:spent_thermal_clip", "base:thermal_clip"]
+	"base:laser_pistol", "base:plasma_coil", "base:power_cell", "base:servo_motor", "base:spent_thermal_clip",
+	"base:thermal_clip"]
 
 
 func test_loads_without_errors() -> void:

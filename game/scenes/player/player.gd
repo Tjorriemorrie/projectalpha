@@ -3,14 +3,16 @@ extends CharacterBody3D
 ## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
 ## riding elevators, the flashlight, using interactables by looking at them (pressing interact, or holding it to pry
 ## a container open), peeking and aiming out of cover, the hitboxes enemies can hit, the weapon (aim down sights
-## zoom, kick) and health (hit feedback, death), the inventory (pockets and backpack, searching containers, picking
-## up and dropping items), and what enemies sense of the player: footsteps they can hear, and which parts are lit so
-## they can be seen from afar. MovementRules and PeekRules make the decisions; this script applies them to the body,
-## head and camera. The Weapon fires and reloads, Health counts the damage, and the HUD's InventoryScreen moves the
-## items. While the inventory is open the player stands still: no moving, looking, peeking or shooting.
+## zoom, kick) and health (hit feedback, death), the inventory (weapon slot, pockets and backpack, searching
+## containers, picking up and dropping items), trading at the hub from the ship, and what enemies sense of the player:
+## footsteps they can hear, and which parts are lit so they can be seen from afar. MovementRules and PeekRules make the
+## decisions; this script applies them to the body, head and camera. The Weapon fires and reloads the gun in the weapon
+## slot (none: unarmed), Health counts the damage, the HUD's InventoryScreen moves the items and its TraderScreen
+## trades. While either screen is open the player stands still: no moving, looking, peeking or shooting.
 ## A run ends by dying or by leaving through an airlock (extracting from a wreck, or boarding one from the ship): the
 ## player stops, the screen fades to black, and the GameSession takes what they carry on to the next scene. The
-## player takes it over in turn when it is ready, or builds the basic kit when there is none (after a death).
+## player takes it over in turn when it is ready; with none, the first clone of a new game builds the basic kit and a
+## clone after a death starts empty-handed.
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
@@ -116,8 +118,8 @@ const DROP_SCATTER := 0.2
 @export var head_radius: float = 0.15
 
 @export_group("Combat")
-## The weapon the player carries, by content ID.
-@export var weapon_id := "base:laser_pistol"
+## The gun in the basic kit, by content ID; it comes with a fresh clip loaded.
+@export var starting_weapon_id := "base:laser_pistol"
 ## At or below this much health one more body hit could kill, so the screen edges stay faintly red.
 @export var critical_health: float = 10.0
 ## Degrees the view flinches when hit.
@@ -126,6 +128,8 @@ const DROP_SCATTER := 0.2
 @export var death_summary_delay: float = 4.0
 ## Holstered on the ship: the pistol is lowered and can't aim or fire, but reloads still work.
 @export var holstered := false
+## At home on the ship the HUD shows the bitcoin in the wallet; on a wreck it doesn't.
+@export var shows_wallet := false
 
 @export_group("Travel")
 ## Seconds the screen takes to fade to black when leaving through an airlock, and to fade in on arriving.
@@ -135,12 +139,15 @@ const DROP_SCATTER := 0.2
 @export var dock_sound: AudioStream
 
 @export_group("Inventory")
-## Cells of the pockets, for things at hand (a reload takes its clips from there), and of the backpack.
+## Cells of the pockets, for things at hand (a reload takes its clips from there), of the backpack, and of the weapon
+## slot, which holds one gun.
 @export var pocket_size := Vector2i(4, 1)
 @export var backpack_size := Vector2i(6, 5)
-## Fresh thermal clips in the basic kit besides the loaded one, in the pockets and in the backpack: a new clone
-## wakes with it, and so does a player in a level started on its own. A player arriving from another scene carries
-## on with what they had instead. Test levels pack two in the backpack.
+@export var weapon_slot_size := Vector2i(3, 2)
+## Fresh thermal clips in the basic kit besides the loaded one, in the pockets and in the backpack: the first clone of
+## a new game wakes with it, and so does a player in a level started on its own. A player arriving from another scene
+## carries on with what they had instead, and a clone after a death wakes empty-handed. Test levels pack two in the
+## backpack.
 @export var starting_pocket_clips: int = 2
 @export var starting_backpack_clips: int = 0
 ## Whether dropped items lie on the floor here. There is no floor on the ship: nothing can be dropped there.
@@ -170,9 +177,10 @@ var interact_target: Interactable
 var peek_state: PeekRules.State = PeekRules.State.NONE
 ## Where the head is relative to its normal position, in metres in the body's frame (x right, y up).
 var head_offset := Vector2.ZERO
-## The thermal clips the player carries; the weapon fires from them. The clips themselves are items in the inventory.
+## The thermal clips the player carries for the gun in hand; the weapon fires from them. The clips themselves are items
+## in the inventory, and the loaded clip's heat lives on the gun.
 var clips: ThermalClips
-## What the player carries: the pockets and the backpack.
+## What the player carries: the weapon slot, the pockets and the backpack.
 var inventory: Inventory
 var is_dead := false
 ## Leaving through an airlock: the player stands still and can't be hit while the screen fades to black.
@@ -228,6 +236,7 @@ var _awaiting_continue := false
 @onready var _hit_sound: AudioStreamPlayer = $HitSound
 @onready var _footstep_sound: AudioStreamPlayer = $FootstepSound
 @onready var _inventory_screen: InventoryScreen = _hud.get_inventory_screen()
+@onready var _trader_screen: TraderScreen = _hud.get_trader_screen()
 
 
 func _ready() -> void:
@@ -246,15 +255,19 @@ func _ready() -> void:
 	_setup_combat()
 	_inventory_screen.dropped_on_floor.connect(_on_dropped_on_floor)
 	_inventory_screen.taken_from_floor.connect(_on_taken_from_floor)
+	if shows_wallet:
+		_hud.show_wallet(GameSession.bitcoin)
+		GameSession.bitcoin_changed.connect(_hud.set_wallet)
 	_update_camera()
 	_set_mouse_captured(true)
 	if GameSession.fade_in_next:
 		GameSession.fade_in_next = false
 		_hud.fade_in(arrive_fade_time)
 	Log.info(("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°, "
-		+ "peek=%.2f/%.2f/%.2f m, aim_out=%.2f/%.2f m") % [
+		+ "peek=%.2f/%.2f/%.2f m, aim_out=%.2f/%.2f m, wallet=%s") % [
 		global_position, walk_speed, sprint_speed, crouch_speed, max_step_height, horizontal_fov,
-		peek_side_reach, peek_up_reach, peek_down_reach, aim_out_side_reach, aim_out_up_reach])
+		peek_side_reach, peek_up_reach, peek_down_reach, aim_out_side_reach, aim_out_up_reach,
+		Bitcoin.format(GameSession.bitcoin) if shows_wallet else "hidden"])
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -272,8 +285,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var pitch_limit := deg_to_rad(PITCH_LIMIT_DEGREES)
 		_yaw = wrapf(_yaw - turn.x, -PI, PI)
 		_pitch = clampf(_pitch - turn.y, -pitch_limit, pitch_limit)
-	elif is_inventory_open():
-		# Esc closes the inventory (read in _physics_process), and the mouse stays free for the grids.
+	elif _is_menu_open():
+		# Esc closes the inventory or the hub (read in _physics_process), and the mouse stays free for the grids.
 		return
 	elif event.is_action_pressed("pause") and mouse_captured:
 		_set_mouse_captured(false)
@@ -296,7 +309,7 @@ func _physics_process(delta: float) -> void:
 		_update_velocity(Vector2.ZERO, delta)
 		_move_and_follow_floor()
 		return
-	if is_inventory_open():
+	if _is_menu_open():
 		_update_while_sorting(delta)
 		return
 	_update_peek_state()
@@ -318,7 +331,7 @@ func _physics_process(delta: float) -> void:
 		set_flashlight(not is_flashlight_on())
 	# A peek can't shoot; aiming out can.
 	_weapon.physics_update(delta, peek_state != PeekRules.State.PEEK, movement_state == MovementRules.State.SPRINT)
-	if Input.is_action_just_pressed("inventory") and not is_inventory_open():
+	if Input.is_action_just_pressed("inventory") and not _is_menu_open():
 		open_inventory()
 
 
@@ -373,20 +386,23 @@ func is_inventory_open() -> bool:
 	return _inventory_screen.is_open
 
 
+func get_trader_screen() -> TraderScreen:
+	return _trader_screen
+
+
+func is_trading() -> bool:
+	return _trader_screen.is_open
+
+
 ## Opens the inventory screen with the dropped items within reach on its floor, searching a container when one is
 ## given. picked is a dropped item the player looked at, which is on the floor even if it is a little out of reach.
 ## The player stands still until it closes.
 func open_inventory(loot: Lootable = null, picked: DroppedItem = null) -> void:
-	if is_dead or is_leaving or is_inventory_open():
-		Log.info("🏃 Inventory not opened: dead=%s, leaving=%s, already_open=%s" % [
-			is_dead, is_leaving, is_inventory_open()])
+	if is_dead or is_leaving or _is_menu_open():
+		Log.info("🏃 Inventory not opened: dead=%s, leaving=%s, menu_open=%s" % [
+			is_dead, is_leaving, _is_menu_open()])
 		return
-	_end_hold()
-	interact_target = null
-	_shown_prompt = ""
-	_shown_hold = false
-	_hud.set_prompt("", "")
-	_set_mouse_captured(false)
+	_enter_menu()
 	var floor := _gather_floor(picked) if has_floor else null
 	_inventory_screen.open(inventory, loot, floor, has_floor)
 	Log.info("🏃 Inventory opened: loot=%s, floor_items=%s, position=%s, crouched=%s" % [
@@ -395,13 +411,54 @@ func open_inventory(loot: Lootable = null, picked: DroppedItem = null) -> void:
 
 func close_inventory() -> void:
 	if not is_inventory_open():
+		Log.info("🏃 Inventory not closed, it isn't open: position=%s" % global_position)
 		return
 	_inventory_screen.close()
-	# The button that dragged items must not fire when the view comes back.
+	_leave_menu()
+	Log.info("🏃 Inventory closed: position=%s" % global_position)
+
+
+## Opens the trader hub's screen, from the ship's trader terminal: the system's hub, its sell crate and the ship's
+## stash, all kept by the GameSession. The player stands still until it closes.
+func open_trader() -> void:
+	if is_dead or is_leaving or _is_menu_open():
+		Log.info("🏃 Trader not opened: dead=%s, leaving=%s, menu_open=%s" % [is_dead, is_leaving, _is_menu_open()])
+		return
+	_enter_menu()
+	_trader_screen.open()
+	Log.info("🏃 Trader opened: hub=%s, bitcoin=%d, position=%s" % [
+		GameSession.trader.title, GameSession.bitcoin, global_position])
+
+
+func close_trader() -> void:
+	if not is_trading():
+		Log.info("🏃 Trader not closed, it isn't open: position=%s" % global_position)
+		return
+	_trader_screen.close()
+	_leave_menu()
+	Log.info("🏃 Trader closed: bitcoin=%d, position=%s" % [GameSession.bitcoin, global_position])
+
+
+func _is_menu_open() -> bool:
+	return is_inventory_open() or is_trading()
+
+
+## Before a screen opens over the game: a hold ends, the prompt goes and the mouse is freed for the screen.
+func _enter_menu() -> void:
+	_end_hold()
+	interact_target = null
+	_shown_prompt = ""
+	_shown_hold = false
+	_hud.set_prompt("", "")
+	_set_mouse_captured(false)
+
+
+## After a screen closes: the button that worked it must not fire when the view comes back, and the mouse is
+## captured again.
+func _leave_menu() -> void:
 	_weapon.suppress_trigger()
 	if not is_dead:
 		_set_mouse_captured(true)
-	Log.info("🏃 Inventory closed: position=%s" % global_position)
 
 
 func is_flashlight_on() -> bool:
@@ -445,41 +502,80 @@ func _setup_head() -> void:
 	_update_hitboxes()
 
 
-## Arms the player with the weapon from the content registry, takes over the kit the last scene's player carried
-## (or builds the basic kit when there is none), and listens for hits.
+## Takes over the kit the last scene's player carried; with none, packs the basic kit when the session says so (a new
+## game, or a level started on its own) or starts empty-handed (after a death). Arms the player with the gun in the
+## weapon slot, again whenever the slot changes, and listens for hits.
 func _setup_combat() -> void:
 	var carried := GameSession.take_carried()
-	inventory = carried if carried else Inventory.new(pocket_size, backpack_size)
-	var loaded_heat := GameSession.carried_heat if carried else 0.0
+	var kit := "carried"
+	if carried:
+		inventory = carried
+	else:
+		inventory = Inventory.new(pocket_size, backpack_size, weapon_slot_size)
+		kit = "basic" if GameSession.basic_kit_next else "none"
+		if GameSession.basic_kit_next:
+			_pack_basic_kit()
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
 	_weapon.fired.connect(_on_weapon_fired)
-	var definition := ContentRegistry.get_definition(weapon_id) as WeaponDefinition
-	if definition == null:
-		Log.error("🏃 No weapon equipped, not a registered weapon: weapon_id=%s" % weapon_id)
-		clips = ThermalClips.new(inventory)
-	else:
-		var fresh_clip := ContentRegistry.get_definition(definition.clip_item) as ItemDefinition
-		var spent_clip := ContentRegistry.get_definition(definition.spent_clip_item) as ItemDefinition
-		if fresh_clip == null or spent_clip == null:
-			Log.error("🏃 Weapon clips are not registered items: weapon=%s, clip_item=%s, spent_clip_item=%s" % [
-				weapon_id, definition.clip_item, definition.spent_clip_item])
-		elif carried == null:
-			for i in starting_pocket_clips:
-				inventory.pockets.add(Item.new(fresh_clip))
-			for i in starting_backpack_clips:
-				inventory.backpack.add(Item.new(fresh_clip))
-		clips = ThermalClips.new(inventory, fresh_clip, spent_clip, loaded_heat)
-		var own_hitboxes: Array[RID] = []
-		for hitbox in get_hitboxes():
-			own_hitboxes.append(hitbox.get_rid())
-		_weapon.equip(definition, clips, own_hitboxes)
 	_weapon.holstered = holstered
+	_arm()
+	inventory.weapon.changed.connect(_arm)
 	_hud.set_health(_health.health, _health.max_health, false)
 	Log.info(("🏃 Combat ready: health=%.0f, weapon=%s, kit=%s, pockets=%s, backpack=%s, items=%d, fresh=%d, "
 		+ "packed=%d, heat=%.0f%%, holstered=%s, critical_health=%.0f") % [_health.health,
-		weapon_id if _weapon.is_equipped() else "none", "carried" if carried else "basic", pocket_size, backpack_size,
+		_weapon.definition.id if _weapon.is_equipped() else "none", kit, pocket_size, backpack_size,
 		inventory.item_count(), clips.fresh, clips.packed, clips.heat * 100.0, holstered, critical_health])
+
+
+## The basic kit: the starting gun, with a fresh clip loaded, in the weapon slot, and fresh clips for it in the
+## pockets and the backpack.
+func _pack_basic_kit() -> void:
+	var gun := ContentRegistry.get_definition(starting_weapon_id) as WeaponDefinition
+	if gun == null:
+		Log.error("🏃 Basic kit has no gun, not a registered weapon: starting_weapon_id=%s" % starting_weapon_id)
+		return
+	inventory.weapon.add(Item.new(gun))
+	var clip := ContentRegistry.get_definition(gun.clip_item) as ItemDefinition
+	if clip == null:
+		Log.error("🏃 Basic kit has no clips, not a registered item: weapon=%s, clip_item=%s" % [gun.id, gun.clip_item])
+		return
+	for i in starting_pocket_clips:
+		inventory.pockets.add(Item.new(clip))
+	for i in starting_backpack_clips:
+		inventory.backpack.add(Item.new(clip))
+	Log.info("🏃 Basic kit packed: gun=%s, pocket_clips=%d, backpack_clips=%d" % [
+		gun.id, starting_pocket_clips, starting_backpack_clips])
+
+
+## Holds the gun in the weapon slot: equips it with its clips when it changed, and puts the weapon away when the slot
+## is empty, leaving the player unarmed. Runs whenever the weapon slot changes, also when the gun is only moved about
+## inside it.
+func _arm() -> void:
+	var gun := inventory.gun()
+	if clips and clips.gun == gun and _weapon.is_equipped() == (gun != null):
+		Log.info("🏃 Weapon slot changed, same gun in hand: weapon=%s" % [gun.definition.id if gun else "none"])
+		return
+	if _weapon.is_equipped():
+		_weapon.unequip()
+	var definition := gun.definition as WeaponDefinition if gun else null
+	if definition == null:
+		clips = ThermalClips.new(inventory)
+		_hud.hide_clips()
+		Log.info("🏃 Unarmed, no gun in the weapon slot: items=%d" % inventory.item_count())
+		return
+	var fresh_clip := ContentRegistry.get_definition(definition.clip_item) as ItemDefinition
+	var spent_clip := ContentRegistry.get_definition(definition.spent_clip_item) as ItemDefinition
+	if fresh_clip == null or spent_clip == null:
+		Log.error("🏃 Weapon clips are not registered items: weapon=%s, clip_item=%s, spent_clip_item=%s" % [
+			definition.id, definition.clip_item, definition.spent_clip_item])
+	clips = ThermalClips.new(inventory, fresh_clip, spent_clip, gun)
+	var own_hitboxes: Array[RID] = []
+	for hitbox in get_hitboxes():
+		own_hitboxes.append(hitbox.get_rid())
+	_weapon.equip(definition, clips, own_hitboxes)
+	Log.info("🏃 Armed: weapon=%s, heat=%.0f%%, fresh=%d, packed=%d, holstered=%s" % [
+		definition.id, clips.heat * 100.0, clips.fresh, clips.packed, holstered])
 
 
 ## The peek follows the peek and aim actions (see PeekRules.next_state). Releasing peek centres the peek target,
@@ -639,12 +735,15 @@ func _gather_floor(picked: DroppedItem) -> ItemGrid:
 	return floor
 
 
-## While the inventory is open the player stands still in their stance and can't look, peek or shoot; Tab, Esc and
-## interact close it. The world keeps going, and a reload under way still finishes.
+## While the inventory or the hub is open the player stands still in their stance and can't look, peek or shoot; Tab,
+## Esc and interact close it. The world keeps going, and a reload under way still finishes.
 func _update_while_sorting(delta: float) -> void:
 	if Input.is_action_just_pressed("inventory") or Input.is_action_just_pressed("pause") \
 			or Input.is_action_just_pressed("interact"):
-		close_inventory()
+		if is_trading():
+			close_trader()
+		else:
+			close_inventory()
 	_update_peek_state(false)
 	_set_movement_state(MovementRules.State.CROUCH_IDLE if is_crouched else MovementRules.State.IDLE)
 	_update_velocity(Vector2.ZERO, delta)
@@ -863,11 +962,11 @@ func _on_died() -> void:
 
 ## The player got out through the wreck's airlock: nothing can hit them any more, the screen fades to black over the
 ## docking sound, and then the run summary shows what they carried out. What they carry stays theirs and goes on to
-## the ship with them; the loaded clip keeps its heat.
+## the ship with them; the gun's loaded clip keeps its heat.
 func extract() -> void:
 	if not _start_leaving("extract"):
 		return
-	var summary := GameSession.extract(inventory, clips.heat)
+	var summary := GameSession.extract(inventory)
 	get_tree().create_timer(leave_fade_time).timeout.connect(_show_summary.bind(summary))
 	Log.info("🏃 Extracting: position=%s, items=%d, value=%d, heat=%.0f%%, summary_in=%.1f s" % [
 		global_position, inventory.item_count(), inventory.value(), clips.heat * 100.0, leave_fade_time])
@@ -889,7 +988,7 @@ func _finish_boarding() -> void:
 		return
 	Log.info("🏃 Faded to black, travelling to the wreck: items=%d, value=%d" % [
 		inventory.item_count(), inventory.value()])
-	GameSession.board(inventory, clips.heat)
+	GameSession.board(inventory)
 
 
 ## Stops the player to leave through an airlock, without the death's slump: a reload under way finishes, the player
@@ -909,7 +1008,7 @@ func _start_leaving(why: String) -> bool:
 
 
 ## Takes the player out of the action when they die or leave: the weapon and hitboxes go (so nothing can see or hit
-## them any more), the peek centres, a hold ends, the inventory closes and the prompt goes.
+## them any more), the peek centres, a hold ends, the inventory or hub closes and the prompt goes.
 func _stop_acting() -> void:
 	_weapon.disable()
 	for hitbox in get_hitboxes():
@@ -922,7 +1021,10 @@ func _stop_acting() -> void:
 	_head_offset_previous = Vector2.ZERO
 	head_offset = Vector2.ZERO
 	_end_hold()
-	close_inventory()
+	if is_trading():
+		close_trader()
+	else:
+		close_inventory()
 	interact_target = null
 	_shown_prompt = ""
 	_shown_hold = false
@@ -958,8 +1060,10 @@ func _update_zoom_and_kick(delta: float) -> void:
 	_view_kick *= exp(-KICK_SETTLE / maxf(recovery_time, 0.01) * delta)
 
 
-## Runs every frame; the HUD only redraws what changed.
+## Runs every frame; the HUD only redraws what changed. Unarmed, the clip readout stays hidden.
 func _update_hud() -> void:
+	_hud.set_hold(_hold / _held_target.hold_time if _held_target and _held_target.hold_time > 0.0 else -1.0)
+	_hud.set_charge(_weapon.charge)
 	if not _weapon.is_equipped():
 		return
 	var definition := _weapon.definition
@@ -967,8 +1071,6 @@ func _update_hud() -> void:
 	var saturated := not clips.has_room_for(definition.shot_heat)
 	_hud.set_clips(clips.heat, charge_heat, clips.fresh, clips.packed, clips.spent, _weapon.is_clip_low(), saturated,
 		_weapon.reload_progress())
-	_hud.set_charge(_weapon.charge)
-	_hud.set_hold(_hold / _held_target.hold_time if _held_target and _held_target.hold_time > 0.0 else -1.0)
 
 
 ## The head doesn't bob while peeking, so the peek holds steady.

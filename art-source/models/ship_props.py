@@ -15,6 +15,9 @@ they span negative Y); the clone pod and the pilot seat stand free and have thei
     console        a desk console with a sloped control panel and an upright screen (material Screen), 1.4 m wide,
                    0.55 m deep; the screen's face is 0.9 x 0.5 m, centred 1.15 m up and 0.07 m in front of the back
     bunk           a bed against the wall along its long side, 2.0 x 0.9 m, with a shelf and a reading lamp
+    trader_terminal  the comms link to the system's trader hub: a pedestal with a sloped keypad, 0.7 m wide and
+                   0.35 m deep, under a wall screen (material Screen) whose face is 0.58 x 0.4 m, centred 1.5 m up and
+                   0.07 m in front of the back, with a green link lamp and a hazard-striped cargo chute above it
 The ship's scenes size their collision to these measurements; keep them in step.
 """
 
@@ -38,6 +41,9 @@ CONSOLE = (1.4, 0.55, 0.8)
 SCREEN = (0.9, 0.5)
 SCREEN_HEIGHT = 1.15
 BUNK = (2.0, 0.9)
+TERMINAL = (0.7, 0.35, 1.0)
+TERMINAL_SCREEN = (0.58, 0.4)
+TERMINAL_SCREEN_HEIGHT = 1.5
 
 
 def material(name: str, color: tuple, metallic: float, roughness: float, emission: tuple | None = None,
@@ -225,12 +231,40 @@ def build_bunk(mats: dict) -> bpy.types.Object:
     return make_object("bunk", bunk, mats)
 
 
+def build_trader_terminal(mats: dict) -> bpy.types.Object:
+    width, depth, height = TERMINAL
+    terminal = Builder()
+    terminal.box((width, depth, 0.06), (0.0, -depth / 2.0, 0.03), "Trim")
+    terminal.box((width - 0.1, depth - 0.04, height - 0.06), (0.0, -depth / 2.0 + 0.02, height / 2.0), "Shell")
+    # The keypad sloping down towards the player, with a few lit keys.
+    terminal.box((width - 0.06, depth + 0.02, 0.05), (0.0, -depth / 2.0, height + 0.02), "Trim", tilt_x=-18.0)
+    for row in range(2):
+        for col in range(5):
+            lit = "Lamp" if (row * 5 + col) % 3 == 0 else "Trim"
+            terminal.box((0.07, 0.05, 0.02), (-0.2 + col * 0.1, -depth + 0.1 + row * 0.1, height + 0.035 + row * 0.03),
+                         lit, tilt_x=-18.0)
+    # The wall screen above, in a frame, with the link lamp beside it.
+    screen_w, screen_h = TERMINAL_SCREEN
+    terminal.box((screen_w + 0.08, 0.06, screen_h + 0.08), (0.0, -0.03, TERMINAL_SCREEN_HEIGHT), "Trim")
+    terminal.box((screen_w, 0.01, screen_h), (0.0, -0.065, TERMINAL_SCREEN_HEIGHT), "Screen")
+    terminal.box((0.04, 0.02, 0.04), (screen_w / 2.0 - 0.02, -0.07, TERMINAL_SCREEN_HEIGHT + screen_h / 2.0 + 0.07),
+                 "Status")
+    # The cargo chute the hub's drones deliver through, a hazard-striped hatch above the screen.
+    chute_bottom = TERMINAL_SCREEN_HEIGHT + screen_h / 2.0 + 0.14
+    terminal.box((0.5, 0.12, 0.3), (0.0, -0.06, chute_bottom + 0.15), "Trim")
+    terminal.box((0.42, 0.01, 0.22), (0.0, -0.125, chute_bottom + 0.15), "Shell")
+    for i in range(4):
+        terminal.box((0.42, 0.012, 0.025), (0.0, -0.132, chute_bottom + 0.06 + i * 0.06), "Hazard")
+    return make_object("trader_terminal", terminal, mats)
+
+
 BUILDERS = {
     "clone_pod": build_clone_pod,
     "stash_cabinet": build_stash_cabinet,
     "pilot_seat": build_pilot_seat,
     "console": build_console,
     "bunk": build_bunk,
+    "trader_terminal": build_trader_terminal,
 }
 
 

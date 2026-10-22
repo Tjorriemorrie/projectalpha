@@ -1,8 +1,9 @@
-"""Builds the low-poly laser pistol and exports it as a glTF binary.
+"""Builds the low-poly laser pistol and exports it as a glTF binary, once for the viewmodel and once as an item.
 
 Run from the repository root (Blender 5.2):
     blender --background --python art-source/models/laser_pistol.py -- [--preview <png path>]
-Writes game/content/base/weapons/laser_pistol/laser_pistol.glb, and renders a preview PNG when asked.
+Writes game/content/base/weapons/laser_pistol/laser_pistol.glb and laser_pistol_item.glb, and renders a preview PNG
+when asked.
 
 The pistol faces -Y (Blender's front view), Z is up, and 1 unit is 1 metre. Its origin is the rear sight, with the
 sight line running along -Y at Z = 0, so the viewmodel can line the sights up with the centre of the screen. It is
@@ -11,6 +12,10 @@ three objects, which Godot imports as three nodes:
     Emitter  the lens at the muzzle and the strips along the slide, which glow (material Emitter)
     Clip     the thermal clip in the grip, with its own origin and axes along the grip so it can slide out
              (materials Metal and ClipHeat, the band that glows from cool to hot)
+
+The item model is the same pistol lying on its left side with the muzzle pointing left (-X), built to its grid shape
+ITEM_SHAPE like the loot items in items.py: rows run towards -Y, and its origin is the middle of the footprint on the
+floor, so seen from straight above the slide fills the top row and the grip hangs into the bottom right cell.
 """
 
 import math
@@ -23,6 +28,10 @@ from mathutils import Matrix, Vector
 
 OUTPUT = (Path(__file__).resolve().parents[2] / "game" / "content" / "base" / "weapons" / "laser_pistol"
           / "laser_pistol.glb")
+ITEM_OUTPUT = OUTPUT.with_name("laser_pistol_item.glb")
+# The item's grid shape; keep it in step with the shape in laser_pistol.tres.
+ITEM_SHAPE = ["##", ".#"]
+CELL = 0.15
 # The grip leans back this many degrees, like a real pistol's.
 GRIP_TILT = math.radians(15.0)
 GRIP_TOP = Vector((0.0, -0.012, -0.06))
@@ -124,6 +133,31 @@ def build_clip(bm: bmesh.types.BMesh) -> None:
     add_box(bm, (0.026, 0.034, 0.005), (0.0, 0.0, -0.031), metal)
 
 
+def lay_flat(objects: list) -> None:
+    """Turns the pistol onto its left side, muzzle to -X and its top to +Y, applies the transforms, and moves it so its
+    footprint is centred on the origin with its lowest point on the floor."""
+    # Columns are where the pistol's X (its right side), Y (its rear) and Z (its top) end up.
+    turn = Matrix(((0.0, 1.0, 0.0, 0.0), (0.0, 0.0, 1.0, 0.0), (1.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
+    for obj in objects:
+        obj.matrix_world = turn @ obj.matrix_world
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    corners = [obj.matrix_world @ Vector(corner) for obj in objects
+               for corner in obj.evaluated_get(depsgraph).bound_box]
+    low = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
+    high = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
+    offset = Vector((-(low.x + high.x) / 2.0, -(low.y + high.y) / 2.0, -low.z))
+    for obj in objects:
+        obj.location += offset
+    size = high - low
+    print(f"🔫 Laid the pistol flat: size={size.x:.3f} x {size.y:.3f} x {size.z:.3f} m, "
+          f"footprint={len(ITEM_SHAPE[0]) * CELL:.2f} x {len(ITEM_SHAPE) * CELL:.2f} m")
+
+
 def render_preview(path: Path) -> None:
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_WORKBENCH"
@@ -166,6 +200,11 @@ def main() -> None:
     print(f"🔫 Exported laser pistol: path={OUTPUT}, objects={len(bpy.data.objects)}")
     if preview:
         render_preview(preview)
+
+    lay_flat([obj for obj in bpy.data.objects if obj.type == "MESH"])
+    bpy.ops.export_scene.gltf(filepath=str(ITEM_OUTPUT), export_format="GLB", export_apply=True, export_yup=True,
+                              use_selection=True)
+    print(f"🔫 Exported laser pistol item: path={ITEM_OUTPUT}, shape={ITEM_SHAPE}")
 
 
 if __name__ == "__main__":

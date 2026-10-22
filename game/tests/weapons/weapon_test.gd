@@ -1,6 +1,7 @@
 extends GdUnitTestSuite
 ## Plays the laser pistol and the player's health in the greybox test scene with simulated input: shooting the
-## targets, charging, the fire rate, peeking, reloading, sprinting, aiming, and a firing watcher killing the player.
+## targets, charging, the fire rate, peeking, reloading, taking the gun out of its slot, sprinting, aiming, and a
+## firing watcher killing the player.
 ## Positions refer to the layout of res://scenes/test/player_test.tscn; the targets stand in a row at z = -4 facing
 ## the player, who faces north (-z). The runner plays 5x fast by running more physics frames per second, so a
 ## physics frame is still 1/60 s of game time.
@@ -175,6 +176,33 @@ func test_reload_takes_its_time_and_swaps_the_clip() -> void:
 	assert_float(_player.clips.heat).is_equal(0.0)
 
 
+func test_taking_the_gun_out_of_its_slot_mid_reload_calls_the_reload_off() -> void:
+	await _face_target()
+	await _tap()
+	var heat := _player.clips.heat
+	Input.action_press(&"reload")
+	await _physics_frames(2)
+	Input.action_release(&"reload")
+	assert_bool(_weapon.is_reloading).is_true()
+	assert_int(_player.clips.fresh).is_equal(1)
+	var gun := _player.inventory.gun()
+	_player.inventory.weapon.remove(gun)
+	await _physics_frames(2)
+	assert_bool(_weapon.is_equipped()).is_false()
+	assert_bool(_weapon.is_reloading).is_false()
+	# The fresh clip went back into its pocket cell, and the gun's loaded clip kept its heat.
+	assert_int(_player.inventory.pockets.count(_item("base:thermal_clip"))).is_equal(2)
+	assert_int(_player.inventory.count(_item("base:spent_thermal_clip"))).is_equal(0)
+	assert_float(gun.clip_heat).is_equal_approx(heat, 0.0001)
+	# Unarmed, the trigger does nothing; put back, the gun is in hand again with its heat.
+	await _tap()
+	assert_int(_weapon.shots_fired).is_equal(1)
+	_player.inventory.weapon.add(gun)
+	await _physics_frames(2)
+	assert_bool(_weapon.is_equipped()).is_true()
+	assert_float(_player.clips.heat).is_equal_approx(heat, 0.0001)
+
+
 func test_reload_with_an_unused_clip_does_nothing() -> void:
 	await _face_target()
 	Input.action_press(&"reload")
@@ -294,3 +322,7 @@ func _physics_frames(count: int) -> void:
 
 func _hud() -> Hud:
 	return _player.get_node("Hud") as Hud
+
+
+static func _item(id: String) -> ItemDefinition:
+	return ContentRegistry.get_definition(id) as ItemDefinition

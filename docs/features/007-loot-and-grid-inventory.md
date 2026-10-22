@@ -39,7 +39,7 @@ still about. Supports *Everything is salvage* and *Choose your risk*.
 
 ### Items
 
-- [x] Every item is its own content definition in the base pack with its name, shape, credit value and a short
+- [x] Every item is its own content definition in the base pack with its name, shape, bitcoin value and a short
       description, all shown on its item card. There is no trader yet, but the value is what makes "is this worth
       the space" a real choice (and 008 can total the haul).
 - [x] Eight salvage items, covering the shapes (starting values, tuned in the playtest):
@@ -139,7 +139,7 @@ still about. Supports *Everything is salvage* and *Choose your risk*.
       slightly dimmed around them, so the player can see a searchlight sweeping in while they sort: an open
       container's grid and the floor under it on the left half, their pockets and backpack on the right half,
       keeping the middle clear, and the item card of the item under the pointer. Under the player's grids, what they
-      carry is totalled (credits and free cells), and the keys are listed along the bottom. The health and heat
+      carry is totalled (bitcoin and free cells), and the keys are listed along the bottom. The health and heat
       placards stay on screen. Items are outlined as one silhouette of their shape; while one is dragged, the cells
       it would take show whether it fits (the laser's blue or red), and where it came from stays as a dark
       cut-out.

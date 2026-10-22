@@ -19,7 +19,7 @@
 script = ExtResource("14_loot")
 marker = "Deck1/StoreRoom/LootSpotWest"
 container = "base:locker"
-items = PackedStringArray("base:gyroscope", "base:power_cell", "base:conduit", "base:circuit_board", "base:thermal_clip", "base:thermal_clip")
+items = PackedStringArray("base:gyroscope", "base:power_cell", "base:conduit", "base:circuit_board", "base:thermal_clip", "base:thermal_clip", "base:laser_pistol")
 
 [sub_resource type="Resource" id="Resource_StoreRoomCrate"]
 script = ExtResource("14_loot")

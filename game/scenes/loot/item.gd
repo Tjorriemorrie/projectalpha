@@ -1,11 +1,14 @@
 class_name Item
 extends RefCounted
 ## One item the player can carry: what it is (its definition), and how it lies in the grid that holds it, its
-## orientation (see ItemShape) and the cell its shape starts at. It doesn't know which grid holds it.
+## orientation (see ItemShape) and the cell its shape starts at. It doesn't know which grid holds it. A gun also
+## keeps the heat of its loaded clip, which goes wherever the gun goes.
 
 var definition: ItemDefinition
 var orientation := 0
 var cell := Vector2i.ZERO
+## For a gun, the heat in its loaded clip, from 0 (fresh) to 1 (saturated). A new gun comes with a fresh clip.
+var clip_heat := 0.0
 
 
 func _init(item_definition: ItemDefinition, item_orientation: int = 0, at: Vector2i = Vector2i.ZERO) -> void:

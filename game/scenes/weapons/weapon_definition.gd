@@ -1,7 +1,9 @@
 class_name WeaponDefinition
-extends ContentDefinition
+extends ItemDefinition
 ## A weapon in the content registry: its numbers, and its viewmodel scene (model, muzzle and sounds), which only
-## loads when the weapon is equipped. Laser weapons heat up as they fire, and a thermal clip soaks up the heat;
+## loads when the weapon is equipped. A weapon is an item too: its shape, value and model (lying flat, for its icon
+## and when it lies on the floor) come from ItemDefinition, and the player holds the one in the inventory's weapon
+## slot. Laser weapons heat up as they fire, and a thermal clip soaks up the heat;
 ## heats are fractions of one clip (0.05 is 5%). Holding the trigger charges a shot: a charge of 0 is a quick click,
 ## 1 is a full charge, and a part charge scales between the two.
 

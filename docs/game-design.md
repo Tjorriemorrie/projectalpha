@@ -54,7 +54,8 @@ The 3 core ideas every feature should support. If a feature doesn't serve a pill
   reach her before her time runs out (see [Rescue clock](#rescue-clock), [Finding her](#finding-her) and
   [The cure](#the-cure)).
 
-Trader hubs are menus, not places to walk around.
+Trader hubs are menus, not places to walk around: the player trades from a console on his ship (see
+[Setting](#setting)).
 
 **Second to second:** move carefully and listen; fight from cover by peeking; sprint for the exit when it goes wrong.
 
@@ -75,28 +76,28 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 |----------|-------------|---------|
 | Boarding and extraction | Board a station or ship, then get out alive to keep what you found. Boarding is always done in secret: if anyone aboard knew, they would be waiting at the airlock, so the suspense is in moving through the ship unnoticed | [008](features/008-extraction-and-clone-loop.md) |
 | First-person combat | Cover-based shooting aboard stations and ships. Forgiving enough to get through many fights in a run: about ten hits kill the player, but health doesn't come back during a run, so every fight wears the player down | [005](features/005-weapon-and-health.md), [004](features/004-free-peek-and-cover.md) |
-| Laser weapons and thermal clips | Weapons are lasers. Every shot heats the weapon, and a thermal clip (as in Mass Effect 2) soaks up the heat. Holding the trigger charges a shot that hits harder, kicks more and puts more heat into the clip; when the clip is saturated the player swaps it for a fresh one, which is the reload. The spent clip goes back into the inventory as salvage (to re-cool, break down or sell later) instead of being dropped. Thermal clips fit every weapon, take space in the grid inventory and are lost on death like everything else | [005](features/005-weapon-and-health.md) |
+| Laser weapons and thermal clips | Weapons are lasers. Every shot heats the weapon, and a thermal clip (as in Mass Effect 2) soaks up the heat. Holding the trigger charges a shot that hits harder, kicks more and puts more heat into the clip; when the clip is saturated the player swaps it for a fresh one, which is the reload. The spent clip goes back into the inventory as salvage (to re-cool, break down or sell later) instead of being dropped. Thermal clips fit every weapon, take space in the grid inventory and are lost on death like everything else. Guns are items too: the one in the weapon slot is in hand, the rest are carried or stashed, all are lost on death, and the hubs sell them | [005](features/005-weapon-and-health.md), [009](features/009-trader-hub.md) |
 | Free peek | Hold Alt and move the mouse to peek out of cover in any direction (replaces fixed left/right lean). Peeking is look-only: you can't shoot, but you are hard to hit. To shoot from cover, hold right click to aim out, which exposes more of you and makes you easier to hit | [004](features/004-free-peek-and-cover.md) |
 | Vents | Crouch-only routes through ventilation shafts | [002](features/002-wreck-section-kit.md) |
 | Flashlight | Lights up dark wrecks, but lights you up for enemies too; toggled on and off, no battery | [002](features/002-wreck-section-kit.md), [006](features/006-robot-enemy.md) |
 | Elevators | The only way between decks: call with a button, ride, and the arrival ding can be heard | [002](features/002-wreck-section-kit.md) |
 | Enemy senses | Enemies see, hear and feel the player. In the dark they only see you up close, unless you are lit by a lamp, your flashlight or your own muzzle flash. Shots, sprinting and the elevator's ding carry far; walking is quieter and crouching quietest. Moving fast, shooting and lighting the way are risks you choose | [006](features/006-robot-enemy.md) |
-| Looting | Pry open containers and robot wreckage, in real time while the wreck is still dangerous, and carry the items out | [007](features/007-loot-and-grid-inventory.md) |
-| Grid inventory | Items take up tetris-like shapes in a backpack grid and a strip of pockets for things at hand (reloads take thermal clips from the pockets); the player rotates, mirrors and arranges them to fit more loot, and drops what isn't worth the space. Every item is moved by dragging it, with no quick-move shortcuts, can be selected, and shows an item card (value, size, description) under the pointer; dropped items lie on the floor, which the inventory shows as a grid of its own | [007](features/007-loot-and-grid-inventory.md) |
-| Trader hubs | Menu-based stations, one in every star system, for selling loot and buying anything in the game, including fuel. Ask one for a cure ingredient and it tells you which systems have it, and the hubs of those systems sell it; some can tell you that she passed through | — |
+| Looting | Pry open containers and robot wreckage, in real time while the wreck is still dangerous, and carry the items out | [007](features/007-loot-and-grid-inventory.md), [010](features/010-wreck-variety.md) |
+| Grid inventory | Items take up tetris-like shapes in a backpack grid, a strip of pockets for things at hand (reloads take thermal clips from the pockets) and a weapon slot for the gun in hand; the player rotates, mirrors and arranges them to fit more loot, and drops what isn't worth the space. Every item is moved by dragging it, with no quick-move shortcuts, can be selected, and shows an item card (value, size, description) under the pointer; dropped items lie on the floor, which the inventory shows as a grid of its own | [007](features/007-loot-and-grid-inventory.md), [009](features/009-trader-hub.md) |
+| Trader hubs | Menu-based stations, one in every star system, traded with from a console on the ship: sell loot from the stash for bitcoin and buy anything in the game, guns and fuel included. Prices vary a little from hub to hub. Ask one for a cure ingredient and it tells you which systems have it, and the hubs of those systems sell it; some can tell you that she passed through | [009](features/009-trader-hub.md) |
 | Breakdown | Break any item down into components (like Arc Raiders) | — |
 | Crafting and upgrades | Craft any item from components; upgrade gear | — |
 | Ship as hub | Your ship is your home between runs (no base building for now) | [008](features/008-extraction-and-clone-loop.md) (minimal) |
-| Travel and fuel | Two fuels, bought at the trader hubs: antimatter for the jump drive, to jump to the next star system (a day per jump), and hydrogen to fly to the ships and stations within a system. Antimatter takes days to procure, which keeps the player boarding ships while he waits (see [Travel and fuel](#travel-and-fuel)) | — |
-| Star map | A dynamic map under fog of war: the player only sees up to a certain distance (about two jumps), with 5-6 systems in jump range, and pre-made systems are added as the fog lifts. Every system has a trader hub, and no system is riskier or richer than another. The player plans his route through the systems that have the cure's ingredients | — |
+| Travel and fuel | Two fuels, bought at the trader hubs: antimatter for the jump drive, to jump to the next star system (a day per jump), and hydrogen to fly to the ships and stations within a system. Antimatter takes days to procure, which keeps the player boarding ships while he waits (see [Travel and fuel](#travel-and-fuel)) | [011](features/011-system-map.md), [012](features/012-star-map-and-travel.md) |
+| Star map | A dynamic map under fog of war: the player only sees up to a certain distance (about two jumps), with 5-6 systems in jump range, and pre-made systems are added as the fog lifts. Every system has a trader hub, and no system is riskier or richer than another. The player plans his route through the systems that have the cure's ingredients | [012](features/012-star-map-and-travel.md) |
 | Triangulation | In every system the player can measure a ping to her ship; combined, the pings give a search area on the star map that shrinks with every ping. Vague at first, clearer as the game goes on (see [Finding her](#finding-her)) | — |
-| System map | The ships and stations to board in a star system, found at its planets, moons, asteroids, anomalies and battlefields. Inspect one to see its difficulty, wreck type and required gear; choosing which ones to board is how the player chooses the risk. Includes job-board leads | — |
+| System map | The ships and stations to board in a star system, found at its planets, moons, asteroids, anomalies and battlefields. Inspect one to see its difficulty, wreck type and required gear; choosing which ones to board is how the player chooses the risk. Includes job-board leads | [011](features/011-system-map.md) |
 | Location requirements | Some locations need specific gear or technology to enter (e.g. an oxygen supply for breached wrecks) | — |
 | Wreck timer | A countdown until the wreck is destroyed | — |
 | Oxygen | Limited air supply aboard breached wrecks | — |
 | Escalation | Rival salvagers keep arriving the longer you stay | — |
 | Story parts | Encrypted drives, found only on her company's ships, which are medium risk and need better gear and upgrades. Decrypted on the ship (a day or two) with the key she sent, some hold a key ingredient of the cure or instructions for making it; the final part is with her (see [The cure](#the-cure)) | — |
-| Rescue clock | Every run and every jump takes a day. The days count up until her stasis message, then count down to the moment her ship blows itself up; the game sets that countdown so the player can just make it (see [Rescue clock](#rescue-clock)) | — |
+| Rescue clock | Every run and every jump takes a day. The days count up until her stasis message, then count down to the moment her ship blows itself up; the game sets that countdown so the player can just make it (see [Rescue clock](#rescue-clock)) | [011](features/011-system-map.md) (day counter only) |
 | Her messages | One-way messages from her, arriving through the game in four phases that keep raising the stakes (see [Raising the stakes](#raising-the-stakes)) | — |
 | Androids | The player starts with three and can buy more at certain hubs. Lose them all and the man must board himself, and his death is game over (see [Androids](#androids)) | — |
 
@@ -121,18 +122,21 @@ Gamepad is supported. There is no jump, prone or slide.
 | Shoot: tap to fire, hold to charge a stronger shot | Left click | Right trigger |
 | Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
-| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory; opens the ship's stash; hold on an airlock's outer door to board the wreck or return to the ship; continues past the run summary | E | A / Cross |
+| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory; opens the ship's stash and trader terminal; hold on an airlock's outer door to board the wreck or return to the ship; continues past the run summary | E | A / Cross |
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
 | Aim out of cover: hold together with peek, in either order, to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory: open and close (Esc and interact also close it) | Tab | View / Select (B also closes it) |
-| In the inventory: move the cursor | Mouse | Left stick / D-pad |
-| In the inventory: drag an item | Left click (hold) | A (hold) |
-| In the inventory: rotate the dragged item 90° | Right click | Right bumper |
-| In the inventory: mirror the dragged item | Middle click or mouse wheel | Left bumper |
+| In the inventory and the trader hub: move the cursor | Mouse | Left stick / D-pad |
+| In the inventory and the trader hub: drag an item | Left click (hold) | A (hold) |
+| In the inventory and the trader hub: rotate the dragged item 90° | Right click | Right bumper |
+| In the inventory and the trader hub: mirror the dragged item | Middle click or mouse wheel | Left bumper |
 | In the inventory: drop an item on the floor | Drag it onto the floor grid, or release it outside the inventory | Y / Triangle |
+| In the trader hub: buy one of an item (it goes to the stash) | Left click on it on the shelf | A |
+| In the trader hub: sell what is in the sell crate | Left click on SELL | A |
+| Trader hub: close | Tab, Esc or E | View / Select or B |
 | Pause | Esc | Menu / Start |
 
 Gamepad bindings are a first draft.
@@ -154,10 +158,11 @@ Gamepad bindings are a first draft.
 
 ### Androids
 
-- He starts with three androids. When one dies he links into the next, which wakes in its charging cradle on his
-  ship with the basic kit.
+- He starts with three androids, the first one carrying the basic kit. When one dies he links into the next, which
+  wakes in its charging cradle on his ship empty-handed: he arms it from the stash or buys a gun at the hub. With no
+  gun and no bitcoin it boards unarmed, and he picks an easy wreck where it might loot a gun and get out.
 - More can be bought at certain trader hubs: the pacing places them like the cure's ingredients, always among the
-  systems in jump range, and a new android comes with the basic kit. Their price is another hidden pacing lever (see
+  systems in jump range, and a new android comes empty-handed too. Their price is another hidden pacing lever (see
   [Rescue clock](#rescue-clock)).
 - If all of them are lost, the man has to board himself. He plays exactly like an android, with the same controls,
   health and kit; only his death is game over.
@@ -205,7 +210,7 @@ The ship runs on two fuels, both bought at the trader hubs:
   procurement time is one of the hidden pacing levers (see [Rescue clock](#rescue-clock)).
 - Hydrogen is always on the shelf, and flying within a system or visiting the hub takes no time.
 - The loop lives within a system: flying a loop through several ships before returning to the hub saves hydrogen and
-  money, compared with flying back to the hub after every ship.
+  bitcoin, compared with flying back to the hub after every ship.
 
 ### Finding her
 
@@ -288,7 +293,7 @@ the kinds can be introduced gradually as the game goes on.
   the ships, only how quickly the journey moves (see [Rescue clock](#rescue-clock)).
 - Her company's ships, the only ones that carry the encrypted drives, are medium risk: the player needs better gear
   and upgrades before boarding them (see [The cure](#the-cure)).
-- On day 0 the player starts in a random system with three androids, the basic kit and a little money: not enough
+- On day 0 the player starts in a random system with three androids, the basic kit and a little bitcoin: not enough
   for antimatter, so the first system already needs runs.
 - Gear and technology gate harder locations. Progression mostly means unlocking access to riskier, richer wrecks.
 - Early game uses quiet wrecks only. Timers, oxygen and escalation are introduced later as the pressure ramps up
@@ -305,6 +310,10 @@ Boarding them is too deadly for people, so salvagers on the rim send androids: f
 android that goes aboard. He is no soldier. When an android dies, the link lets him remember what it went through,
 but the disconnect knocks him out for a while; then he links into the next one, if he has one left (see
 [Androids](#androids)).
+
+The rim trades in bitcoin (₿). Nobody docks to trade there: a ship trades with a system's trader hub over the comms
+link, and drones carry all the cargo between them: what he sells goes out of his ship's hold, and what he buys comes
+back to it. So he trades from a console without ever leaving his ship.
 
 ### Story summary
 
@@ -381,7 +390,7 @@ and the largest stations take up to 30.
 | Level / area | Purpose | Key mechanics introduced | Feature |
 |--------------|---------|--------------------------|---------|
 | Blueprint-based generation | Builds each wreck's layout from its class blueprint | — | — |
-| Star systems | Pre-made systems (a trader hub, plus ships and stations at planets, moons, asteroids, anomalies and battlefields), picked from a pool of about 25 and added to the star map as the fog lifts | — | — |
+| Star systems | Pre-made systems (a trader hub, plus ships and stations at planets, moons, asteroids, anomalies and battlefields), picked from a pool of about 25 and added to the star map as the fog lifts | — | [012](features/012-star-map-and-travel.md) |
 | Small ships | Early game, about 5-minute runs | Core loop | [002](features/002-wreck-section-kit.md) |
 | Large stations | Late game, runs of up to 30 minutes | TBD | — |
 
@@ -423,7 +432,7 @@ Sound is crucial to the tension. The player must be able to hear threats before 
 
 - **Menus:** main menu, pause, settings, inventory (grid), crafting and breakdown, star map, trader hub.
 - **HUD:** classic, with corner indicators for health, thermal clip heat, oxygen (on breached wrecks) and the wreck timer
-  (on doomed wrecks).
+  (on doomed wrecks), and at home on the ship the bitcoin in the wallet.
 
 ## 8. Scope
 

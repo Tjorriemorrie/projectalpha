@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/ship/bunk.glb" id="12_bunk"]
 [ext_resource type="PackedScene" path="res://content/base/containers/locker/locker.glb" id="13_locker"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="14_player"]
+[ext_resource type="PackedScene" path="res://scenes/ship/trader_terminal.tscn" id="15_terminal"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_seat"]
 size = Vector3(0.62, 1.4, 0.75)
@@ -97,6 +98,10 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 12, 0, -4.9)
 
 [node name="Stash" parent="." instance=ExtResource("9_stash")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 5.8)
+
+[node name="TraderTerminal" parent="." instance=ExtResource("15_terminal")]
+unique_name_in_owner = true
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 13.35, 0, 5.8)
 
 [node name="Props" type="Node3D" parent="."]
 
@@ -228,4 +233,5 @@ material = SubResource("StandardMaterial3D_hull")
 [node name="Player" parent="." instance=ExtResource("14_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.12, 5)
 holstered = true
+shows_wallet = true
 has_floor = false

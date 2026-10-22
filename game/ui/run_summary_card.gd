@@ -22,7 +22,7 @@ const TRACE_TIME := 1.4
 const BEATS: Array[float] = [0.12, 0.34, 0.56, 0.78]
 const FLATLINE_AFTER := 2
 
-## What the card says, for tests: e.g. "RUN COMPLETE | Haul 9 items · 1,240 CR | Gained +1,050 CR | E Continue".
+## What the card says, for tests: e.g. "RUN COMPLETE | Haul 9 items · ₿1,240 | Gained +₿1,050 | E Continue".
 var text := ""
 
 var _summary: RunSummary
@@ -66,13 +66,13 @@ func show_summary(summary: RunSummary, key: String) -> void:
 		_rows.remove_child(row)
 		row.queue_free()
 	var lines: Array[String] = [_title.text]
-	var carried := "%d %s  ·  %s CR" % [summary.items, "item" if summary.items == 1 else "items",
-		_credits(summary.value)]
+	var carried := "%d %s  ·  %s" % [summary.items, "item" if summary.items == 1 else "items",
+		Bitcoin.format(summary.value)]
 	if summary.extracted:
-		var gained := ("+%s" if summary.gained > 0 else "%s") % _credits(summary.gained)
+		var gained := Bitcoin.format(summary.gained, true)
 		_add_row("Haul", carried, INK_COLOR)
-		_add_row("Gained", "%s CR" % gained, LASER_COLOR if summary.gained > 0 else DIM_COLOR)
-		lines.append_array(["Haul %s" % carried, "Gained %s CR" % gained])
+		_add_row("Gained", gained, LASER_COLOR if summary.gained > 0 else DIM_COLOR)
+		lines.append_array(["Haul %s" % carried, "Gained %s" % gained])
 	else:
 		_add_row("Lost", carried, DANGER_COLOR if summary.items > 0 else DIM_COLOR)
 		_add_row("Next", "Clone %d activated" % summary.clone_number, INK_COLOR)
@@ -232,12 +232,3 @@ func _draw_lifeline() -> void:
 		_lifeline.draw_polyline(shown, color, 1.6, true)
 		_lifeline.draw_circle(shown[shown.size() - 1], 2.5, color.lightened(0.4))
 
-
-## Credits with a thousands separator: 1240 is "1,240", -50 is "−50".
-static func _credits(value: int) -> String:
-	var digits := str(absi(value))
-	var grouped := ""
-	while digits.length() > 3:
-		grouped = "," + digits.right(3) + grouped
-		digits = digits.left(digits.length() - 3)
-	return ("−" if value < 0 else "") + digits + grouped

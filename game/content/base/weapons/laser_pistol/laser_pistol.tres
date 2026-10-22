@@ -5,7 +5,11 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Laser pistol"
-viewmodel = "res://content/base/weapons/laser_pistol/laser_pistol.tscn"
+shape = PackedStringArray("##", ".#")
+value = 200
+description = "A compact laser sidearm. Hold the trigger to charge a heavier shot. Its loaded clip stays in it, and the one in the weapon slot is the one in hand."
+model = "res://content/base/weapons/laser_pistol/laser_pistol_item.glb"
+viewmodel ="res://content/base/weapons/laser_pistol/laser_pistol.tscn"
 clip_item = "base:thermal_clip"
 spent_clip_item = "base:spent_thermal_clip"
 damage = 25.0

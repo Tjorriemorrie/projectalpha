@@ -157,7 +157,7 @@ func grow_to(rows: int) -> void:
 	changed.emit()
 
 
-## Total value of the items it holds, in credits.
+## Total value of the items it holds, in bitcoin.
 func value() -> int:
 	var total := 0
 	for item in items:

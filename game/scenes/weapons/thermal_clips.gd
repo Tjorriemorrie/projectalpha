@@ -1,15 +1,24 @@
 class_name ThermalClips
 extends RefCounted
-## The thermal clips the player carries: the heat in the loaded clip (0 is fresh, 1 is saturated), and the clips in
-## the player's inventory, which are items. A reload takes a fresh clip from the pockets when it starts and keeps its
-## cell for the spent clip that comes out of the weapon when it ends, so a reload never needs room. A spent clip is
-## salvage, so it stays with the player instead of being dropped.
+## The thermal clips the player carries: the heat in the gun's loaded clip (0 is fresh, 1 is saturated), and the
+## clips in the player's inventory, which are items. The heat lives on the gun item, so it goes wherever the gun goes.
+## A reload takes a fresh clip from the pockets when it starts and keeps its cell for the spent clip that comes out of
+## the weapon when it ends, so a reload never needs room. A spent clip is salvage, so it stays with the player instead
+## of being dropped.
 
 ## Heat differences smaller than this count as equal, so twenty 5% shots exactly saturate a clip.
 const EPSILON := 0.0001
 const NO_CELL := Vector2i(-1, -1)
 
-var heat := 0.0
+## The loaded clip's heat, kept on the gun; always 0 with no gun.
+var heat: float:
+	get:
+		return gun.clip_heat if gun else 0.0
+	set(value):
+		if gun:
+			gun.clip_heat = value
+## The gun whose loaded clip this is, or null when the player is unarmed.
+var gun: Item
 var inventory: Inventory
 ## The items a fresh and a spent clip are (from the weapon's definition).
 var fresh_clip: ItemDefinition
@@ -32,11 +41,11 @@ var _swap_cell := NO_CELL
 
 
 func _init(carried: Inventory = null, fresh_item: ItemDefinition = null, spent_item: ItemDefinition = null,
-		loaded_heat: float = 0.0) -> void:
+		loaded: Item = null) -> void:
 	inventory = carried
 	fresh_clip = fresh_item
 	spent_clip = spent_item
-	heat = loaded_heat
+	gun = loaded
 
 
 ## How much heat the loaded clip can still take.
@@ -85,6 +94,18 @@ func swap() -> void:
 	if spent_clip:
 		inventory.pockets.place(Item.new(spent_clip), _swap_cell, 0)
 	_swap_cell = NO_CELL
+
+
+## Calls off a swap under way: the fresh clip take_fresh() took goes back into its reserved cell, and the loaded clip
+## stays as it was. Returns whether there was one.
+func cancel_swap() -> bool:
+	if _swap_cell == NO_CELL:
+		return false
+	inventory.pockets.release(_swap_cell)
+	if fresh_clip:
+		inventory.pockets.place(Item.new(fresh_clip), _swap_cell, 0)
+	_swap_cell = NO_CELL
+	return true
 
 
 ## Whether a swap is under way (a fresh clip taken, its cell reserved).

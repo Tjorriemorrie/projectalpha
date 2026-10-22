@@ -26,7 +26,7 @@ Pin the Godot version and only upgrade deliberately, between features.
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
   🧩 wreck assembly and navigation, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers,
   🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music, 🎒 inventory, loot and items,
-  🧬 the game session and travel, 🚀 the ship, 💡 lamps).
+  🧬 the game session, travel and the wallet, 🚀 the ship, 💡 lamps, 💰 the trader hub's screen).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -52,7 +52,7 @@ projectalpha/
     │       ├── items/     # One self-contained folder per item (definition, model)
     │       └── containers/ # One self-contained folder per loot container (definition, scene, model)
     ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, combat, weapons,
-    │                      # enemies, loot, sections, wreck, ship, run, test)
+    │                      # enemies, loot, sections, wreck, ship, run, trade, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -85,7 +85,7 @@ projectalpha/
 |----------|----------------|
 | ContentRegistry | Discovers and registers all content definitions by ID (see [Content and modding](#content-and-modding)) |
 | ItemIcons | Renders every registered item's grid icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
-| GameSession | The session between scenes: the stash, the clone number, the kit handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session)) |
+| GameSession | The session between scenes: the stash, the wallet, the system's trader hub and its sell crate, the clone number, the kit handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session) and [Trading](#trading)) |
 
 ### Communication between nodes
 
@@ -95,7 +95,8 @@ projectalpha/
 ### Game state and saving
 
 The session lives in memory in `GameSession` (008): the stash, the clone number, the runs boarded and the kit
-handed between scenes. Nothing is saved yet, so quitting starts a new game. TBD: what is saved, file format, where
+handed between scenes, and since 009 the wallet, the hub's price seed and the sell crate. Nothing is saved yet, so
+quitting starts a new game. TBD: what is saved, file format, where
 (`user://`).
 
 ## 5. Systems
@@ -142,6 +143,8 @@ Settled in [003](features/003-content-registry.md):
 - **Kinds so far.** `SectionDefinition` (003), `WeaponDefinition` (005), `EnemyDefinition` (006), and
   `ItemDefinition` and `ContainerDefinition` (007). A weapon definition holds all its numbers (damage, heat, charge,
   kick, spread, zoom, reload and raise times) and the items it loads and unloads, so a new weapon is a new folder.
+  Since 009 `WeaponDefinition` extends `ItemDefinition`: a gun is an item (shape, value, a model lying flat), so it
+  registers once and `get_all(ItemDefinition)` lists it with the other items.
   An enemy definition holds its scene, the marker mount it needs, the robot brain's numbers and the salvage in its
   wreckage; how a kind moves is exported on its scene. An item definition holds its shape (rows of text), value and
   model, so a new item is a folder with a `.tres` and a `.glb` and no icon to draw. None needed a change to the
@@ -319,10 +322,12 @@ Built in [005](features/005-weapon-and-health.md).
   draws the beam, sparks, impact flash and scorch for any shooter, in its own colour (the player blue-white,
   enemies red). Scorch marks are permanent for the run: each is a `Decal` child of the surface it hit (so it moves
   with doors and elevators), at most 256 at once with the oldest removed first, fading out beyond 25 m.
-- **Weapons and thermal clips.** `Weapon` (under the player's camera) runs a `WeaponDefinition` with the clips
-  the player carries (`ThermalClips`: the loaded clip's heat as a fraction; the fresh and spent clips are items in
-  the player's inventory since 007, and a reload takes a fresh one from the pockets). `WeaponRules` holds the
-  decisions. `Weapon.blocks_sprint()` and `Weapon.is_aiming` feed the player's sprint block and speed cap; the
+- **Weapons and thermal clips.** `Weapon` (under the player's camera) runs the gun in the inventory's weapon slot
+  with the clips the player carries (`ThermalClips`: the loaded clip's heat as a fraction, kept on the gun item as
+  `Item.clip_heat` since 009 so it goes wherever the gun goes; the fresh and spent clips are items in the player's
+  inventory since 007, and a reload takes a fresh one from the pockets). The player re-arms whenever the slot changes
+  (`Player._arm()`): `Weapon.equip()` the new gun, or `unequip()` and stay unarmed, which calls off a reload under
+  way (`ThermalClips.cancel_swap()` puts the fresh clip back). `WeaponRules` holds the decisions. `Weapon.blocks_sprint()` and `Weapon.is_aiming` feed the player's sprint block and speed cap; the
   player passes in whether it can shoot (not while peeking), whether it is lowered (sprinting or sorting the
   inventory) and whether it takes input (not while the inventory is open).
 - **Viewmodels.** A weapon's viewmodel scene has a `WeaponViewmodel` root whose origin is the rear sight. Its
@@ -378,8 +383,9 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
   their state changes. A screen that handles the mouse itself sets everything it holds to ignore the mouse (a
   `PanelContainer` stops clicks by default) and reads the pointer from its events, not from the window, so headless
   tests can push real mouse events. `Hud.key_label(action)` gives the bound key for any prompt; a held action shows "HOLD"
-  before the key cap and fills a second ring, in the placards' ink, round the centre dot. The inventory screen
-  (007) is part of the HUD. So is the run summary (008), a placard drawn on the black screen after a run (`RunSummaryCard`,
+  before the key cap and fills a second ring, in the placards' ink, round the centre dot. The clip readout hides
+  while the player is unarmed (`Hud.hide_clips()`). The inventory screen (007) and the trader hub's screen (009) are
+  part of the HUD; both extend `GridScreen`. So is the run summary (008), a placard drawn on the black screen after a run (`RunSummaryCard`,
   with the clone's lifeline traced in the laser's blue, or flatlining in red after a death); `Hud.fade_in()` lifts the
   black on arrival.
 
@@ -390,7 +396,8 @@ Built in [007](features/007-loot-and-grid-inventory.md).
 - **Grids and shapes.** Items take up shapes of cells (`ItemShape`: rows of text, eight orientations: quarter turns
   clockwise, then the same mirrored). `ItemGrid` (node-free) holds `Item`s (definition, orientation, cell) with no
   overlaps, finds space in reading order and any orientation, and can reserve cells. The player's `Inventory` is
-  two grids, pockets (4×1) and backpack (6×5). Loot only moves by being dragged: nothing is ever sorted into a grid
+  the weapon slot (`WeaponSlot`, 3×2, which only takes one weapon: the gun in hand, since 009), the pockets (4×1)
+  and the backpack (6×5). Loot only moves by being dragged: nothing is ever sorted into a grid
   by itself (only level set-up packs containers, and a reload puts its spent clip in the fresh clip's cell).
   Node-free classes don't log; the nodes that change them log the outcome.
 - **Loot.** A `Lootable` (`Interactable` with an `ItemGrid`) is anything the player pries open by holding interact
@@ -399,7 +406,8 @@ Built in [007](features/007-loot-and-grid-inventory.md).
   noise (4 m).
 - **The screen.** The `InventoryScreen` overlays the running game, which keeps going while it is open; the player
   stands still and the weapon takes no input. The container and the floor are on the left half, the player's
-  grids on the right. Items are dragged, turned and mirrored with the mouse; pressing one selects it, and the one
+  grids (weapon slot, pockets, backpack) on the right. What it shares with the hub's screen (dragging, previews, the
+  item card, placards, key hints, the two-column layout) lives in its base, `GridScreen`, with hooks for the rest. Items are dragged, turned and mirrored with the mouse; pressing one selects it, and the one
   under the pointer shows its item card. The screen always shows the floor: the dropped items within reach and in sight, in a grid that grows to keep two empty rows.
   Dragging an item onto it, or releasing one outside the placards, makes a `DroppedItem` (a rigid body on the
   `item` layer, one box per cell) that clatters as a 3 m noise; dragging one off it frees the body. Its calls
@@ -415,10 +423,12 @@ Built in [008](features/008-extraction-and-clone-loop.md).
 
 - **Session.** `GameSession` keeps the stash (`ItemGrid` 10×8), the clone number (one more per death), the runs
   boarded, how the player arrives on the ship (`NEW_CLONE` in the clone pod, `EXTRACTED` in the airlock) and the kit
-  (the `Inventory` and the loaded clip's heat) while it crosses to the next scene. `board()`, `extract()` and `die()`
-  record the run (`RunSummary`) and hand the kit over (a death hands none); `board()` and `continue_to_ship()`
-  travel. A player takes the kit in `_setup_combat()` (`take_carried()`, once) or builds the basic kit from
-  `starting_pocket_clips` (2) and `starting_backpack_clips` (0; the test levels set 2). Travel sounds play on the
+  (the `Inventory`, whose gun carries its clip's heat) while it crosses to the next scene. `board()`, `extract()` and
+  `die()` record the run (`RunSummary`) and hand the kit over (a death hands none); `board()` and
+  `continue_to_ship()` travel. A player takes the kit in `_setup_combat()` (`take_carried()`, once). With none, it
+  builds the basic kit only while `basic_kit_next` is on (a new game, or a level started on its own): the gun from
+  `starting_weapon_id` in the weapon slot, `starting_pocket_clips` (2) and `starting_backpack_clips` (0; the test
+  levels set 2). After a death `basic_kit_next` is off and the next clone wakes empty-handed (009). Travel sounds play on the
   session, so they carry on through the scene change; every arrival fades in from black (`fade_in_next`).
 - **Airlocks.** The airlock section (`Airlock`) has an outer door (`%OuterDoor`, an `Interactable` with a hold time)
   and a sign above it. While interact is held on it, it loops a cycling sound and makes an `airlock` noise (10 m)
@@ -433,9 +443,35 @@ Built in [008](features/008-extraction-and-clone-loop.md).
   player in the clone pod (`ClonePod`) or the airlock. Its player instance has `holstered` on (`Weapon.holstered`:
   lowered, no aim or trigger, reloads work) and `has_floor` off (the inventory screen has no floor and returns items
   released outside). The `Stash` binds a `Lootable` to the session's grid (`Lootable.bind()`), already open.
+- **Trader terminal.** `TraderTerminal` stands beside the stash; its `Interactable` ("Trade") opens the hub's
+  screen through `Player.open_trader()` (009).
 - **Outside.** The space beyond the cockpit window is the ship environment's star sky shader
   (`scenes/ship/starfield.gdshader`) and the wreck's dark hull as CSG on render layer 2 (`exterior`), lit only by a
   directional light whose cull mask is that layer, so it never lights the ship's inside.
+
+### Trading
+
+Built in [009](features/009-trader-hub.md).
+
+- **Prices.** `Trader` (`scenes/trade/`, node-free) is a hub: a title and a price seed. Selling pays an item's value
+  and buying costs twice it (`SELL_RATE`, `BUY_RATE`), both times the same per-item factor within ±5%
+  (`PRICE_VARIANCE`), seeded from the hub's seed and the item's ID so a hub always quotes the same price.
+  `Trader.shelf()` is every registered item, weapons first, then the cheapest up; stock is unlimited, and a mod adds
+  stock by adding items. The rates are a first guess for the tuning pass (roadmap backlog).
+- **Wallet and trades.** `GameSession` keeps `bitcoin` (₿500 at the start, never lost; `bitcoin_changed`), the
+  system's `trader` (rolled in `new_game()`; one system until 012) and the sell `crate` (6×4). `sell_crate()` pays
+  the hub's offer for everything in the crate, `buy()` puts one item in the stash's first free spot and is refused
+  when the wallet is short or the stash full, and `return_crate()` puts what is left back in the stash (what doesn't
+  fit stays in the crate for the next visit).
+- **The screen.** `TraderScreen` (a `GridScreen`): the crate with the offer and a SELL button and the shop
+  (`ShopView`: icon tiles with buy prices, red and dimmed when unaffordable) on the left, the wallet and the stash on
+  the right. Items drag between the stash and the crate only; clicking a shop tile buys one and selects it in the
+  stash. The wallet ticks to its new amount with the change fading beside it, and a status line explains every deal
+  or refusal. Selling is from the stash only, so carried loot goes into the stash first.
+- **Bitcoin.** The only currency is bitcoin: every amount the player sees goes through `Bitcoin.format()`
+  (`scripts/bitcoin.gd`): the ₿ symbol, commas between thousands, and a sign for changes (`₿1,240`, `−₿50`,
+  `+₿154`). At home the HUD shows the wallet in the top left: the ship's player has `shows_wallet` on, calls
+  `Hud.show_wallet()` and feeds it `GameSession.bitcoin_changed`; the readout hides while the hub's screen is open.
 
 ### Lighting
 
@@ -466,7 +502,8 @@ Built in [008](features/008-extraction-and-clone-loop.md).
   folder (e.g. `content/base/weapons/laser_pistol/`); shared models go into `game/assets/models/`.
 - Units: 1 Blender unit = 1 metre; apply scale and rotation before export.
 - Orientation: models face -Y in Blender (toward the Front view camera). This arrives as +Z in Godot, which is Godot's model front (`Vector3.MODEL_FRONT`).
-- Naming: a content model is named after its content folder (`laser_pistol.glb`). The ship's props are shared
+- Naming: a content model is named after its content folder (`laser_pistol.glb`). A weapon's item model (its icon
+  and how it lies on the floor) is `<name>_item.glb`: the same mesh laid flat to its shape by the weapon's script. The ship's props are shared
   models in `game/assets/models/ship/`, built by `art-source/models/ship_props.py`, one object each named after the
   prop. Objects and materials that
   code looks up get fixed names in the script (the pistol's `Clip`, `Emitter` and `ClipHeat`; the turret's `Ring`
@@ -502,7 +539,9 @@ Built in [008](features/008-extraction-and-clone-loop.md).
     `godot --headless --path game -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode -c -a res://tests`
   - Reports are written to `game/reports/` (ignored by git).
   - Suites that end runs turn `GameSession.travel_enabled` off (it still emits `travelled`) and call
-    `GameSession.new_game()` before and after each test, so no kit or clone count leaks into another suite.
+    `GameSession.new_game()` before and after each test, so no kit, clone count or bitcoin leak into another suite.
+  - Headless runs can't capture the mouse: `Input.mouse_mode` never reads `MOUSE_MODE_CAPTURED`, so tests check the
+    player's state instead.
   - Keep decisions in node-free classes (like `MovementRules`) so they can be unit tested. Behaviour that needs
     physics is tested by loading a scene with `scene_runner` and pressing actions with `Input.action_press`.
     `Input.action_press` changes action state without sending input events, so gameplay input that tests

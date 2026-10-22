@@ -41,7 +41,14 @@ Ordered, but only roughly. Re-order freely once the MVP is played.
 
 | #   | Feature | Status |
 |-----|---------|--------|
-|     |         |        |
+| 009 | [Trader hub](features/009-trader-hub.md) | done |
+| 010 | [Wreck variety](features/010-wreck-variety.md) | planned |
+| 011 | [System map](features/011-system-map.md) | planned |
+| 012 | [Star map and travel](features/012-star-map-and-travel.md) | planned |
+
+Later, roughly in this order: triangulation, her messages and the rescue clock's countdown, the company's ships and
+the cure, and the android stock (together with swapping the clone fiction for the android link). Saving has to land
+before the 90 to 100-day campaign can be played end to end.
 
 ## Idea backlog
 
@@ -63,8 +70,14 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
 - Swap the clone fiction in the game for the android link (008 built clones: the clone pod, `NEW_CLONE`,
   "Clone 3 activated"): the clone pod becomes the android's charging cradle, with the man's body in a link chair.
   Update the README, technical design and 008 spec that describe it.
-- Loot tables: container contents rolled each run (bigger containers rolling better loot), with missions filling
-  loot markers by difficulty; 007 keeps every wreck's loot fixed.
+- Unlimited stash: no size limit, since the player has to sell to survive and we control the prices. It grows to
+  fit (like the inventory screen's floor), so storing or buying never has to check for room; 009 refuses a buy
+  when the 10×8 stash is full.
+- Armor and gear (e.g. body armor, helmets), found on wrecks and sold at the hubs like everything else.
+- Tuning pass, once a full playthrough is possible: tweak all the control variables together. So far: the hubs'
+  sell and buy rates and per-hub price variance (009), item values, starting bitcoin (009), fuel prices and
+  antimatter procurement days, ingredient and android prices, decryption delay, how quickly the pings narrow, the
+  countdown's length, and run difficulty (aiming at about half of all runs extracting).
 - Missions that need the man himself to board instead of an android (nice to have).
 - A way through (nice to have, much later; it needs a cutscene): the last stretch to her is cut off by a nebula,
   minefield, anomaly or blockade, and charts, codes or a drive upgrade get the player past it.
