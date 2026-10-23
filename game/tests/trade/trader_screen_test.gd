@@ -2,9 +2,10 @@ extends GdUnitTestSuite
 ## Trades at the hub from the player's ship with travel turned off, through the trader terminal and mouse events
 ## pushed into the viewport: interact on the terminal opens the hub's screen; items dragged from the stash into the
 ## sell crate show the hub's offer, and SELL sells them into the wallet; clicking an item in the shop buys one into
-## the stash, unless the wallet is short or the stash is full; the card of the shop item under the pointer shows its
-## price; closing puts what is left in the crate back into the stash; at home the HUD shows the bitcoin in the wallet,
-## except while trading; and the player stands still while trading.
+## the stash, unless the wallet is short or the stash is full; FILL UP fills the hydrogen tank as far as the wallet
+## pays; the card of the shop item under the pointer shows its price; closing puts what is left in the crate back into
+## the stash; at home the HUD shows the bitcoin in the wallet, the hydrogen and the day, except while trading; the
+## player stands still while trading; and away from the hub the terminal is out of range.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: the stash room south of x = 12, with the trader
 ## terminal against its south wall at (13.35, 0, 5.8), facing north, its screen 1.5 m up.
 
@@ -50,7 +51,66 @@ func test_interact_on_the_terminal_opens_the_hub() -> void:
 func test_the_terminal_shows_the_hub_its_linked_to() -> void:
 	await _load_ship()
 	var text := _runner.find_child("TraderTerminal").get_node("%ScreenText") as Label3D
-	assert_str(text.text).is_equal("TRADER LINK\nTRADER HUB")
+	assert_str(GameSession.trader.title).is_equal("%s Hanse" % GameSession.system.definition.display_name)
+	assert_str(text.text).is_equal("TRADER LINK\n%s" % GameSession.trader.title.to_upper())
+
+
+func test_away_from_the_hub_the_terminal_is_out_of_range() -> void:
+	GameSession.hydrogen = 1000
+	GameSession.fly_to_wreck(GameSession.system.wrecks[0])
+	await _load_ship()
+	var text := _runner.find_child("TraderTerminal").get_node("%ScreenText") as Label3D
+	assert_str(text.text).is_equal("TRADER LINK\nOUT OF RANGE")
+	await _look_at_terminal()
+	assert_str(_hud().prompt_text).is_empty()
+	await _press(&"interact")
+	assert_bool(_screen.is_open).is_false()
+	# Back at the hub, the link is up again.
+	GameSession.fly_to_hub()
+	await _physics_frames(2)
+	assert_str(text.text).is_equal("TRADER LINK\n%s" % GameSession.trader.title.to_upper())
+	assert_str(_hud().prompt_text).is_equal("E Trade")
+
+
+func test_fill_up_fills_the_tank_for_bitcoin() -> void:
+	GameSession.hydrogen = 14
+	await _load_ship()
+	await _open_hub()
+	var price := GameSession.trader.hydrogen_price(10)
+	assert_str(_screen.hydrogen_text).is_equal("14/24")
+	assert_str(_screen.fill_text).is_equal("FILL UP  %s" % Bitcoin.format(price))
+	await _click(_screen.fill_button_center())
+	assert_int(GameSession.hydrogen).is_equal(24)
+	assert_int(GameSession.bitcoin).is_equal(500 - price)
+	assert_str(_screen.hydrogen_text).is_equal("24/24")
+	assert_str(_screen.fill_text).is_equal("FULL")
+	assert_str(_screen.status_text).is_equal("Filled the tank: 10 hydrogen for %s." % Bitcoin.format(price))
+	await _click(_screen.fill_button_center())
+	assert_int(GameSession.bitcoin).is_equal(500 - price)
+	assert_str(_screen.status_text).is_equal("The tank is already full.")
+
+
+func test_fill_up_with_an_empty_wallet_is_refused() -> void:
+	GameSession.hydrogen = 4
+	GameSession.bitcoin = 0
+	await _load_ship()
+	await _open_hub()
+	await _click(_screen.fill_button_center())
+	assert_int(GameSession.hydrogen).is_equal(4)
+	assert_str(_screen.status_text).starts_with("Not enough bitcoin for hydrogen")
+
+
+func test_at_home_the_hud_shows_the_hydrogen_and_the_day_except_while_trading() -> void:
+	GameSession.hydrogen = 20
+	GameSession.day = 3
+	await _load_ship()
+	assert_str(_hud().hydrogen_text).is_equal("20/24")
+	assert_str(_hud().day_text).is_equal("3")
+	await _open_hub()
+	assert_str(_hud().hydrogen_text).is_empty()
+	await _click(_screen.fill_button_center())
+	await _press(&"inventory")
+	assert_str(_hud().hydrogen_text).is_equal("24/24")
 
 
 func test_tab_and_esc_close_it() -> void:

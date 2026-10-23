@@ -1,6 +1,7 @@
 extends GdUnitTestSuite
 ## Unit tests for Trader, a hub's prices: selling pays an item's value and buying costs twice that, each varied a
-## little and always the same way by the hub's seed; the offer for a crate; and the shelf's order.
+## little and always the same way by the hub's seed; hydrogen's price and how much a wallet buys; the offer for a
+## crate; and the shelf's order.
 
 var _clip: ItemDefinition
 var _coil: ItemDefinition
@@ -20,6 +21,28 @@ func test_prices_are_the_value_and_twice_the_value_give_or_take_the_variance() -
 		assert_float(factor).is_between(1.0 - Trader.PRICE_VARIANCE, 1.0 + Trader.PRICE_VARIANCE)
 		assert_int(trader.sell_price(definition)).is_equal(roundi(definition.value * factor))
 		assert_int(trader.buy_price(definition)).is_equal(roundi(definition.value * 2.0 * factor))
+
+
+func test_hydrogen_is_cheap_give_or_take_the_variance() -> void:
+	for hub_seed in [1, 7, 42, 99]:
+		var trader := Trader.new(hub_seed)
+		var tank := trader.hydrogen_price(24)
+		assert_int(tank).is_between(floori(24 * Trader.HYDROGEN_VALUE * (1.0 - Trader.PRICE_VARIANCE)),
+			ceili(24 * Trader.HYDROGEN_VALUE * (1.0 + Trader.PRICE_VARIANCE)))
+		assert_int(trader.hydrogen_price(24)).is_equal(tank)
+		assert_int(trader.hydrogen_price(0)).is_equal(0)
+		assert_int(trader.hydrogen_price(1)).is_greater_equal(1)
+
+
+func test_the_wallet_buys_as_much_hydrogen_as_it_pays_for() -> void:
+	var trader := Trader.new(7)
+	assert_int(trader.affordable_hydrogen(10, 1000)).is_equal(10)
+	assert_int(trader.affordable_hydrogen(10, 0)).is_equal(0)
+	assert_int(trader.affordable_hydrogen(0, 1000)).is_equal(0)
+	for bitcoin in [3, 12, 37, 50]:
+		var units := trader.affordable_hydrogen(24, bitcoin)
+		assert_int(trader.hydrogen_price(units)).is_less_equal(bitcoin)
+		assert_int(trader.hydrogen_price(units + 1)).is_greater(bitcoin)
 
 
 func test_a_hub_always_quotes_the_same_price() -> void:

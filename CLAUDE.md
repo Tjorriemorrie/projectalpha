@@ -3,6 +3,9 @@
 ## Design documents and feature workflow
 
 - `docs/game-design.md`: the full game vision (MVP and beyond), kept high level. Answers *what* and *why*.
+- `docs/galaxy.md`: the world: its star systems, the places in them and the factions at war over them. Lore and
+  names only; mechanics stay in the game design doc.
+- `docs/characters.md`: the people and organisations: their names, history and personalities.
 - `docs/technical-design.md`: project-wide conventions, architecture and technical decisions.
 - `docs/roadmap.md`: MVP definition, build order and status of every feature, plus the idea backlog.
 - `docs/features/NNN-name.md`: one spec per feature, copied from `docs/features/_template.md`.

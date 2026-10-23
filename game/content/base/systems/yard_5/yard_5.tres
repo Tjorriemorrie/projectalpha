@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "Cornflower"
+habitable = true
+note = "II: drone factories"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "Yard 5 III"
+note = "gas giant, harvesters"
+
+[sub_resource type="Resource" id="Resource_place3"]
+script = ExtResource("2_place")
+display_name = "the Boneyard"
+kind = 2
+note = "a belt of scrapped drones and hulls that Massey recycles"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Yard 5"
+map_id = "C3"
+star = 2
+owner = 1
+map_position = Vector2(-28.0, -21.0)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2"), SubResource("Resource_place3")])

@@ -84,14 +84,15 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 | Enemy senses | Enemies see, hear and feel the player. In the dark they only see you up close, unless you are lit by a lamp, your flashlight or your own muzzle flash. Shots, sprinting and the elevator's ding carry far; walking is quieter and crouching quietest. Moving fast, shooting and lighting the way are risks you choose | [006](features/006-robot-enemy.md) |
 | Looting | Pry open containers and robot wreckage, in real time while the wreck is still dangerous, and carry the items out | [007](features/007-loot-and-grid-inventory.md), [010](features/010-wreck-variety.md) |
 | Grid inventory | Items take up tetris-like shapes in a backpack grid, a strip of pockets for things at hand (reloads take thermal clips from the pockets) and a weapon slot for the gun in hand; the player rotates, mirrors and arranges them to fit more loot, and drops what isn't worth the space. Every item is moved by dragging it, with no quick-move shortcuts, can be selected, and shows an item card (value, size, description) under the pointer; dropped items lie on the floor, which the inventory shows as a grid of its own | [007](features/007-loot-and-grid-inventory.md), [009](features/009-trader-hub.md) |
-| Trader hubs | Menu-based stations, one in every star system, traded with from a console on the ship: sell loot from the stash for bitcoin and buy anything in the game, guns and fuel included. Prices vary a little from hub to hub. Ask one for a cure ingredient and it tells you which systems have it, and the hubs of those systems sell it; some can tell you that she passed through | [009](features/009-trader-hub.md) |
+| Trader hubs | Menu-based stations, one in every star system, traded with from a console on the ship while it is at the hub: sell loot from the stash for bitcoin and buy anything in the game, guns and fuel included. Prices vary a little from hub to hub. Ask one for a cure ingredient and it tells you which systems have it, and the hubs of those systems sell it; some can tell you that she passed through | [009](features/009-trader-hub.md) |
 | Breakdown | Break any item down into components (like Arc Raiders) | — |
 | Crafting and upgrades | Craft any item from components; upgrade gear | — |
 | Ship as hub | Your ship is your home between runs (no base building for now) | [008](features/008-extraction-and-clone-loop.md) (minimal) |
 | Travel and fuel | Two fuels, bought at the trader hubs: antimatter for the jump drive, to jump to the next star system (a day per jump), and hydrogen to fly to the ships and stations within a system. Antimatter takes days to procure, which keeps the player boarding ships while he waits (see [Travel and fuel](#travel-and-fuel)) | [011](features/011-system-map.md), [012](features/012-star-map-and-travel.md) |
-| Star map | A dynamic map under fog of war: the player only sees up to a certain distance (about two jumps), with 5-6 systems in jump range, and pre-made systems are added as the fog lifts. Every system has a trader hub, and no system is riskier or richer than another. The player plans his route through the systems that have the cure's ingredients | [012](features/012-star-map-and-travel.md) |
+| Star map | A map of the fixed, hand-made cluster (see [galaxy.md](galaxy.md)), all of it visible from the start (no fog of war), with about five systems in jump range of any system (a jump reaches at most 10 light years). Every system has a trader hub, and no system is riskier or richer than another. The player plans his route through the systems that have the cure's ingredients | [012](features/012-star-map-and-travel.md) |
+| Intel | The map shows every system, but not what is in it: a system's ships and stations show only once the player arrives. Intel, bought at a trader hub, shows them and their details for another system before he jumps there, so he can tell which systems hold good salvage before he spends antimatter and a day on the jump | [012](features/012-star-map-and-travel.md) |
 | Triangulation | In every system the player can measure a ping to her ship; combined, the pings give a search area on the star map that shrinks with every ping. Vague at first, clearer as the game goes on (see [Finding her](#finding-her)) | — |
-| System map | The ships and stations to board in a star system, found at its planets, moons, asteroids, anomalies and battlefields. Inspect one to see what makes it dangerous, never a difficulty level: its wreck type, how many robots are still active in its security system, how many human enemies are aboard, how quickly it escalates, and the gear it requires. Choosing which ones to board is how the player chooses the risk. Includes job-board leads | [011](features/011-system-map.md) |
+| System map | The ships and stations to board in a star system, found at its planets, moons, asteroids, anomalies and battlefields. Inspect one to see what makes it dangerous, never a difficulty level: its wreck type, how many robots are still active in its security system, how many human enemies are aboard, how quickly it escalates, and the gear it requires. Choosing which ones to board is how the player chooses the risk. Every ship can be boarded once: afterwards it is gone, whether the android extracted or died | [011](features/011-system-map.md) |
 | Location requirements | Some locations need specific gear or technology to enter (e.g. an oxygen supply for breached wrecks) | — |
 | Wreck timer | A countdown until the wreck is destroyed | — |
 | Oxygen | Limited air supply aboard breached wrecks | — |
@@ -122,21 +123,26 @@ Gamepad is supported. There is no jump, prone or slide.
 | Shoot: tap to fire, hold to charge a stronger shot | Left click | Right trigger |
 | Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
-| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory; opens the ship's stash and trader terminal; hold on an airlock's outer door to board the wreck or return to the ship; continues past the run summary | E | A / Cross |
+| Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory; opens the ship's stash, trader terminal and system map console; hold on an airlock's outer door to board the wreck or return to the ship; continues past the run summary | E | A / Cross |
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
 | Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
 | Aim out of cover: hold together with peek, in either order, to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory: open and close (Esc and interact also close it) | Tab | View / Select (B also closes it) |
-| In the inventory and the trader hub: move the cursor | Mouse | Left stick / D-pad |
+| In the inventory, the trader hub and the system map: move the cursor | Mouse | Left stick / D-pad |
 | In the inventory and the trader hub: drag an item | Left click (hold) | A (hold) |
 | In the inventory and the trader hub: rotate the dragged item 90° | Right click | Right bumper |
 | In the inventory and the trader hub: mirror the dragged item | Middle click or mouse wheel | Left bumper |
 | In the inventory: drop an item on the floor | Drag it onto the floor grid, or release it outside the inventory | Y / Triangle |
 | In the trader hub: buy one of an item (it goes to the stash) | Left click on it on the shelf | A |
 | In the trader hub: sell what is in the sell crate | Left click on SELL | A |
+| In the trader hub: fill the hydrogen tank | Left click on FILL UP | A |
 | Trader hub: close | Tab, Esc or E | View / Select or B |
+| In the system map: see a wreck's or the hub's details and the course there | Point at it | Point at it |
+| In the system map: select a wreck or the hub | Left click on it | A |
+| In the system map: fly to the selected wreck or the hub | Left click on FLY | A |
+| System map: close | Tab, Esc or E | View / Select or B |
 | Pause | Esc | Menu / Start |
 
 Gamepad bindings are a first draft.
@@ -188,8 +194,10 @@ The whole game runs against a clock, which starts as a count of days and becomes
 - Days only pass by boarding and jumping. Decrypting a drive, flying within a system and visiting the hub take no
   time, and the player can't wait without boarding.
 - There is no way to buy her more days: a fixed clock keeps the pacing controllable and every day meaningful.
-- **Hidden pacing.** The game never adjusts the ships: the player still sees the risk of every one he chooses to
-  board. Behind the scenes it only adjusts how quickly he moves through the systems (such as how long antimatter
+- **Hidden pacing.** The game never changes a ship or station once the player can see it: he always sees the true
+  risk of every one he chooses to board. Behind the scenes it picks which ships and stations a system holds (how
+  many, which kinds and how risky) at the moment they are revealed, on arrival or when he buys intel on the system,
+  to suit how he is doing. It also adjusts how quickly he moves through the systems (such as how long antimatter
   takes to procure), when he gets the parts of the cure, what ingredients and androids cost, how quickly the
   triangulation narrows down her location, when her messages arrive and how long the countdown is, so that he
   arrives near its end. Getting there before its last stretch takes a good player.
@@ -201,7 +209,7 @@ The ship runs on two fuels, both bought at the trader hubs:
 
 | Fuel | What it does |
 |------|--------------|
-| Antimatter | Feeds the jump drive: one jump to the next star system, which takes a day. Rare and expensive |
+| Antimatter | Feeds the jump drive: one jump to the next star system, which takes a day. Rare and expensive. The tank holds one jump, which reaches at most 10 light years, so the distances on the star map decide where the ship can go (see [galaxy.md](galaxy.md#4-the-map)) |
 | Hydrogen | Flies the ship within a system, between its planets, moons, asteroids, anomalies and battlefields, to the ships and stations there and back to the hub. Cheap and common |
 
 - It takes the loot of about five ships or stations per system to afford the antimatter to move on.
@@ -209,6 +217,8 @@ The ship runs on two fuels, both bought at the trader hubs:
   The player can't wait without boarding, so he can't board one ship and jump; he boards ships while he waits. The
   procurement time is one of the hidden pacing levers (see [Rescue clock](#rescue-clock)).
 - Hydrogen is always on the shelf, and flying within a system or visiting the hub takes no time.
+- Trading and refuelling only happen at the hub, and the ship never flies further than its tank can get it back to
+  the hub, so it can't be stranded.
 - The loop lives within a system: flying a loop through several ships before returning to the hub saves hydrogen and
   bitcoin, compared with flying back to the hub after every ship.
 
@@ -224,13 +234,14 @@ Her messages don't say where she is: the player finds her by triangulation.
 - At first the cones are wide, so he moves almost at random; as the game goes on they narrow and point him in a
   direction. How quickly they narrow is one of the hidden pacing levers (see [Rescue clock](#rescue-clock)), and
   nothing else sharpens them: there is no receiver upgrade.
-- Her location is random, so every playthrough is a different journey, and it is fixed when the game starts. The
-  hidden pacing only changes how clear the pings are, never where she is, so a player who reads the pings carefully
-  is never cheated.
-- **Fog of war.** The player only sees the star map up to a certain distance (about two jumps), and from any system
-  there are 5-6 systems he can jump to. As he travels and the fog lifts, the game adds pre-made star systems to the
-  map: picked at random from a pool of about 25, without repeats, plus the systems the pacing needs (for an
-  ingredient or a hub still).
+- Her location is random, on the far half of the map from his start and at least six jumps away (see
+  [galaxy.md](galaxy.md#4-the-map)), so every playthrough is a different journey, and it is fixed when the game
+  starts. The hidden pacing only changes how clear the pings are, never where she is, so a player who reads the pings
+  carefully is never cheated.
+- **The whole map is visible.** The cluster is fixed, the same in every playthrough (see [galaxy.md](galaxy.md)),
+  and the star map shows all of it from the start; from any system there are about five systems he can jump to.
+  What is in a system shows only on arrival or through [intel](#mechanics). The pacing picks which systems in reach
+  have an ingredient or a hub still.
 - **Budget.** The clock gives about 90 days, and every system costs about six (about five runs plus the jump), so the
   whole journey crosses only about 15 to 18 systems (18 means closer to four runs per system). Her random location
   has to fit within that.
@@ -261,7 +272,7 @@ making it.
   story forward gradually (see hidden pacing in [Rescue clock](#rescue-clock)).
 - A drive that holds an ingredient names it. The player asks for that ingredient at a trader hub, which tells him
   which star systems have it, and he plans his route through those systems. The game puts the ingredient in one or
-  more of the 5-6 systems he can jump to, so it is always within reach. Maybe, if he is doing well, an
+  more of the systems he can jump to, so it is always within reach. Maybe, if he is doing well, an
   ingredient sits in a system a little way back, so he has to double back.
 - He buys the ingredient at the trader hub of a system that has it, so an ingredient can never be lost. It is
   expensive, so it costs extra runs and with them days, and its price is another hidden pacing lever.
@@ -293,10 +304,12 @@ the kinds can be introduced gradually as the game goes on.
   riskier or richer than each other: the risk lies only in which ships and stations the player boards. The other
   risk is time: every run costs a day of her pod.
 - Difficulty is tuned so that about half of all runs end in a successful extraction. The hidden pacing never changes
-  the ships, only how quickly the journey moves (see [Rescue clock](#rescue-clock)).
+  a ship the player can see: it picks which ships a system holds when they are revealed, and how quickly the journey
+  moves (see [Rescue clock](#rescue-clock)).
 - Her company's ships, the only ones that carry the encrypted drives, are medium risk: the player needs better gear
   and upgrades before boarding them (see [The cure](#the-cure)).
-- On day 0 the player starts in a random system with three androids, the basic kit and a little bitcoin: not enough
+- On day 0 the player starts in a random system on the outer ring of the map (see
+  [galaxy.md](galaxy.md#4-the-map)) with three androids, the basic kit and a little bitcoin: not enough
   for antimatter, so the first system already needs runs.
 - Gear and technology gate harder locations. Progression mostly means unlocking access to riskier, richer wrecks.
 - Early game uses quiet wrecks only. Timers, oxygen and escalation are introduced later as the pressure ramps up
@@ -318,10 +331,12 @@ The rim trades in bitcoin (₿). Nobody docks to trade there: a ship trades with
 link, and drones carry all the cargo between them: what he sells goes out of his ship's hold, and what he buys comes
 back to it. So he trades from a console without ever leaving his ship.
 
+The galaxy, its star systems and the factions at war over them are in [galaxy.md](galaxy.md).
+
 ### Story summary
 
-The man is out to save his wife, who trusts no one but him. She worked for a mercenary army company (name TBD;
-maybe also a weapons manufacturer), in its bioweapons division on a space station. The division builds weapons for
+The man is out to save his wife, who trusts no one but him. She worked for Halden-Mori, a mercenary army and
+weapons maker, in its bioweapons division on a space station. The division builds weapons for
 contracts, but the company's top researcher, a high-up executive, was creating a virus there off the books: with
 the company's resources, but without its knowledge or approval. His plan: release the virus on civilians, then make
 a fortune selling the cure. Even a mercenary army would be finished if that came out.
@@ -374,14 +389,7 @@ More lore and story twists can be added between the phases later.
 
 ### Characters
 
-The rest of the cast is deferred with the story.
-
-| Name | Role | Description |
-|------|------|-------------|
-| The man (name TBD) | Player | Her husband: an ordinary salvager, no soldier and with no link to her company, who boards wrecks through mind-controlled androids while his own body stays on his ship |
-| His wife (name TBD) | The one to save | Worked in the company's bioweapons division. Defected: stole the virus, wrote an AI to hide the cure, and fled. Got infected, and lies in a stasis pod deep in space. Trusts only her husband; holds the final part, the virus sample |
-| The nemesis (name TBD) | The bad guy, only in the narrative | The company's top researcher, a high-up executive. He created the virus with the company's resources, on its bioweapons station, without the company knowing or approving, to release it and sell the cure. The only one looking for her, but he doesn't know where she went. Never met or fought: he shows up in logs on the drives and in hub stills, and flees when her evidence reaches the company |
-| Her company (name TBD) | Her former employer | A mercenary army (maybe also a weapons manufacturer), grown rich on the wars. Its bioweapons division, on a space station, builds weapons for contracts; this virus was off the books, and the company never knew of it or approved it. The encrypted drives are only found on its ships, which are medium risk |
+The cast, the companies and the other people and organisations of the cluster are in [characters.md](characters.md).
 
 ## 4. Levels / content
 
@@ -393,7 +401,7 @@ and the largest stations take up to 30.
 | Level / area | Purpose | Key mechanics introduced | Feature |
 |--------------|---------|--------------------------|---------|
 | Blueprint-based generation | Builds each wreck's layout from its class blueprint | — | — |
-| Star systems | Pre-made systems (a trader hub, plus ships and stations at planets, moons, asteroids, anomalies and battlefields), picked from a pool of about 25 and added to the star map as the fog lifts | — | [012](features/012-star-map-and-travel.md) |
+| Star systems | The hand-made systems of a fixed galaxy (see [galaxy.md](galaxy.md)): each has a trader hub, plus ships and stations at planets, moons, asteroids, anomalies and battlefields | — | [011](features/011-system-map.md), [012](features/012-star-map-and-travel.md) |
 | Small ships | Early game, about 5-minute runs: hand-built layouts (courier, hauler, freighter) with robots and loot rolled every run | Core loop | [002](features/002-wreck-section-kit.md), [010](features/010-wreck-variety.md) |
 | Large stations | Late game, runs of up to 30 minutes | TBD | — |
 
@@ -443,5 +451,5 @@ The MVP, milestones and build order are tracked in [roadmap.md](roadmap.md).
 
 ## 9. Open questions
 
-None right now. The detailed story, the names (the man, his wife, the nemesis, the company, the virus) and the
-writing come near the end of development.
+None right now. The detailed story, the names of the man, his wife, the nemesis and the virus, and the writing come
+near the end of development (see [characters.md](characters.md)).

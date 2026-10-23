@@ -26,7 +26,8 @@ Pin the Godot version and only upgrade deliberately, between features.
   DEBUG level. Every message starts with its module's emoji, used consistently (🏃 player, 🛗 elevators,
   🧩 wreck assembly and navigation, 🚪 doors, 🖐️ interactables, 📦 content registry, 👁️ debug exposure watchers,
   🔫 weapons, 🩸 health and damage, 🎯 shooting targets, 🤖 robots, 🔊 noise and hearing, 🎵 combat music, 🎒 inventory, loot and items,
-  🧬 the game session, travel and the wallet, 🚀 the ship, 💡 lamps, 💰 the trader hub's screen).
+  🧬 the game session, travel and the wallet, 🚀 the ship, 💡 lamps, 💰 the trader hub's screen, 🪐 the system map's
+  screen; the art-source galaxy scripts print 🌌).
   Code that runs every frame logs only when something changes (a state change, a step), never every frame.
 
 ## 3. Project structure
@@ -50,9 +51,11 @@ projectalpha/
     │       ├── weapons/   # One self-contained folder per weapon (definition, viewmodel, model, sounds)
     │       ├── enemies/   # One self-contained folder per enemy (definition, scene, model, own sounds)
     │       ├── items/     # One self-contained folder per item (definition, model)
-    │       └── containers/ # One self-contained folder per loot container (definition, scene, model)
+    │       ├── containers/ # One self-contained folder per loot container (definition, scene, model)
+    │       ├── wrecks/    # One folder per wreck layout (definition, scene)
+    │       └── systems/   # One folder per star system (definition), written from docs/galaxy.md
     ├── scenes/            # .tscn scenes and framework code, grouped by feature (player, combat, weapons,
-    │                      # enemies, loot, sections, wreck, ship, run, trade, test)
+    │                      # enemies, loot, sections, wreck, ship, run, trade, galaxy, test)
     ├── scripts/           # Shared / standalone scripts
     ├── ui/
     ├── autoload/          # Global singletons
@@ -86,7 +89,7 @@ projectalpha/
 |----------|----------------|
 | ContentRegistry | Discovers and registers all content definitions by ID (see [Content and modding](#content-and-modding)) |
 | ItemIcons | Renders every registered item's grid icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
-| GameSession | The session between scenes: the stash, the wallet, the system's trader hub and its sell crate, the clone number, the docked wreck, the kit and the wreck's roll handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session), [Trading](#trading) and [Wreck layouts and rolls](#wreck-layouts-and-rolls)) |
+| GameSession | The session between scenes: the stash, the wallet, the hydrogen tank, the day, the star system the ship is in and where in it, its trader hub and sell crate, the clone number, the docked wreck, the kit and the wreck's roll handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session), [Trading](#trading), [Wreck layouts and rolls](#wreck-layouts-and-rolls) and [Star systems and the system map](#star-systems-and-the-system-map)) |
 
 ### Communication between nodes
 
@@ -96,9 +99,9 @@ projectalpha/
 ### Game state and saving
 
 The session lives in memory in `GameSession` (008): the stash, the clone number, the runs boarded and the kit
-handed between scenes, since 009 the wallet, the hub's price seed and the sell crate, and since 010 the docked
-wreck's roll. Nothing is saved yet, so
-quitting starts a new game. TBD: what is saved, file format, where
+handed between scenes, since 009 the wallet, the hub's price seed and the sell crate, since 010 the docked
+wreck's roll, and since 011 the star system with the wrecks still in it, where the ship is, the hydrogen and the
+day. Nothing is saved yet, so quitting starts a new game. TBD: what is saved, file format, where
 (`user://`).
 
 ## 5. Systems
@@ -148,7 +151,9 @@ Settled in [003](features/003-content-registry.md):
   Since 009 `WeaponDefinition` extends `ItemDefinition`: a gun is an item (shape, value, a model lying flat), so it
   registers once and `get_all(ItemDefinition)` lists it with the other items. `WreckDefinition` (010) is a wreck
   layout: its scene, level range, expected robots per level and number of containers. Since 010 a container
-  definition also holds its loot table, budget and roll weight.
+  definition also holds its loot table, budget and roll weight. `StarSystemDefinition` (011) is a star system of
+  the fixed galaxy, with its places as `SystemPlace` sub-resources; `art-source/galaxy/systems.py` writes all 50
+  from [galaxy.md](galaxy.md) and `galaxy.json`, so the doc stays the one place they are written down.
   An enemy definition holds its scene, the marker mount it needs, the robot brain's numbers and the salvage in its
   wreckage; how a kind moves is exported on its scene. An item definition holds its shape (rows of text), value and
   model, so a new item is a folder with a `.tres` and a `.glb` and no icon to draw. None needed a change to the
@@ -389,8 +394,10 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
   `PanelContainer` stops clicks by default) and reads the pointer from its events, not from the window, so headless
   tests can push real mouse events. `Hud.key_label(action)` gives the bound key for any prompt; a held action shows "HOLD"
   before the key cap and fills a second ring, in the placards' ink, round the centre dot. The clip readout hides
-  while the player is unarmed (`Hud.hide_clips()`). The inventory screen (007) and the trader hub's screen (009) are
-  part of the HUD; both extend `GridScreen`. So is the run summary (008), a placard drawn on the black screen after a run (`RunSummaryCard`,
+  while the player is unarmed (`Hud.hide_clips()`). The inventory screen (007), the trader hub's screen (009) and
+  the system map (011) are part of the HUD; all extend `MenuScreen` (placards in two columns, key hints, the pointer
+  from mouse events, fade), the first two through `GridScreen` (dragging items). At home the top left shows the
+  bitcoin, the hydrogen and the day (`Hud.show_wallet()`), hidden while the hub's screen or the map is open. So is the run summary (008), a placard drawn on the black screen after a run (`RunSummaryCard`,
   with the clone's lifeline traced in the laser's blue, or flatlining in red after a death); `Hud.fade_in()` lifts the
   black on arrival.
 
@@ -439,7 +446,9 @@ Built in [008](features/008-extraction-and-clone-loop.md).
   and a sign above it. While interact is held on it, it loops a cycling sound and makes an `airlock` noise (10 m)
   every second; a full hold emits `cycled`. Every `Wreck` connects its airlocks (`Wreck.airlocks`): on a wreck
   cycling extracts ("Return to ship", 3 s), and the `Ship` sets "Board the hauler · about 4 robots active", 1 s, under
-  a "HAULER DOCKED" sign, from the docked wreck (010).
+  a "HAULER DOCKED" sign, from the docked wreck (010). With nothing docked (011) the sign reads "NOTHING DOCKED"
+  and the outer door is shut (`Airlock.set_usable()`, which takes its `Interactable` off the interactable layer with
+  `set_enabled()`); the ship updates both whenever it flies (`GameSession.ship_moved`).
 - **Leaving.** `Player.extract()` and `Player.board()` stop the player without the death's slump: a reload under way
   finishes, the weapon and hitboxes go (nothing can see or hit them), and the screen fades to black over the docking
   sound (`leave_fade_time`). Boarding then travels; extracting and dying show the run summary, and interact (read in
@@ -450,10 +459,14 @@ Built in [008](features/008-extraction-and-clone-loop.md).
   lowered, no aim or trigger, reloads work) and `has_floor` off (the inventory screen has no floor and returns items
   released outside). The `Stash` binds a `Lootable` to the session's grid (`Lootable.bind()`), already open.
 - **Trader terminal.** `TraderTerminal` stands beside the stash; its `Interactable` ("Trade") opens the hub's
-  screen through `Player.open_trader()` (009).
+  screen through `Player.open_trader()` (009), only while the ship is at the hub (011); elsewhere its screen reads
+  "OUT OF RANGE" and it is off.
+- **Cockpit console.** `SystemConsole` in front of the pilot seat; its `Interactable` ("System map") opens the
+  system map through `Player.open_system_map()` (011), and its screen names the system.
 - **Outside.** The space beyond the cockpit window is the ship environment's star sky shader
   (`scenes/ship/starfield.gdshader`) and the wreck's dark hull as CSG on render layer 2 (`exterior`), lit only by a
-  directional light whose cull mask is that layer, so it never lights the ship's inside.
+  directional light whose cull mask is that layer, so it never lights the ship's inside. The hull and docking tube
+  only show while a wreck is docked.
 
 ### Trading
 
@@ -465,13 +478,14 @@ Built in [009](features/009-trader-hub.md).
   `Trader.shelf()` is every registered item, weapons first, then the cheapest up; stock is unlimited, and a mod adds
   stock by adding items. The rates are a first guess for the tuning pass (roadmap backlog).
 - **Wallet and trades.** `GameSession` keeps `bitcoin` (₿500 at the start, never lost; `bitcoin_changed`), the
-  system's `trader` (rolled in `new_game()`; one system until 012) and the sell `crate` (6×4). `sell_crate()` pays
+  system's `trader` (rolled when the ship arrives in a system, titled "<System> Hanse") and the sell `crate` (6×4).
+  Trading only works at the hub (`GameSession.at_hub`, 011). `sell_crate()` pays
   the hub's offer for everything in the crate, `buy()` puts one item in the stash's first free spot and is refused
   when the wallet is short or the stash full, and `return_crate()` puts what is left back in the stash (what doesn't
   fit stays in the crate for the next visit).
 - **The screen.** `TraderScreen` (a `GridScreen`): the crate with the offer and a SELL button and the shop
-  (`ShopView`: icon tiles with buy prices, red and dimmed when unaffordable) on the left, the wallet and the stash on
-  the right. Items drag between the stash and the crate only; clicking a shop tile buys one and selects it in the
+  (`ShopView`: icon tiles with buy prices, red and dimmed when unaffordable) on the left, the wallet, the hydrogen
+  tank (a `FuelGauge` and FILL UP, 011) and the stash on the right. Items drag between the stash and the crate only; clicking a shop tile buys one and selects it in the
   stash. The wallet ticks to its new amount with the change fading beside it, and a status line explains every deal
   or refusal. Selling is from the stash only, so carried loot goes into the stash first.
 - **Bitcoin.** The only currency is bitcoin: every amount the player sees goes through `Bitcoin.format()`
@@ -488,10 +502,12 @@ Built in [010](features/010-wreck-variety.md).
   expected robots at each level, and its number of containers. Adding a layout needs no code. The base layouts:
   courier (1 deck, levels 1–2), hauler (2 decks, 1–3) and freighter (2 decks with the cargo bay, 2–3).
 - **Hidden difficulty.** The level is never shown. The player sees the expected robot count ("about 4 robots
-  active"); the wreck holds that give or take one (`WreckRoll.ROBOT_SPREAD`).
+  active"); the wreck holds that give or take one (`WreckRoll.ROBOT_SPREAD`), and never fewer than two
+  (`WreckRoll.MIN_ROBOTS`). A layout must expect at least three at every level
+  (`WreckDefinition.LEAST_EXPECTED_ROBOTS`), or the registry refuses it, so the floor never makes the scan lie.
 - **The roll.** `WreckRoll` (node-free) is a layout, a level and a seed; the robots aboard come from the seed when it
-  is made. `GameSession.docked` is rolled (`roll_docked()`) in `new_game()` and when a run ends; `board()` travels to
-  its scene and the wreck takes it once with `GameSession.take_boarding(layout)`. In `_ready()`, a wreck whose scene
+  is made. A system's wrecks are rolled when it is revealed (011, see below); `GameSession.docked` is the one the
+  ship flew to, `board()` travels to its scene and the wreck takes it once with `GameSession.take_boarding(layout)`. In `_ready()`, a wreck whose scene
   is a registered layout fills its `enemies` and `loot` lists from that roll (or its own at a random level when run on
   its own) with `apply_roll()`, then places them as any wreck does. The same roll on the same layout always gives the
   same wreck.
@@ -503,6 +519,32 @@ Built in [010](features/010-wreck-variety.md).
   budget left and the grid, packed as `Lootable.fill()` packs them. Unknown item IDs are skipped and logged.
   `Dice` (`scripts/`) does the random picks, always from the roll's own generator.
 - **Robot salvage** stays fixed per enemy kind (`EnemyDefinition.salvage`).
+
+### Star systems and the system map
+
+Built in [011](features/011-system-map.md).
+
+- **Systems.** All 50 systems of [galaxy.md](galaxy.md) are content (`StarSystemDefinition`, `scenes/galaxy/`): map
+  ID, star, owner, `map_position` (light years, for 012) and places (`SystemPlace`: name, kind, habitable, note),
+  from the star outwards with each moon after its planet. They are written by `art-source/galaxy/systems.py`; edit
+  galaxy.md or `galaxy.json` and rerun it. A new game arrives in a random one (`GameSession.arrive_in()`).
+- **The map.** `StarSystem` (node-free) lays a system out in map units: one orbit per place, a unit apart, at angles
+  seeded from the map ID and kept at least `ORBIT_ANGLE_GAP` apart, a moon just below its planet and the hub just
+  above the first habitable world (y down, as drawn), so names don't collide. `StarSystem.reveal()` rolls 6 to 8
+  `SystemWreck`s (roll, place or open space, map position): random layouts at random levels, a place that already
+  holds wrecks less likely, one in four in open space; wrecks at a place take fixed spots on the side away from its
+  name (`FAN_SPOTS`), wrecks in a belt spread along its ring. Wrecks only leave, when boarded.
+- **Flying.** A flight burns `hydrogen_between()`: a unit per map unit, rounded up, at least one. `GameSession`
+  keeps `ship_position`, `at_hub`, `hydrogen` (tank 24) and `day`; `fly_to_wreck()` refuses a flight unless the
+  tank also gets the ship from there back to the hub (`hydrogen_needed()`), so it can never be stranded; it docks
+  the wreck (`docked`) and emits `ship_moved`. `fly_to_hub()`, `refuel()` (hub only; `Trader.hydrogen_price()`, ₿5 a
+  unit within the hub's ±5%), and `board()` passes a day and takes the wreck off the map.
+- **The screen.** `SystemMapScreen` (a `MenuScreen`) holds `SystemMapView`, the orbital diagram drawn in code on a
+  dark scope, and a column with the system, the hydrogen (`FuelGauge`, segmented like the heat gauge), the target
+  and FLY. Targets are indices (a wreck's in `system.wrecks`, `HUB`, `NONE`): the one under the pointer, or else
+  the selected one, shows its details and its course (dashed, with the hydrogen per leg, red when refused) on the
+  map and the gauge. FLY slides the ship's marker along the course and plays `thruster_burn.wav`. Clicks use
+  `inventory_drag` like the hub's screen.
 
 ### Lighting
 

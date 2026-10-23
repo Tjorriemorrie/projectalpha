@@ -168,3 +168,38 @@ func test_bigger_containers_get_bigger_budgets() -> void:
 	var locker := ContentRegistry.get_definition("base:locker") as ContainerDefinition
 	assert_int(case.budget).is_less(crate.budget)
 	assert_int(crate.budget).is_less(locker.budget)
+
+
+func test_registers_the_fifty_star_systems_of_the_galaxy() -> void:
+	var systems := ContentRegistry.get_all(StarSystemDefinition)
+	assert_int(systems.size()).is_equal(50)
+	var map_ids := {}
+	for definition: StarSystemDefinition in systems:
+		assert_str(definition.display_name).override_failure_message(
+			"%s has no name" % definition.id).is_not_empty()
+		assert_int(definition.places.size()).override_failure_message(
+			"%s has %d places" % [definition.id, definition.places.size()]).is_between(
+				StarSystemDefinition.MIN_PLACES, StarSystemDefinition.MAX_PLACES)
+		map_ids[definition.map_id] = definition.id
+	assert_int(map_ids.size()).is_equal(50)
+
+
+func test_star_systems_hold_what_galaxy_md_says() -> void:
+	var praetor := ContentRegistry.get_definition("base:praetor") as StarSystemDefinition
+	assert_str(praetor.map_id).is_equal("H2")
+	assert_int(praetor.star).is_equal(StarSystemDefinition.Star.YELLOW)
+	assert_int(praetor.owner).is_equal(StarSystemDefinition.Owner.HALDEN_MORI)
+	var names := praetor.places.map(func(place: SystemPlace) -> String: return place.display_name)
+	assert_array(names).is_equal(["Praetor I", "Hearth", "Calloway", "Praetor IV", "the Granary", "Dray's Gate"])
+	assert_bool(praetor.places[1].habitable).is_true()
+	assert_int(praetor.places[2].kind).is_equal(SystemPlace.Kind.MOON)
+	assert_int(praetor.places[4].kind).is_equal(SystemPlace.Kind.BELT)
+	assert_int(praetor.places[5].kind).is_equal(SystemPlace.Kind.STATION)
+	var goldenrod := ContentRegistry.get_definition("base:goldenrod") as StarSystemDefinition
+	assert_int(goldenrod.owner).is_equal(StarSystemDefinition.Owner.CONTESTED)
+	assert_int(goldenrod.places[3].kind).is_equal(SystemPlace.Kind.BATTLEFIELD)
+	assert_str(goldenrod.places[3].display_name).is_equal("the Long Fall")
+	var kr_207 := ContentRegistry.get_definition("base:kr_207") as StarSystemDefinition
+	assert_int(kr_207.star).is_equal(StarSystemDefinition.Star.NEUTRON)
+	assert_str(kr_207.places[0].display_name).is_equal("KR-207 I")
+	assert_int(kr_207.places[1].kind).is_equal(SystemPlace.Kind.ANOMALY)

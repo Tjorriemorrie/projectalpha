@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "Mallow"
+habitable = true
+note = "II"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "Mallow III"
+note = "gas giant, its harvesters have changed hands a dozen times"
+
+[sub_resource type="Resource" id="Resource_place3"]
+script = ExtResource("2_place")
+display_name = "the Scatter"
+kind = 4
+note = "battlefield: wreckage strewn across the system by running fights"
+
+[sub_resource type="Resource" id="Resource_place4"]
+script = ExtResource("2_place")
+display_name = "the Red Mist"
+kind = 5
+note = "anomaly: a red gas cloud"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Mallow"
+map_id = "X3"
+owner = 4
+map_position = Vector2(-15.8, -10.6)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2"), SubResource("Resource_place3"), SubResource("Resource_place4")])

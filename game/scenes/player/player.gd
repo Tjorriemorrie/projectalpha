@@ -128,7 +128,8 @@ const DROP_SCATTER := 0.2
 @export var death_summary_delay: float = 4.0
 ## Holstered on the ship: the pistol is lowered and can't aim or fire, but reloads still work.
 @export var holstered := false
-## At home on the ship the HUD shows the bitcoin in the wallet; on a wreck it doesn't.
+## At home on the ship the HUD shows the bitcoin in the wallet, the hydrogen in the tank and the day; on a wreck it
+## doesn't.
 @export var shows_wallet := false
 
 @export_group("Travel")
@@ -237,6 +238,7 @@ var _awaiting_continue := false
 @onready var _footstep_sound: AudioStreamPlayer = $FootstepSound
 @onready var _inventory_screen: InventoryScreen = _hud.get_inventory_screen()
 @onready var _trader_screen: TraderScreen = _hud.get_trader_screen()
+@onready var _system_map: SystemMapScreen = _hud.get_system_map_screen()
 
 
 func _ready() -> void:
@@ -256,8 +258,9 @@ func _ready() -> void:
 	_inventory_screen.dropped_on_floor.connect(_on_dropped_on_floor)
 	_inventory_screen.taken_from_floor.connect(_on_taken_from_floor)
 	if shows_wallet:
-		_hud.show_wallet(GameSession.bitcoin)
+		_hud.show_wallet(GameSession.bitcoin, GameSession.hydrogen, GameSession.day)
 		GameSession.bitcoin_changed.connect(_hud.set_wallet)
+		GameSession.hydrogen_changed.connect(_hud.set_hydrogen)
 	_update_camera()
 	_set_mouse_captured(true)
 	if GameSession.fade_in_next:
@@ -439,8 +442,49 @@ func close_trader() -> void:
 	Log.info("🏃 Trader closed: bitcoin=%d, position=%s" % [GameSession.bitcoin, global_position])
 
 
+func get_system_map() -> SystemMapScreen:
+	return _system_map
+
+
+func is_viewing_map() -> bool:
+	return _system_map.is_open
+
+
+## Opens the system map, from the cockpit console: the system the ship is in, kept by the GameSession, where the
+## player inspects its wrecks and flies the ship. The player stands still until it closes.
+func open_system_map() -> void:
+	if is_dead or is_leaving or _is_menu_open():
+		Log.info("🏃 System map not opened: dead=%s, leaving=%s, menu_open=%s" % [is_dead, is_leaving, _is_menu_open()])
+		return
+	_enter_menu()
+	_system_map.open()
+	Log.info("🏃 System map opened: system=%s, hydrogen=%d, position=%s" % [
+		GameSession.system.definition.id if GameSession.system else "none", GameSession.hydrogen, global_position])
+
+
+func close_system_map() -> void:
+	if not is_viewing_map():
+		Log.info("🏃 System map not closed, it isn't open: position=%s" % global_position)
+		return
+	_system_map.close()
+	_leave_menu()
+	Log.info("🏃 System map closed: hydrogen=%d, at_hub=%s, docked=%s, position=%s" % [
+		GameSession.hydrogen, GameSession.at_hub,
+		GameSession.docked.definition.id if GameSession.docked else "none", global_position])
+
+
 func _is_menu_open() -> bool:
-	return is_inventory_open() or is_trading()
+	return is_inventory_open() or is_trading() or is_viewing_map()
+
+
+## Closes whichever screen is open over the game.
+func _close_menu() -> void:
+	if is_trading():
+		close_trader()
+	elif is_viewing_map():
+		close_system_map()
+	else:
+		close_inventory()
 
 
 ## Before a screen opens over the game: a hold ends, the prompt goes and the mouse is freed for the screen.
@@ -735,15 +779,12 @@ func _gather_floor(picked: DroppedItem) -> ItemGrid:
 	return floor
 
 
-## While the inventory or the hub is open the player stands still in their stance and can't look, peek or shoot; Tab,
-## Esc and interact close it. The world keeps going, and a reload under way still finishes.
+## While the inventory, the hub or the system map is open the player stands still in their stance and can't look,
+## peek or shoot; Tab, Esc and interact close it. The world keeps going, and a reload under way still finishes.
 func _update_while_sorting(delta: float) -> void:
 	if Input.is_action_just_pressed("inventory") or Input.is_action_just_pressed("pause") \
 			or Input.is_action_just_pressed("interact"):
-		if is_trading():
-			close_trader()
-		else:
-			close_inventory()
+		_close_menu()
 	_update_peek_state(false)
 	_set_movement_state(MovementRules.State.CROUCH_IDLE if is_crouched else MovementRules.State.IDLE)
 	_update_velocity(Vector2.ZERO, delta)
@@ -1021,10 +1062,7 @@ func _stop_acting() -> void:
 	_head_offset_previous = Vector2.ZERO
 	head_offset = Vector2.ZERO
 	_end_hold()
-	if is_trading():
-		close_trader()
-	else:
-		close_inventory()
+	_close_menu()
 	interact_target = null
 	_shown_prompt = ""
 	_shown_hold = false

@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "Praetor I"
+note = "scorched rock"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "Hearth"
+habitable = true
+note = "II: the settlers' capital, now Halden-Mori's regional headquarters"
+
+[sub_resource type="Resource" id="Resource_place3"]
+script = ExtResource("2_place")
+display_name = "Calloway"
+kind = 1
+habitable = true
+note = "II-b, a settled moon"
+
+[sub_resource type="Resource" id="Resource_place4"]
+script = ExtResource("2_place")
+display_name = "Praetor IV"
+note = "gas giant, harvesters"
+
+[sub_resource type="Resource" id="Resource_place5"]
+script = ExtResource("2_place")
+display_name = "the Granary"
+kind = 2
+note = "belt"
+
+[sub_resource type="Resource" id="Resource_place6"]
+script = ExtResource("2_place")
+display_name = "Dray's Gate"
+kind = 3
+note = "the headquarters fortress"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Praetor"
+map_id = "H2"
+owner = 0
+map_position = Vector2(0.5, 2.6)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2"), SubResource("Resource_place3"), SubResource("Resource_place4"), SubResource("Resource_place5"), SubResource("Resource_place6")])

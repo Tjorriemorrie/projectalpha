@@ -7,14 +7,17 @@ extends ContentDefinition
 
 ## Difficulty levels run from 1 to MAX_LEVEL. The player never sees one; they see what makes a wreck dangerous.
 const MAX_LEVEL := 5
+## The fewest robots a layout may expect at any level: enough that a wreck rolled the spread below it still holds
+## WreckRoll.MIN_ROBOTS, so the scan's estimate never undersells a wreck.
+const LEAST_EXPECTED_ROBOTS := WreckRoll.MIN_ROBOTS + WreckRoll.ROBOT_SPREAD
 
 ## The layout's scene, whose root is a Wreck. A res:// path, or a uid:// when picked in the inspector.
 @export_file("*.tscn") var scene := ""
 ## The lowest (x) and highest (y) difficulty level it is rolled at, evenly.
 @export var levels := Vector2i(1, 1)
 ## How many robots are expected aboard at each of its levels, lowest level first: what the system map shows. The
-## wreck holds this many give or take one.
-@export var expected_robots := PackedInt32Array([0])
+## wreck holds this many give or take one, and never fewer than two; each must be at least LEAST_EXPECTED_ROBOTS.
+@export var expected_robots := PackedInt32Array([LEAST_EXPECTED_ROBOTS])
 ## How many containers it holds, each on a random loot marker.
 @export var containers := 0
 
@@ -41,8 +44,9 @@ func get_problems() -> PackedStringArray:
 		problems.append("Wreck needs one expected robot count per level: levels=%s, expected_robots=%s" % [
 			levels, expected_robots])
 	for count in expected_robots:
-		if count < 0:
-			problems.append("Wreck expects a negative number of robots: expected_robots=%s" % expected_robots)
+		if count < LEAST_EXPECTED_ROBOTS:
+			problems.append("Wreck expects too few robots, every level needs at least %d: expected_robots=%s" % [
+				LEAST_EXPECTED_ROBOTS, expected_robots])
 			break
 	if containers < 0:
 		problems.append("Wreck has a negative number of containers: containers=%d" % containers)

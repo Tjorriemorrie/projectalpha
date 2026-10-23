@@ -1,6 +1,6 @@
 """Generates the ship and travel placeholder sounds: the ship's low engine hum, the airlock cycling while interact is
-held on its outer door, docking (clunks and a hiss, playing through the fade when boarding or extracting) and the
-clone pod's hiss when a new clone wakes up.
+held on its outer door, docking (clunks and a hiss, playing through the fade when boarding or extracting), the
+thrusters burning when the ship flies within a system, and the clone pod's hiss when a new clone wakes up.
 
 Run from the repository root: python art-source/audio/ship_sounds.py
 Writes 16-bit mono 44.1 kHz WAVs into game/assets/audio/ship/. ship_hum.wav and airlock_cycle.wav loop seamlessly
@@ -73,6 +73,16 @@ def dock() -> list[float]:
     return synth.mix((first, 1.0, 0.0), (second, 0.8, 0.45), (clink, 0.15, 0.5), (release, 0.35, 0.75))
 
 
+def thruster_burn() -> list[float]:
+    """Flying within the system: the thrusters light with a thump, roar as the ship crosses and die away, and the
+    clamps knock as it comes to rest."""
+    ignition = knock(0.4, 38.0, 8.0, seed=69, grit=0.6)
+    roar = synth.fade(synth.noise(1.3, seed=70, smoothing=0.92), 0.15, 0.7)
+    drone = synth.fade(synth.sweep(1.3, 46.0, 62.0, (1.0, 0.5, 0.3)), 0.2, 0.7)
+    clamp = knock(0.4, 60.0, 11.0, seed=71, grit=0.3)
+    return synth.mix((ignition, 0.8, 0.0), (roar, 4.5, 0.05), (drone, 0.5, 0.05), (clamp, 0.6, 1.2))
+
+
 def pod_hiss() -> list[float]:
     """The clone pod opening: the seal's soft thunk and a breath of gas that falls away."""
     thunk = knock(0.3, 70.0, 16.0, seed=67, grit=0.2)
@@ -85,6 +95,7 @@ def main() -> None:
     synth.write(SHIP / "airlock_cycle.wav", airlock_cycle(), peak=0.6)
     synth.write(SHIP / "dock.wav", dock(), peak=0.8)
     synth.write(SHIP / "pod_hiss.wav", pod_hiss(), peak=0.5)
+    synth.write(SHIP / "thruster_burn.wav", thruster_burn(), peak=0.6)
 
 
 if __name__ == "__main__":

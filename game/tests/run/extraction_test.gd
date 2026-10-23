@@ -129,10 +129,11 @@ func test_a_player_boarding_from_the_ship_arrives_with_what_they_carried() -> vo
 	gun.clip_heat = 0.3
 	carried.weapon.add(gun)
 	var hauler := ContentRegistry.get_definition("base:hauler") as WreckDefinition
-	GameSession.docked = WreckRoll.new(hauler, 2, 7)
+	var roll := WreckRoll.new(hauler, 2, 7)
+	GameSession.docked = roll
 	GameSession.board(carried)
 	await _load_wreck()
-	assert_object(_wreck.roll).is_same(GameSession.docked)
+	assert_object(_wreck.roll).is_same(roll)
 	assert_object(_player.inventory).is_same(carried)
 	assert_bool(_player.get_weapon().is_equipped()).is_true()
 	assert_float(_player.clips.heat).is_equal_approx(0.3, 0.001)

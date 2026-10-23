@@ -46,6 +46,12 @@ func set_purpose(cycle_prompt: String, docked_sign: String, time: float) -> void
 		name, prompt, sign_text, cycle_time])
 
 
+## Opens or shuts the outer door to cycling: on the ship it is shut while nothing is docked outside.
+func set_usable(usable: bool) -> void:
+	_outer_door.set_enabled(usable)
+	Log.info("🚪 Airlock %s: airlock=%s, sign=%s" % ["usable" if usable else "shut", name, sign_text])
+
+
 func get_outer_door() -> Interactable:
 	return _outer_door
 

@@ -2,12 +2,13 @@ class_name TraderScreen
 extends GridScreen
 ## The trader hub's screen, part of the HUD (see GridScreen), opened from the ship's trader terminal: the hub on the
 ## left half, what the player owns on the right. The hub's side is the sell crate, with the hub's offer for what is in
-## it and a SELL button, and the shop: every item, at the hub's buy price. The player's side is the wallet and the
-## ship's stash. Items are dragged from the stash into the crate and back, SELL sells the crate, and clicking an item
-## in the shop buys one into the stash. After every deal the wallet ticks to its new amount, with the change fading
-## beside it, and a status line says what happened (or why it couldn't). What is left in the crate goes back to the
-## stash when the screen closes. The trades go through the GameSession, which keeps the hub, the crate, the stash and
-## the wallet. The player opens and closes it.
+## it and a SELL button, and the shop: every item, at the hub's buy price. The player's side is the wallet, the ship's
+## hydrogen tank with a FILL UP button, and the ship's stash. Items are dragged from the stash into the crate and back,
+## SELL sells the crate, clicking an item in the shop buys one into the stash, and FILL UP fills the tank as far as the
+## wallet pays. After every deal the wallet ticks to its new amount, with the change fading beside it, and a status
+## line says what happened (or why it couldn't). What is left in the crate goes back to the stash when the screen
+## closes. The trades go through the GameSession, which keeps the hub, the crate, the stash, the tank and the wallet.
+## The player opens and closes it, only while the ship is at the hub.
 
 ## Seconds the wallet takes to tick to a new amount, and the change beside it to fade out after it.
 const TICK_TIME := 0.45
@@ -20,6 +21,9 @@ const TILE_CELLS := 1.4
 var offer_text := ""
 var status_text := ""
 var bitcoin_text := ""
+## What the tank readout and its button say, for tests: e.g. "18/24" and "FILL UP  ₿30".
+var hydrogen_text := ""
+var fill_text := ""
 
 var _crate_view: ItemGridView
 var _stash_view: ItemGridView
@@ -32,6 +36,12 @@ var _sell_hovered := false
 var _bitcoin: Label
 var _delta: Label
 var _stash_size: Label
+var _hydrogen: Label
+var _fuel_gauge: FuelGauge
+var _fill_button: PanelContainer
+var _fill_style: StyleBoxFlat
+var _fill_label: Label
+var _fill_hovered := false
 var _status: Label
 var _shown_bitcoin := 0
 var _tick: Tween
@@ -51,14 +61,8 @@ func _build() -> void:
 	_offer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_offer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	footer.add_child(_offer)
+	_sell_style = _button_style()
 	_sell_button = PanelContainer.new()
-	_sell_style = StyleBoxFlat.new()
-	_sell_style.set_border_width_all(1)
-	_sell_style.set_corner_radius_all(2)
-	_sell_style.content_margin_left = 18.0
-	_sell_style.content_margin_right = 18.0
-	_sell_style.content_margin_top = 4.0
-	_sell_style.content_margin_bottom = 4.0
 	_sell_button.add_theme_stylebox_override("panel", _sell_style)
 	_sell_label = _label("SELL", 13, INK_COLOR, true)
 	_sell_button.add_child(_sell_label)
@@ -72,6 +76,25 @@ func _build() -> void:
 	# Room for the change, so the placard doesn't widen when it shows.
 	_delta.custom_minimum_size = Vector2(64.0, 0.0)
 	_right_column.add_child(_placard("BITCOIN", _delta, _bitcoin))
+	var fuel_body := VBoxContainer.new()
+	fuel_body.add_theme_constant_override("separation", 8)
+	_fuel_gauge = FuelGauge.new()
+	fuel_body.add_child(_fuel_gauge)
+	var fuel_footer := HBoxContainer.new()
+	fuel_footer.add_theme_constant_override("separation", 12)
+	var fuel_note := _label("Flies the ship within the system", 12, DIM_TEXT_COLOR, false)
+	fuel_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fuel_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	fuel_footer.add_child(fuel_note)
+	_fill_style = _button_style()
+	_fill_button = PanelContainer.new()
+	_fill_button.add_theme_stylebox_override("panel", _fill_style)
+	_fill_label = _label("FILL UP", 13, INK_COLOR, true)
+	_fill_button.add_child(_fill_label)
+	fuel_footer.add_child(_fill_button)
+	fuel_body.add_child(fuel_footer)
+	_hydrogen = _label("", 13, INK_COLOR, true)
+	_right_column.add_child(_placard("HYDROGEN", _hydrogen, fuel_body))
 	_stash_size = _label("", 12, DIM_TEXT_COLOR, true)
 	_right_column.add_child(_placard("STASH", _stash_size, _stash_view))
 	_status = _label("", 13, DIM_TEXT_COLOR, false)
@@ -94,10 +117,13 @@ func open() -> void:
 	_shop.setup(GameSession.trader, Trader.shelf(ContentRegistry.get_all(ItemDefinition)),
 		roundf(cell_px * TILE_CELLS), _font)
 	_stash_size.text = "%d × %d" % [GameSession.stash.size.x, GameSession.stash.size.y]
+	_fuel_gauge.custom_minimum_size = Vector2(cell_px * GameSession.STASH_SIZE.x, 10.0)
 	if not GameSession.crate.changed.is_connected(_update_offer):
 		GameSession.crate.changed.connect(_update_offer)
 	if not GameSession.bitcoin_changed.is_connected(_on_bitcoin_changed):
 		GameSession.bitcoin_changed.connect(_on_bitcoin_changed)
+	if not GameSession.hydrogen_changed.is_connected(_update_fuel):
+		GameSession.hydrogen_changed.connect(_update_fuel)
 	if _tick:
 		_tick.kill()
 	if _delta_fade:
@@ -108,10 +134,11 @@ func open() -> void:
 	_shop.set_bitcoin(GameSession.bitcoin)
 	_set_status("", DIM_TEXT_COLOR)
 	_update_offer()
+	_update_fuel(GameSession.hydrogen)
 	_show_screen()
-	Log.info("💰 Trader opened: hub=%s, bitcoin=%d, shelf=%d, crate_items=%d, stash_items=%d, cell=%.0f px" % [
-		GameSession.trader.title, GameSession.bitcoin, _shop.definitions.size(), GameSession.crate.items.size(),
-		GameSession.stash.items.size(), _cell_px])
+	Log.info("💰 Trader opened: hub=%s, bitcoin=%d, hydrogen=%d, shelf=%d, crate_items=%d, stash_items=%d, cell=%.0f px" % [
+		GameSession.trader.title, GameSession.bitcoin, GameSession.hydrogen, _shop.definitions.size(),
+		GameSession.crate.items.size(), GameSession.stash.items.size(), _cell_px])
 
 
 ## Closes the screen: an item still being dragged goes back where it came from, and what is left in the crate goes
@@ -126,6 +153,8 @@ func close() -> void:
 		GameSession.crate.changed.disconnect(_update_offer)
 	if GameSession.bitcoin_changed.is_connected(_on_bitcoin_changed):
 		GameSession.bitcoin_changed.disconnect(_on_bitcoin_changed)
+	if GameSession.hydrogen_changed.is_connected(_update_fuel):
+		GameSession.hydrogen_changed.disconnect(_update_fuel)
 	Log.info("💰 Trader closed: bitcoin=%d, left_in_crate=%d, stash_items=%d" % [
 		GameSession.bitcoin, left, GameSession.stash.items.size()])
 
@@ -174,6 +203,38 @@ func buy(definition: ItemDefinition) -> Item:
 	return item
 
 
+## Fills the ship's tank with as much hydrogen as it holds and the wallet pays for. Returns the units bought; when
+## none, the status line says why.
+func refuel() -> int:
+	var missing := GameSession.HYDROGEN_TANK - GameSession.hydrogen
+	if missing <= 0:
+		_play(bump_sound)
+		_set_status("The tank is already full.", DIM_TEXT_COLOR)
+		Log.info("💰 Refuel refused, the tank is full: hydrogen=%d" % GameSession.hydrogen)
+		return 0
+	var bitcoin_before := GameSession.bitcoin
+	var units := GameSession.refuel()
+	if units <= 0:
+		_play(bump_sound)
+		_set_status("Not enough bitcoin for hydrogen: a unit costs %s." % Bitcoin.format(
+			GameSession.trader.hydrogen_price(1)), DANGER_COLOR)
+		Log.info("💰 Refuel refused, not enough bitcoin: hydrogen=%d, bitcoin=%d" % [
+			GameSession.hydrogen, GameSession.bitcoin])
+		return 0
+	var price := bitcoin_before - GameSession.bitcoin
+	_play(place_sound)
+	var topped := "Filled the tank" if units == missing else "Bought what the wallet pays for"
+	_set_status("%s: %d hydrogen for %s." % [topped, units, Bitcoin.format(price)], DIM_TEXT_COLOR)
+	Log.info("💰 Refuelled: units=%d, price=%d, hydrogen=%d, bitcoin=%d" % [
+		units, price, GameSession.hydrogen, GameSession.bitcoin])
+	return units
+
+
+## The middle of the FILL UP button, in this control's pixels.
+func fill_button_center() -> Vector2:
+	return get_global_transform().affine_inverse() * _fill_button.get_global_rect().get_center()
+
+
 ## The middle of an item's tile in the shop, in this control's pixels: where the pointer goes to buy it.
 func shop_tile_center(definition: ItemDefinition) -> Vector2:
 	var middle := _shop.get_global_transform() * _shop.tile_center(definition)
@@ -196,6 +257,9 @@ func _on_pressed() -> bool:
 	if _pointer_over(_sell_button):
 		sell()
 		return true
+	if _pointer_over(_fill_button):
+		refuel()
+		return true
 	var definition := shop_item_at_pointer()
 	if definition:
 		buy(definition)
@@ -209,6 +273,10 @@ func _on_refreshed() -> void:
 	if over_sell != _sell_hovered:
 		_sell_hovered = over_sell
 		_update_sell_button()
+	var over_fill := dragged == null and _pointer_over(_fill_button)
+	if over_fill != _fill_hovered:
+		_fill_hovered = over_fill
+		_update_fuel(GameSession.hydrogen)
 
 
 func _card_definition() -> ItemDefinition:
@@ -246,6 +314,38 @@ func _update_sell_button() -> void:
 	_sell_style.bg_color = Color(LASER_COLOR, 0.28 if _sell_hovered else 0.12) if active \
 		else Color(PLACARD_COLOR, 0.4)
 	_sell_label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
+
+
+## The tank's readout and gauge, and FILL UP with what filling the tank costs: in the laser's blue when the wallet
+## buys some hydrogen, brighter under the pointer.
+func _update_fuel(_hydrogen_left: int) -> void:
+	var missing := GameSession.HYDROGEN_TANK - GameSession.hydrogen
+	var units := GameSession.trader.affordable_hydrogen(missing, GameSession.bitcoin)
+	hydrogen_text = "%d/%d" % [GameSession.hydrogen, GameSession.HYDROGEN_TANK]
+	_hydrogen.text = hydrogen_text
+	_fuel_gauge.set_state(GameSession.HYDROGEN_TANK, GameSession.hydrogen, 0, 0)
+	if missing <= 0:
+		fill_text = "FULL"
+	else:
+		# What the wallet buys, or with an empty wallet what a full tank would cost.
+		fill_text = "FILL UP  %s" % Bitcoin.format(GameSession.trader.hydrogen_price(units if units > 0 else missing))
+	_fill_label.text = fill_text
+	var active := units > 0
+	_fill_style.border_color = LASER_COLOR if active else Color(INK_COLOR, 0.25)
+	_fill_style.bg_color = Color(LASER_COLOR, 0.28 if _fill_hovered else 0.12) if active else Color(PLACARD_COLOR, 0.4)
+	_fill_label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
+
+
+## A button's frame: SELL and FILL UP.
+func _button_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(2)
+	style.content_margin_left = 18.0
+	style.content_margin_right = 18.0
+	style.content_margin_top = 4.0
+	style.content_margin_bottom = 4.0
+	return style
 
 
 ## The wallet changed: it ticks to the new amount, and the change shows beside it and fades.

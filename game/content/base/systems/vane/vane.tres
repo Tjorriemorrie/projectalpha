@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "Vane I"
+note = "irradiated rock"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "Vane Labs"
+kind = 3
+note = "Corvid's black-site research, shielded from the star"
+
+[sub_resource type="Resource" id="Resource_place3"]
+script = ExtResource("2_place")
+display_name = "the Pulse"
+kind = 5
+note = "anomaly: the neutron star's sweeping beam"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Vane"
+map_id = "E5"
+star = 4
+owner = 2
+map_position = Vector2(29.6, -5.0)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2"), SubResource("Resource_place3")])

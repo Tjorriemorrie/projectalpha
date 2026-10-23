@@ -2,10 +2,16 @@ extends GdUnitTestSuite
 ## Checks the game session on its own, with travel turned off: a new game, handing the kit the player carries from one
 ## scene to the next (once, the gun keeping its loaded clip's heat), the summaries of an extraction and a death, clone
 ## numbers, the basic kit only for the first clone, the stash lasting through runs and deaths, the wallet (selling
-## the crate, buying into the stash, and the crate going back to the stash), and the docked wreck: rolled for a new
-## game and after every run, boarded, and its roll handed to that wreck once.
+## the crate, buying into the stash, and the crate going back to the stash, only at the hub), flying within the system
+## on hydrogen (never further than the tank gets back to the hub), refuelling at the hub, the day counter, and the
+## docked wreck: boarded, its roll handed to that wreck once, and gone from the system for good after the run.
+## Most tests swap the new game's system for a hand-made one with known distances: the hub at the origin, the hauler
+## 3 units east, the courier 4 units north of that and 5 from the hub, and the freighter 7 units west.
 
 var _travelled: Array[String] = []
+var _hauler: SystemWreck
+var _courier: SystemWreck
+var _freighter: SystemWreck
 
 
 func before_test() -> void:
@@ -13,6 +19,15 @@ func before_test() -> void:
 	GameSession.travel_enabled = false
 	_travelled.clear()
 	GameSession.travelled.connect(_on_travelled)
+	var system := StarSystem.new(ContentRegistry.get_definition("base:praetor") as StarSystemDefinition)
+	system.hub_position = Vector2.ZERO
+	_hauler = SystemWreck.new(WreckRoll.new(_layout("base:hauler"), 2, 7), system.definition.places[4],
+		Vector2(3.0, 0.0))
+	_courier = SystemWreck.new(WreckRoll.new(_layout("base:courier"), 1, 3), null, Vector2(3.0, 4.0))
+	_freighter = SystemWreck.new(WreckRoll.new(_layout("base:freighter"), 3, 5), null, Vector2(-7.0, 0.0))
+	system.wrecks.assign([_hauler, _courier, _freighter])
+	GameSession.system = system
+	GameSession.ship_position = Vector2.ZERO
 
 
 func after_test() -> void:
@@ -34,13 +49,151 @@ func test_a_new_game_wakes_the_first_clone_with_an_empty_stash() -> void:
 	assert_array(GameSession.crate.items).is_empty()
 
 
+func test_a_new_game_starts_on_day_0_with_a_full_tank_at_the_hub_of_a_star_system() -> void:
+	GameSession.new_game()
+	assert_int(GameSession.day).is_equal(0)
+	assert_int(GameSession.hydrogen).is_equal(GameSession.HYDROGEN_TANK)
+	assert_int(GameSession.HYDROGEN_TANK).is_equal(24)
+	var system := GameSession.system
+	assert_object(system).is_not_null()
+	assert_bool(ContentRegistry.get_all(StarSystemDefinition).has(system.definition)).is_true()
+	assert_int(system.wrecks.size()).is_between(StarSystem.MIN_WRECKS, StarSystem.MAX_WRECKS)
+	assert_bool(GameSession.at_hub).is_true()
+	assert_vector(GameSession.ship_position).is_equal(system.hub_position)
+	assert_object(GameSession.docked).is_null()
+	assert_str(GameSession.trader.title).is_equal(system.definition.hub_name())
+
+
+func test_flying_to_a_wreck_burns_hydrogen_and_docks_with_it() -> void:
+	var burns: Array[int] = []
+	var on_burn := func(hydrogen: int) -> void: burns.append(hydrogen)
+	GameSession.hydrogen_changed.connect(on_burn)
+	var moves: Array[bool] = []
+	var on_move := func() -> void: moves.append(true)
+	GameSession.ship_moved.connect(on_move)
+	assert_int(GameSession.flight_cost(_hauler.position)).is_equal(3)
+	assert_int(GameSession.hydrogen_needed(_hauler.position)).is_equal(6)
+	assert_bool(GameSession.fly_to_wreck(_hauler)).is_true()
+	GameSession.hydrogen_changed.disconnect(on_burn)
+	GameSession.ship_moved.disconnect(on_move)
+	assert_int(GameSession.hydrogen).is_equal(21)
+	assert_array(burns).is_equal([21])
+	assert_array(moves).is_equal([true])
+	assert_object(GameSession.docked).is_same(_hauler.roll)
+	assert_bool(GameSession.at_hub).is_false()
+	assert_vector(GameSession.ship_position).is_equal(_hauler.position)
+	# Flying takes no time, and the wreck stays in the system until it is boarded.
+	assert_int(GameSession.day).is_equal(0)
+	assert_bool(GameSession.system.wrecks.has(_hauler)).is_true()
+
+
+func test_a_flight_is_refused_when_the_tank_couldnt_get_back_to_the_hub() -> void:
+	GameSession.hydrogen = 9
+	# The courier is 5 there and 5 back.
+	assert_bool(GameSession.fly_to_wreck(_courier)).is_false()
+	assert_int(GameSession.hydrogen).is_equal(9)
+	assert_bool(GameSession.at_hub).is_true()
+	assert_object(GameSession.docked).is_null()
+	GameSession.hydrogen = 10
+	assert_bool(GameSession.fly_to_wreck(_courier)).is_true()
+	assert_int(GameSession.hydrogen).is_equal(5)
+	# What is left always gets the ship home.
+	assert_bool(GameSession.fly_to_hub()).is_true()
+	assert_int(GameSession.hydrogen).is_equal(0)
+	assert_bool(GameSession.at_hub).is_true()
+	assert_object(GameSession.docked).is_null()
+
+
+func test_a_loop_through_the_wrecks_burns_less_than_flying_back_to_the_hub_between_them() -> void:
+	GameSession.fly_to_wreck(_hauler)
+	GameSession.fly_to_wreck(_courier)
+	GameSession.fly_to_hub()
+	var loop := GameSession.HYDROGEN_TANK - GameSession.hydrogen
+	assert_int(loop).is_equal(3 + 4 + 5)
+	GameSession.hydrogen = GameSession.HYDROGEN_TANK
+	GameSession.fly_to_wreck(_hauler)
+	GameSession.fly_to_hub()
+	GameSession.fly_to_wreck(_courier)
+	GameSession.fly_to_hub()
+	assert_int(GameSession.HYDROGEN_TANK - GameSession.hydrogen).is_greater(loop)
+
+
+func test_a_wreck_no_longer_in_the_system_cant_be_flown_to() -> void:
+	GameSession.system.remove(_freighter)
+	assert_bool(GameSession.fly_to_wreck(_freighter)).is_false()
+	assert_int(GameSession.hydrogen).is_equal(GameSession.HYDROGEN_TANK)
+
+
+func test_refuelling_at_the_hub_fills_the_tank_for_bitcoin() -> void:
+	GameSession.hydrogen = 10
+	var price := GameSession.trader.hydrogen_price(14)
+	assert_int(GameSession.refuel()).is_equal(14)
+	assert_int(GameSession.hydrogen).is_equal(GameSession.HYDROGEN_TANK)
+	assert_int(GameSession.bitcoin).is_equal(500 - price)
+	assert_int(price).is_between(66, 74)
+	assert_int(GameSession.refuel()).is_equal(0)
+
+
+func test_refuelling_buys_what_the_wallet_pays_for() -> void:
+	GameSession.hydrogen = 0
+	GameSession.bitcoin = 12
+	var units := GameSession.refuel()
+	assert_int(units).is_equal(2)
+	assert_int(GameSession.hydrogen).is_equal(2)
+	assert_int(GameSession.bitcoin).is_equal(12 - GameSession.trader.hydrogen_price(2))
+	GameSession.bitcoin = 0
+	assert_int(GameSession.refuel()).is_equal(0)
+
+
+func test_refuelling_trading_and_buying_only_happen_at_the_hub() -> void:
+	GameSession.fly_to_wreck(_hauler)
+	GameSession.hydrogen = 10
+	assert_int(GameSession.refuel()).is_equal(0)
+	assert_int(GameSession.hydrogen).is_equal(10)
+	var gyroscope := Item.new(_item("base:gyroscope"))
+	GameSession.crate.add(gyroscope)
+	assert_int(GameSession.sell_crate()).is_equal(0)
+	assert_bool(GameSession.crate.has(gyroscope)).is_true()
+	assert_object(GameSession.buy(_item("base:thermal_clip"))).is_null()
+	assert_int(GameSession.bitcoin).is_equal(500)
+
+
+func test_boarding_takes_a_day_and_the_wreck_is_gone_for_good_whether_the_android_extracts_or_dies() -> void:
+	GameSession.fly_to_wreck(_hauler)
+	GameSession.board(_kit([]))
+	assert_int(GameSession.day).is_equal(1)
+	assert_bool(GameSession.system.wrecks.has(_hauler)).is_false()
+	assert_object(GameSession.docked).is_null()
+	GameSession.extract(_kit([]))
+	assert_object(GameSession.docked).is_null()
+	assert_bool(GameSession.system.wrecks.has(_hauler)).is_false()
+	# The ship stays where the wreck was, with nothing docked.
+	assert_vector(GameSession.ship_position).is_equal(_hauler.position)
+	assert_bool(GameSession.at_hub).is_false()
+	GameSession.fly_to_wreck(_courier)
+	GameSession.board(_kit([]))
+	GameSession.die(_kit([]))
+	assert_int(GameSession.day).is_equal(2)
+	assert_array(GameSession.system.wrecks).is_equal([_freighter])
+	assert_object(GameSession.docked).is_null()
+
+
+func test_days_only_pass_by_boarding() -> void:
+	GameSession.fly_to_wreck(_hauler)
+	GameSession.fly_to_hub()
+	GameSession.refuel()
+	GameSession.sell_crate()
+	assert_int(GameSession.day).is_equal(0)
+
+
 func test_boarding_hands_the_kit_to_the_wreck_once() -> void:
 	var carried := _kit(["base:thermal_clip", "base:gyroscope"])
 	var gun := Item.new(_item("base:laser_pistol"))
 	gun.clip_heat = 0.4
 	carried.weapon.add(gun)
+	GameSession.fly_to_wreck(_hauler)
 	GameSession.board(carried)
-	assert_array(_travelled).is_equal([GameSession.docked.definition.get_scene_path()])
+	assert_array(_travelled).is_equal([_hauler.roll.definition.get_scene_path()])
 	assert_int(GameSession.runs).is_equal(1)
 	var taken := GameSession.take_carried()
 	assert_object(taken).is_same(carried)
@@ -50,7 +203,8 @@ func test_boarding_hands_the_kit_to_the_wreck_once() -> void:
 
 func test_extracting_keeps_the_kit_and_sums_up_the_haul() -> void:
 	var carried := _kit(["base:thermal_clip", "base:thermal_clip"])
-	var wreck_scene := GameSession.docked.definition.get_scene_path()
+	var wreck_scene := _hauler.roll.definition.get_scene_path()
+	GameSession.fly_to_wreck(_hauler)
 	GameSession.board(carried)
 	GameSession.take_carried()
 	carried.backpack.add(Item.new(_item("base:plasma_coil")))
@@ -70,6 +224,7 @@ func test_extracting_keeps_the_kit_and_sums_up_the_haul() -> void:
 
 func test_dying_loses_the_kit_and_wakes_the_next_clone() -> void:
 	var carried := _kit(["base:thermal_clip", "base:power_cell"])
+	GameSession.fly_to_wreck(_hauler)
 	GameSession.board(carried)
 	GameSession.take_carried()
 	var summary := GameSession.die(carried)
@@ -95,9 +250,11 @@ func test_every_death_counts_a_clone() -> void:
 func test_the_stash_lasts_through_runs_and_deaths() -> void:
 	var gyroscope := Item.new(_item("base:gyroscope"))
 	assert_bool(GameSession.stash.add(gyroscope)).is_true()
+	GameSession.fly_to_wreck(_hauler)
 	GameSession.board(_kit([]))
 	GameSession.die(_kit([]))
 	GameSession.continue_to_ship()
+	GameSession.fly_to_wreck(_courier)
 	GameSession.board(_kit([]))
 	GameSession.extract(_kit([]))
 	assert_bool(GameSession.stash.has(gyroscope)).is_true()
@@ -178,14 +335,15 @@ func test_what_doesnt_fit_in_the_stash_waits_in_the_crate() -> void:
 	assert_bool(GameSession.crate.has(gyroscope)).is_true()
 
 
-func test_a_new_game_docks_a_registered_wreck_at_a_level_in_its_range() -> void:
-	var docked := GameSession.docked
-	assert_object(docked).is_not_null()
-	assert_bool(ContentRegistry.get_all(WreckDefinition).has(docked.definition)).is_true()
-	assert_int(docked.level).is_between(docked.definition.levels.x, docked.definition.levels.y)
+func test_boarding_with_nothing_docked_does_nothing() -> void:
+	GameSession.board(_kit([]))
+	assert_array(_travelled).is_empty()
+	assert_int(GameSession.day).is_equal(0)
+	assert_int(GameSession.runs).is_equal(0)
 
 
 func test_boarding_hands_the_docked_wrecks_roll_to_that_wreck_once() -> void:
+	GameSession.fly_to_wreck(_courier)
 	var docked := GameSession.docked
 	GameSession.board(_kit([]))
 	assert_object(GameSession.take_boarding(docked.definition)).is_same(docked)
@@ -201,20 +359,9 @@ func test_another_layout_gets_no_roll() -> void:
 	assert_object(GameSession.take_boarding(hauler)).is_null()
 
 
-func test_every_run_ends_with_a_new_wreck_docked() -> void:
-	var first := GameSession.docked
-	GameSession.board(_kit([]))
-	GameSession.extract(_kit([]))
-	var second := GameSession.docked
-	assert_object(second).is_not_same(first)
-	GameSession.board(_kit([]))
-	GameSession.die(_kit([]))
-	assert_object(GameSession.docked).is_not_same(second)
-	assert_object(GameSession.docked).is_not_null()
-
-
 func test_travel_arrives_fading_in() -> void:
 	GameSession.fade_in_next = false
+	GameSession.fly_to_wreck(_hauler)
 	GameSession.board(_kit([]))
 	assert_bool(GameSession.fade_in_next).is_true()
 
@@ -235,3 +382,7 @@ static func _kit(ids: Array) -> Inventory:
 
 static func _item(id: String) -> ItemDefinition:
 	return ContentRegistry.get_definition(id) as ItemDefinition
+
+
+static func _layout(id: String) -> WreckDefinition:
+	return ContentRegistry.get_definition(id) as WreckDefinition

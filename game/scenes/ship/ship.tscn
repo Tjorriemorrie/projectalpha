@@ -10,7 +10,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ship/clone_pod.tscn" id="8_clone_pod"]
 [ext_resource type="PackedScene" path="res://scenes/ship/stash.tscn" id="9_stash"]
 [ext_resource type="PackedScene" path="res://assets/models/ship/pilot_seat.glb" id="10_seat"]
-[ext_resource type="PackedScene" path="res://assets/models/ship/console.glb" id="11_console"]
+[ext_resource type="PackedScene" path="res://scenes/ship/system_console.tscn" id="11_console"]
 [ext_resource type="PackedScene" path="res://assets/models/ship/bunk.glb" id="12_bunk"]
 [ext_resource type="PackedScene" path="res://content/base/containers/locker/locker.glb" id="13_locker"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="14_player"]
@@ -18,12 +18,6 @@
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_seat"]
 size = Vector3(0.62, 1.4, 0.75)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_console"]
-size = Vector3(1.4, 0.9, 0.55)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_screen"]
-size = Vector3(0.98, 0.6, 0.08)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bunk"]
 size = Vector3(2, 0.62, 0.9)
@@ -103,6 +97,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 5.8)
 unique_name_in_owner = true
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 13.35, 0, 5.8)
 
+[node name="SystemConsole" parent="." instance=ExtResource("11_console")]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8)
+
 [node name="Props" type="Node3D" parent="."]
 
 [node name="PilotSeat" type="StaticBody3D" parent="Props"]
@@ -113,30 +111,6 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -0.55)
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Props/PilotSeat"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
 shape = SubResource("BoxShape3D_seat")
-
-[node name="Console" type="StaticBody3D" parent="Props"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8)
-
-[node name="Model" parent="Props/Console" instance=ExtResource("11_console")]
-
-[node name="Body" type="CollisionShape3D" parent="Props/Console"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0.275)
-shape = SubResource("BoxShape3D_console")
-
-[node name="Screen" type="CollisionShape3D" parent="Props/Console"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0.04)
-shape = SubResource("BoxShape3D_screen")
-
-[node name="ScreenText" type="Label3D" parent="Props/Console"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0.078)
-pixel_size = 0.0025
-modulate = Color(0.55, 0.8, 1, 1)
-outline_modulate = Color(0.02, 0.05, 0.08, 1)
-text = "STAR MAP
-OFFLINE"
-font_size = 56
-outline_size = 4
-line_spacing = 6.0
 
 [node name="Bunk" type="StaticBody3D" parent="Props"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -5.8)

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "Fennel"
+habitable = true
+note = "I: a trading post with Massey's Grid A-1, legal or not"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "the Lees"
+kind = 5
+note = "anomaly: a dust nebula where ships hide"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Fennel"
+map_id = "F7"
+star = 0
+map_position = Vector2(-9.5, 25.2)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2")])

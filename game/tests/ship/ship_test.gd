@@ -4,7 +4,8 @@ extends GdUnitTestSuite
 ## takes nothing else), and a player back from the wreck arrives in the airlock with what they carried; the stash
 ## opens with the session's grid and takes items dragged with the mouse, there is no floor, the pistol is holstered but
 ## reloads, the airlock says which wreck is docked and what the scan says about its robots, and holding interact on
-## its outer door boards that wreck with the kit and the wreck's roll handed over.
+## its outer door boards that wreck with the kit and the wreck's roll handed over; with nothing docked the outer door
+## is shut and the window shows no hull, and flying to a wreck docks it at once. The cockpit console names the system.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: one deck at y = 0, the cockpit at the origin, a
 ## corridor east along z = 0 to x = 12, the clone bay south of x = 4 with the pod at (4, 0, 5), the bedroom north of
 ## x = 8, the stash room south of x = 12 with the stash against its south wall at z = 5.8, and the airlock north of
@@ -201,20 +202,57 @@ func test_the_airlock_shows_the_docked_wreck() -> void:
 	GameSession.docked = WreckRoll.new(ContentRegistry.get_definition("base:hauler") as WreckDefinition, 2, 7)
 	await _load_ship()
 	await _look_at_outer_door()
-	assert_str(_hud().prompt_text).is_equal("Hold E Board the hauler · about 4 robots active")
+	assert_str(_hud().prompt_text).is_equal("Hold E Board the hauler · about 5 robots active")
 	var sign_label := _ship.airlocks[0].get_node("%Sign") as Label3D
 	assert_str(sign_label.text).is_equal("HAULER DOCKED")
 
 
-func test_the_airlock_counts_one_robot_without_a_plural() -> void:
+func test_the_airlock_shows_a_level_1_courier_with_its_robots() -> void:
 	GameSession.docked = WreckRoll.new(ContentRegistry.get_definition("base:courier") as WreckDefinition, 1, 7)
 	await _load_ship()
 	await _look_at_outer_door()
-	assert_str(_hud().prompt_text).is_equal("Hold E Board the courier · about 1 robot active")
+	assert_str(_hud().prompt_text).is_equal("Hold E Board the courier · about 3 robots active")
+
+
+func test_with_nothing_docked_the_airlock_is_shut_and_the_window_shows_only_stars() -> void:
+	await _load_ship()
+	await _look_at_outer_door()
+	assert_object(GameSession.docked).is_null()
+	assert_str(_hud().prompt_text).is_empty()
+	assert_bool(_ship.airlocks[0].get_outer_door().is_enabled()).is_false()
+	var sign_label := _ship.airlocks[0].get_node("%Sign") as Label3D
+	assert_str(sign_label.text).is_equal("NOTHING DOCKED")
+	assert_bool((_ship.get_node("Outside/Hull") as Node3D).visible).is_false()
+	Input.action_press(&"interact")
+	await _physics_frames(roundi(1.5 * FRAMES_PER_SECOND))
+	Input.action_release(&"interact")
+	assert_bool(_player.is_leaving).is_false()
+	assert_array(_travelled).is_empty()
+
+
+func test_flying_to_a_wreck_docks_it_at_the_airlock_and_shows_its_hull() -> void:
+	GameSession.hydrogen = 1000
+	var wreck := GameSession.system.wrecks[0]
+	await _load_ship()
+	GameSession.fly_to_wreck(wreck)
+	await _look_at_outer_door()
+	var layout := wreck.title()
+	assert_str(_hud().prompt_text).is_equal("Hold E Board the %s · %s" % [layout.to_lower(), wreck.roll.robots_estimate()])
+	assert_bool(_ship.airlocks[0].get_outer_door().is_enabled()).is_true()
+	var sign_label := _ship.airlocks[0].get_node("%Sign") as Label3D
+	assert_str(sign_label.text).is_equal("%s DOCKED" % layout.to_upper())
+	assert_bool((_ship.get_node("Outside/Hull") as Node3D).visible).is_true()
+
+
+func test_the_cockpit_console_shows_the_system() -> void:
+	await _load_ship()
+	var text := _ship.get_node("%SystemConsole").get_node("%ScreenText") as Label3D
+	assert_str(text.text).is_equal("SYSTEM MAP\n%s" % GameSession.system.definition.display_name.to_upper())
 
 
 func test_holding_interact_on_the_outer_door_boards_the_wreck() -> void:
-	var docked := GameSession.docked
+	var docked := WreckRoll.new(ContentRegistry.get_definition("base:hauler") as WreckDefinition, 2, 7)
+	GameSession.docked = docked
 	await _load_ship()
 	await _look_at_outer_door()
 	assert_str(_hud().prompt_text).starts_with("Hold E Board the %s" % docked.definition.display_name.to_lower())

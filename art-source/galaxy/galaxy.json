@@ -1,0 +1,378 @@
+{
+  "systems": [
+    {
+      "id": "H1",
+      "name": "Vigil",
+      "faction": "her",
+      "x": 2.3,
+      "y": 18.7
+    },
+    {
+      "id": "H2",
+      "name": "Praetor",
+      "faction": "her",
+      "x": 0.5,
+      "y": 2.6
+    },
+    {
+      "id": "H3",
+      "name": "Centurion",
+      "faction": "her",
+      "x": 7.3,
+      "y": 14.5
+    },
+    {
+      "id": "H4",
+      "name": "Mori",
+      "faction": "her",
+      "x": 6.2,
+      "y": 7.0
+    },
+    {
+      "id": "H5",
+      "name": "Ferrum",
+      "faction": "her",
+      "x": 13.9,
+      "y": 9.8
+    },
+    {
+      "id": "H6",
+      "name": "Aquila",
+      "faction": "her",
+      "x": 10.3,
+      "y": 2.4
+    },
+    {
+      "id": "H7",
+      "name": "Pilum",
+      "faction": "her",
+      "x": 15.8,
+      "y": 1.2
+    },
+    {
+      "id": "H8",
+      "name": "Limes",
+      "faction": "her",
+      "x": 3.5,
+      "y": -18.3
+    },
+    {
+      "id": "H9",
+      "name": "Legate",
+      "faction": "her",
+      "x": -2.6,
+      "y": -15.2
+    },
+    {
+      "id": "H10",
+      "name": "Halden",
+      "faction": "her",
+      "x": -2.0,
+      "y": -6.5
+    },
+    {
+      "id": "H11",
+      "name": "Aegis",
+      "faction": "her",
+      "x": -8.0,
+      "y": -13.0
+    },
+    {
+      "id": "H12",
+      "name": "Tribune",
+      "faction": "her",
+      "x": -7.3,
+      "y": -6.8
+    },
+    {
+      "id": "H13",
+      "name": "Castra",
+      "faction": "her",
+      "x": -13.5,
+      "y": -2.7
+    },
+    {
+      "id": "H14",
+      "name": "Bastion",
+      "faction": "her",
+      "x": -16.8,
+      "y": 1.5
+    },
+    {
+      "id": "H15",
+      "name": "Vallum",
+      "faction": "her",
+      "x": -8.4,
+      "y": 0.8
+    },
+    {
+      "id": "H16",
+      "name": "Gladius",
+      "faction": "her",
+      "x": -3.3,
+      "y": 18.6
+    },
+    {
+      "id": "H17",
+      "name": "Concordia",
+      "faction": "her",
+      "x": -0.8,
+      "y": 10.9
+    },
+    {
+      "id": "C1",
+      "name": "KR-207",
+      "faction": "cheap",
+      "x": -25.8,
+      "y": -25.7
+    },
+    {
+      "id": "C2",
+      "name": "Depot 9",
+      "faction": "cheap",
+      "x": -19.4,
+      "y": -18.7
+    },
+    {
+      "id": "C3",
+      "name": "Yard 5",
+      "faction": "cheap",
+      "x": -28.0,
+      "y": -21.0
+    },
+    {
+      "id": "C4",
+      "name": "Grid C-12",
+      "faction": "cheap",
+      "x": -24.8,
+      "y": -17.6
+    },
+    {
+      "id": "C5",
+      "name": "KR-114",
+      "faction": "cheap",
+      "x": -32.6,
+      "y": -18.8
+    },
+    {
+      "id": "C6",
+      "name": "Intake 4",
+      "faction": "cheap",
+      "x": -31.1,
+      "y": -14.2
+    },
+    {
+      "id": "C7",
+      "name": "Yard 2",
+      "faction": "cheap",
+      "x": -33.2,
+      "y": -10.1
+    },
+    {
+      "id": "C8",
+      "name": "Grid B-7",
+      "faction": "cheap",
+      "x": -28.5,
+      "y": -6.6
+    },
+    {
+      "id": "C9",
+      "name": "Depot 1",
+      "faction": "cheap",
+      "x": -33.5,
+      "y": -0.9
+    },
+    {
+      "id": "C10",
+      "name": "Grid B-4",
+      "faction": "cheap",
+      "x": -28.6,
+      "y": 7.6
+    },
+    {
+      "id": "C11",
+      "name": "Depot 6",
+      "faction": "cheap",
+      "x": -22.4,
+      "y": 13.3
+    },
+    {
+      "id": "C12",
+      "name": "Grid A-2",
+      "faction": "cheap",
+      "x": -25.7,
+      "y": 15.8
+    },
+    {
+      "id": "C13",
+      "name": "Grid A-1",
+      "faction": "cheap",
+      "x": -17.6,
+      "y": 20.4
+    },
+    {
+      "id": "E1",
+      "name": "Spire",
+      "faction": "elite",
+      "x": 26.8,
+      "y": 6.7
+    },
+    {
+      "id": "E2",
+      "name": "Talon",
+      "faction": "elite",
+      "x": 33.4,
+      "y": 2.5
+    },
+    {
+      "id": "E3",
+      "name": "Lance",
+      "faction": "elite",
+      "x": 28.1,
+      "y": 0.3
+    },
+    {
+      "id": "E4",
+      "name": "Aerie",
+      "faction": "elite",
+      "x": 36.0,
+      "y": -0.9
+    },
+    {
+      "id": "E5",
+      "name": "Vane",
+      "faction": "elite",
+      "x": 29.6,
+      "y": -5.0
+    },
+    {
+      "id": "E6",
+      "name": "Rook",
+      "faction": "elite",
+      "x": 35.1,
+      "y": -6.1
+    },
+    {
+      "id": "F1",
+      "name": "Thistle",
+      "faction": "free",
+      "x": 7.9,
+      "y": -22.1
+    },
+    {
+      "id": "F2",
+      "name": "Gleaning",
+      "faction": "free",
+      "x": 7.8,
+      "y": -26.8
+    },
+    {
+      "id": "F3",
+      "name": "Lastlight",
+      "faction": "free",
+      "x": 2.2,
+      "y": -27.3
+    },
+    {
+      "id": "F4",
+      "name": "Patience",
+      "faction": "free",
+      "x": -1.4,
+      "y": -24.2
+    },
+    {
+      "id": "F5",
+      "name": "Ostby",
+      "faction": "free",
+      "x": -12.9,
+      "y": 27.8
+    },
+    {
+      "id": "F6",
+      "name": "Holdfast",
+      "faction": "free",
+      "x": -9.3,
+      "y": 20.9
+    },
+    {
+      "id": "F7",
+      "name": "Fennel",
+      "faction": "free",
+      "x": -9.5,
+      "y": 25.2
+    },
+    {
+      "id": "F8",
+      "name": "Willowherb",
+      "faction": "free",
+      "x": -4.1,
+      "y": 25.9
+    },
+    {
+      "id": "X1",
+      "name": "Bluebell",
+      "faction": "contested",
+      "x": 18.2,
+      "y": 5.8,
+      "between": [
+        "her",
+        "elite"
+      ]
+    },
+    {
+      "id": "X2",
+      "name": "Foxglove",
+      "faction": "contested",
+      "x": 22.2,
+      "y": -1.0,
+      "between": [
+        "her",
+        "elite"
+      ]
+    },
+    {
+      "id": "X3",
+      "name": "Mallow",
+      "faction": "contested",
+      "x": -15.8,
+      "y": -10.6,
+      "between": [
+        "her",
+        "cheap"
+      ]
+    },
+    {
+      "id": "X4",
+      "name": "Harebell",
+      "faction": "contested",
+      "x": -21.3,
+      "y": -4.5,
+      "between": [
+        "her",
+        "cheap"
+      ]
+    },
+    {
+      "id": "X5",
+      "name": "Goldenrod",
+      "faction": "contested",
+      "x": -24.8,
+      "y": 1.9,
+      "between": [
+        "her",
+        "cheap"
+      ]
+    },
+    {
+      "id": "X6",
+      "name": "Teasel",
+      "faction": "contested",
+      "x": -23.8,
+      "y": 7.8,
+      "between": [
+        "her",
+        "cheap"
+      ]
+    }
+  ]
+}

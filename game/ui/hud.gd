@@ -4,8 +4,9 @@ extends CanvasLayer
 ## looking, with a ring that fills while a shot charges and a wider one that fills while interact is held (prying
 ## a container open); under it the prompt for the interactable they are looking at ("[E]  Call elevator", or
 ## "HOLD [E]  Pry open supply crate"); health in the bottom left and the loaded clip's heat in the bottom right (hidden
-## while unarmed); at home on the ship, the bitcoin in the wallet in the top left (hidden while the trader hub's screen,
-## which has its own, is open); and the inventory and trader hub screens. Hits flash the screen edges red and point to where they came from, the edges stay faintly
+## while unarmed); at home on the ship, the bitcoin in the wallet, the hydrogen in the tank and the day in the top left
+## (hidden while the trader hub's screen or the system map, which show their own, is open); and the inventory, trader
+## hub and system map screens. Hits flash the screen edges red and point to where they came from, the edges stay faintly
 ## red while health is critical, and death fades to black. A run ends on black with the run summary placard, and an
 ## arrival fades in from black. The player calls it; it decides nothing.
 
@@ -26,8 +27,10 @@ var prompt_text := ""
 ## What the corner readouts say, for tests: e.g. "100" and "35% 2 fresh · 2 packed · 1 spent".
 var health_text := ""
 var clips_text := ""
-## What the wallet readout says, for tests: e.g. "₿500", or "" while it isn't shown.
+## What the ship's readouts say, for tests: e.g. "₿500", "24/24" and "3", or "" while they aren't shown.
 var wallet_text := ""
+var hydrogen_text := ""
+var day_text := ""
 
 var _fade: Tween
 var _death_fade: Tween
@@ -46,6 +49,7 @@ var _wallet_wanted := false
 @onready var _hold_ring: ChargeRing = $Root/HoldRing
 @onready var _inventory_screen: InventoryScreen = $Root/InventoryScreen
 @onready var _trader_screen: TraderScreen = $Root/TraderScreen
+@onready var _system_map_screen: SystemMapScreen = $Root/SystemMapScreen
 @onready var _key: Label = $Root/Prompt/KeyCap/Key
 @onready var _action: Label = $Root/Prompt/Action
 @onready var _screen_edges: ColorRect = $Root/ScreenEdges
@@ -60,7 +64,9 @@ var _wallet_wanted := false
 @onready var _heat_gauge: HeatGauge = $Root/Clips/Rows/HeatGauge
 @onready var _clip_count: Label = $Root/Clips/Rows/Count
 @onready var _wallet: Control = $Root/Wallet
-@onready var _wallet_value: Label = $Root/Wallet/Rows/Value
+@onready var _wallet_value: Label = $Root/Wallet/Columns/Bitcoin/Value
+@onready var _hydrogen_value: Label = $Root/Wallet/Columns/Hydrogen/Value
+@onready var _day_value: Label = $Root/Wallet/Columns/Day/Value
 @onready var _death_screen: ColorRect = $Root/DeathFade
 @onready var _summary: RunSummaryCard = $Root/RunSummary
 
@@ -70,6 +76,7 @@ func _ready() -> void:
 	_clips.visible = false
 	_wallet.visible = false
 	_trader_screen.visibility_changed.connect(_update_wallet_visibility)
+	_system_map_screen.visibility_changed.connect(_update_wallet_visibility)
 	_edges_material = _screen_edges.material as ShaderMaterial
 	_edges_material.set_shader_parameter("intensity", 0.0)
 	_death_screen.color.a = 0.0
@@ -89,6 +96,10 @@ func get_inventory_screen() -> InventoryScreen:
 
 func get_trader_screen() -> TraderScreen:
 	return _trader_screen
+
+
+func get_system_map_screen() -> SystemMapScreen:
+	return _system_map_screen
 
 
 ## Shows the key and what it does, or hides the prompt when action is empty. hold marks an action that is used by
@@ -160,11 +171,12 @@ func set_clips(heat: float, charge_heat: float, fresh: int, packed: int, spent: 
 	clips_text = "%s %s" % [value, count] if not value.is_empty() else "%s %s" % [label, count]
 
 
-## Shows the bitcoin in the wallet in the top left, at home on the ship.
-func show_wallet(bitcoin: int) -> void:
+## Shows the bitcoin in the wallet, the hydrogen in the tank and the day in the top left, at home on the ship.
+func show_wallet(bitcoin: int, hydrogen: int, day: int) -> void:
 	_wallet_wanted = true
+	_day_value.text = "%d" % day
+	set_hydrogen(hydrogen)
 	set_wallet(bitcoin)
-	_update_wallet_visibility()
 
 
 ## The bitcoin in the wallet changed.
@@ -173,9 +185,17 @@ func set_wallet(bitcoin: int) -> void:
 	_update_wallet_visibility()
 
 
+## The hydrogen in the tank changed.
+func set_hydrogen(hydrogen: int) -> void:
+	_hydrogen_value.text = "%d/%d" % [hydrogen, GameSession.HYDROGEN_TANK]
+	_update_wallet_visibility()
+
+
 func _update_wallet_visibility() -> void:
-	_wallet.visible = _wallet_wanted and not _trader_screen.visible
+	_wallet.visible = _wallet_wanted and not _trader_screen.visible and not _system_map_screen.visible
 	wallet_text = _wallet_value.text if _wallet.visible else ""
+	hydrogen_text = _hydrogen_value.text if _wallet.visible else ""
+	day_text = _day_value.text if _wallet.visible else ""
 
 
 ## Hides the clip readout while the player is unarmed; the next set_clips() shows it again.

@@ -1,8 +1,8 @@
 extends GdUnitTestSuite
-## Checks rolling a wreck without loading one: the robots aboard against the expected count, levels, what the scan
-## says, putting robots and containers on markers (given as paths and mounts or spaces), the loot within the
-## containers' budgets, the level-1 gun, and the same seed rolling the same wreck. Uses the base game's layouts, robots
-## and containers.
+## Checks rolling a wreck without loading one: the robots aboard against the expected count (never fewer than two),
+## levels, what the scan says, putting robots and containers on markers (given as paths and mounts or spaces), the loot
+## within the containers' budgets, the level-1 gun, and the same seed rolling the same wreck. Uses the base game's
+## layouts, robots and containers.
 
 const FLOOR := SectionMarker.Mount.FLOOR
 const CEILING := SectionMarker.Mount.CEILING
@@ -15,10 +15,23 @@ func test_robots_aboard_are_the_expected_count_give_or_take_one() -> void:
 	var seen := {}
 	for seed_value in 60:
 		var roll := WreckRoll.new(hauler, 2, seed_value)
-		assert_int(roll.expected_robots()).is_equal(4)
-		assert_int(roll.robots).is_between(3, 5)
+		assert_int(roll.expected_robots()).is_equal(5)
+		assert_int(roll.robots).is_between(4, 6)
 		seen[roll.robots] = true
-	assert_array(seen.keys()).contains_exactly_in_any_order([3, 4, 5])
+	assert_array(seen.keys()).contains_exactly_in_any_order([4, 5, 6])
+
+
+func test_every_wreck_holds_at_least_two_robots() -> void:
+	for layout: WreckDefinition in ContentRegistry.get_all(WreckDefinition):
+		for level in range(layout.levels.x, layout.levels.y + 1):
+			for seed_value in 30:
+				assert_int(WreckRoll.new(layout, level, seed_value).robots).override_failure_message(
+					"%s at level %d rolled too few robots" % [layout.id, level]).is_greater_equal(2)
+	# Even a layout expecting fewer than it may (which the registry refuses) never holds fewer than two.
+	var sparse := WreckDefinition.new()
+	sparse.expected_robots = PackedInt32Array([0])
+	assert_int(WreckRoll.new(sparse, 1, 1).robots).is_equal(WreckRoll.MIN_ROBOTS)
+	assert_bool(" ".join(sparse.get_problems()).contains("expects too few robots")).is_true()
 
 
 func test_the_same_seed_rolls_the_same_robots() -> void:
@@ -46,10 +59,7 @@ func test_random_rolls_a_registered_layout_at_a_level_in_its_range() -> void:
 
 func test_the_scan_says_about_how_many_robots_are_active() -> void:
 	assert_str(WreckRoll.new(_layout("base:hauler"), 3, 1).robots_estimate()).is_equal("about 6 robots active")
-	assert_str(WreckRoll.new(_layout("base:courier"), 1, 1).robots_estimate()).is_equal("about 1 robot active")
-	var empty := WreckDefinition.new()
-	empty.expected_robots = PackedInt32Array([0])
-	assert_str(WreckRoll.new(empty, 1, 1).robots_estimate()).is_equal("no robots active")
+	assert_str(WreckRoll.new(_layout("base:courier"), 1, 1).robots_estimate()).is_equal("about 3 robots active")
 
 
 func test_robots_go_on_markers_that_fit_their_kind() -> void:

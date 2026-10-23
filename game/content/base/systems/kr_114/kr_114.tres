@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "KR-114 I"
+note = "ice"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "KR-114 II"
+note = "rock"
+
+[sub_resource type="Resource" id="Resource_place3"]
+script = ExtResource("2_place")
+display_name = "the Drift"
+kind = 2
+note = "belt"
+
+[sub_resource type="Resource" id="Resource_place4"]
+script = ExtResource("2_place")
+display_name = "the Edge"
+kind = 5
+note = "anomaly: where the charts end and deep space begins"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "KR-114"
+map_id = "C5"
+star = 0
+owner = 1
+map_position = Vector2(-32.6, -18.8)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2"), SubResource("Resource_place3"), SubResource("Resource_place4")])

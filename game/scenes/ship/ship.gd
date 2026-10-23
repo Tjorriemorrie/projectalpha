@@ -1,9 +1,10 @@
 class_name Ship
 extends Wreck
-## The player's ship, docked at the wreck: home between runs. It assembles from the same kit sections as a wreck, but
-## has no robots or loot, and its lamps are warm and steady. A new clone wakes up in the clone pod; a player back from
-## the wreck arrives in the airlock, where cycling the outer door boards the wreck. The stash keeps what is safe. The
-## scene's player has the pistol holstered and no floor to drop things on.
+## The player's ship: home between runs. It assembles from the same kit sections as a wreck, but has no robots or
+## loot, and its lamps are warm and steady. A new clone wakes up in the clone pod; a player back from the wreck arrives
+## in the airlock. The cockpit console opens the system map, to fly to a wreck; once one is docked, its hull shows
+## outside the window and cycling the airlock's outer door boards it, and while nothing is docked the outer door is
+## shut. The stash keeps what is safe. The scene's player has the pistol holstered and no floor to drop things on.
 
 ## The colour of the ship's lamps: warm white, about 3800 K.
 @export var lamp_color := Color(1.0, 0.8, 0.62)
@@ -17,9 +18,13 @@ extends Wreck
 @export var board_prompt := "Board the %s · %s"
 @export var board_sign := "%s DOCKED"
 @export var board_time := 1.0
+## The airlock's sign while nothing is docked.
+@export var empty_sign := "NOTHING DOCKED"
 
 @onready var _clone_pod: ClonePod = %ClonePod
 @onready var _arrival_spawn: Marker3D = %ArrivalSpawn
+## What shows outside the window while a wreck is docked: its hull and the docking tube.
+@onready var _docked_outside: Array[Node3D] = [$Outside/Hull, $Outside/DockingTube]
 
 
 func _ready() -> void:
@@ -36,24 +41,32 @@ func _ready() -> void:
 		fill.position = Vector3(0.0, -0.5, 0.0)
 		lamp.add_child(fill)
 	_show_docked()
+	GameSession.ship_moved.connect(_show_docked)
 	_place_player()
-	Log.info("🚀 Ship ready: ship=%s, lamps=%d, airlocks=%d, arrival=%s, clone=%d, stash_items=%d" % [
+	Log.info("🚀 Ship ready: ship=%s, lamps=%d, airlocks=%d, arrival=%s, clone=%d, stash_items=%d, at_hub=%s" % [
 		name, lamps.size(), airlocks.size(), GameSession.Arrival.keys()[GameSession.arrival], GameSession.clone_number,
-		GameSession.stash.items.size()])
+		GameSession.stash.items.size(), GameSession.at_hub])
 
 
 ## The airlock says which wreck is docked and what the scan says about its robots: "Board the hauler · about 4 robots
-## active" under a "HAULER DOCKED" sign.
+## active" under a "HAULER DOCKED" sign, with its hull outside the window. With nothing docked the outer door is shut,
+## under a "NOTHING DOCKED" sign, and the window shows only stars. Runs again whenever the ship flies.
 func _show_docked() -> void:
 	var docked := GameSession.docked
-	var layout := docked.definition.display_name if docked else "wreck"
-	var prompt := board_prompt % [layout.to_lower(), docked.robots_estimate() if docked else "no scan"]
+	for node in _docked_outside:
+		node.visible = docked != null
+	if docked == null:
+		for airlock in airlocks:
+			airlock.set_purpose("", empty_sign, board_time)
+			airlock.set_usable(false)
+		Log.info("🚀 Nothing docked, the airlock is shut: ship=%s, at_hub=%s" % [name, GameSession.at_hub])
+		return
+	var layout := docked.definition.display_name
+	var prompt := board_prompt % [layout.to_lower(), docked.robots_estimate()]
 	var sign_text := board_sign % layout.to_upper()
 	for airlock in airlocks:
 		airlock.set_purpose(prompt, sign_text, board_time)
-	if docked == null:
-		Log.warning("🚀 No wreck docked to show at the airlock: ship=%s" % name)
-		return
+		airlock.set_usable(true)
 	Log.info("🚀 Docked wreck shown at the airlock: ship=%s, layout=%s, prompt=%s, sign=%s" % [
 		name, docked.definition.id, prompt, sign_text])
 

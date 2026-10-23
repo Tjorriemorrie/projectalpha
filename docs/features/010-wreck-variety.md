@@ -33,14 +33,15 @@ loot, so every run played the same. The player never sees a difficulty level, on
 
       | Layout | Decks | Sections | Levels | Expected robots per level | Containers |
       |--------|-------|----------|--------|---------------------------|------------|
-      | Courier | 1 | 7 | 1–2 | 1 / 2 | 3 |
-      | Hauler | 2 | 14 (the small wreck) | 1–3 | 3 / 4 / 6 | 6 |
+      | Courier | 1 | 7 | 1–2 | 3 / 4 | 3 |
+      | Hauler | 2 | 14 (the small wreck) | 1–3 | 4 / 5 / 6 | 6 |
       | Freighter | 2 | 25, with the cargo bay | 2–3 | 6 / 8 | 9 |
 - [x] Two new sections, so the new layouts look different: a 4-way corridor crossing, and a cargo bay (2×3 cells)
       for the freighter, with loot markers, drone posts and turret mounts, and cover to fight from.
 - [x] Robots placed to suit each wreck's difficulty. The expected count for its level is what the system map shows
       ("about 4 robots active"), but a scan of a derelict's security network is never certain: the wreck actually
-      holds the expected count ±1, rolled with the rest. Every run they go on random enemy markers, never within 5 m
+      holds the expected count ±1, rolled with the rest. Every wreck holds at least two robots, so every layout
+      expects at least three at each level (raised during 011, when a courier rolled none). Every run they go on random enemy markers, never within 5 m
       of the airlock's inner door (boarding is done in secret, so nothing waits there), and the marker decides the
       kind: a ceiling mount gets a turret, a floor post a drone. A destroyed robot's salvage stays fixed
       per kind (turret: plasma coil and circuit board; drone: power cell and servo motor), so the player knows what

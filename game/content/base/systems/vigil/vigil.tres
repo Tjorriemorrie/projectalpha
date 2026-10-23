@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="StarSystemDefinition" format=3]
+
+[ext_resource type="Script" path="res://scenes/galaxy/star_system_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scenes/galaxy/system_place.gd" id="2_place"]
+
+[sub_resource type="Resource" id="Resource_place1"]
+script = ExtResource("2_place")
+display_name = "Hollyhock"
+habitable = true
+note = "I"
+
+[sub_resource type="Resource" id="Resource_place2"]
+script = ExtResource("2_place")
+display_name = "Vigil Watch"
+kind = 3
+note = "a listening post facing the free north"
+
+[sub_resource type="Resource" id="Resource_place3"]
+script = ExtResource("2_place")
+display_name = "the Hush"
+kind = 5
+note = "anomaly: a radio-dead zone"
+
+[resource]
+script = ExtResource("1_definition")
+display_name = "Vigil"
+map_id = "H1"
+star = 0
+owner = 0
+map_position = Vector2(2.3, 18.7)
+places = Array[ExtResource("2_place")]([SubResource("Resource_place1"), SubResource("Resource_place2"), SubResource("Resource_place3")])

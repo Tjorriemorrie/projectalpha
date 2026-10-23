@@ -8,12 +8,14 @@ extends RefCounted
 
 ## How far the robots aboard can be off the expected count, either way: a scan of a security network is never sure.
 const ROBOT_SPREAD := 1
+## Every wreck holds at least this many robots, so none is an empty walk-through.
+const MIN_ROBOTS := 2
 
 var definition: WreckDefinition
 ## The hidden difficulty level, within the layout's range.
 var level := 1
 var roll_seed := 0
-## How many robots are aboard: the expected count give or take ROBOT_SPREAD, never below 0.
+## How many robots are aboard: the expected count give or take ROBOT_SPREAD, never below MIN_ROBOTS.
 var robots := 0
 ## What roll_loot() left out: unknown items in loot tables, a gun that fit no container.
 var problems := PackedStringArray()
@@ -27,7 +29,7 @@ func _init(layout: WreckDefinition, wreck_level: int, wreck_seed: int) -> void:
 	roll_seed = wreck_seed
 	var rng := RandomNumberGenerator.new()
 	rng.seed = roll_seed
-	robots = maxi(0, expected_robots() + rng.randi_range(-ROBOT_SPREAD, ROBOT_SPREAD))
+	robots = maxi(MIN_ROBOTS, expected_robots() + rng.randi_range(-ROBOT_SPREAD, ROBOT_SPREAD))
 
 
 ## A random layout from those given, at a random level in its range, with a random seed; null when there are none.
@@ -47,12 +49,10 @@ func expected_robots() -> int:
 	return definition.expected_robots_at(level)
 
 
-## What the scan says about the robots, e.g. "about 4 robots active".
+## What the scan says about the robots, e.g. "about 4 robots active". A layout always expects several (see
+## WreckDefinition.LEAST_EXPECTED_ROBOTS).
 func robots_estimate() -> String:
-	var expected := expected_robots()
-	if expected == 0:
-		return "no robots active"
-	return "about %d robot%s active" % [expected, "" if expected == 1 else "s"]
+	return "about %d robots active" % expected_robots()
 
 
 ## The generator the markers are filled from: the same sequence every time for the same seed.
