@@ -1,11 +1,11 @@
 class_name MenuScreen
 extends Control
 ## The base of the full-screen screens in the HUD (the inventory and the trader hub, through GridScreen, and the system
-## map): placards in two columns either side of the screen's centre, over the running game, which stays visible and
-## slightly dimmed, with key hints along the bottom. The screen takes every mouse event itself (its placards let them
-## through) and keeps the pointer's position from them, so a gamepad can drive the same pointer later. Subclasses build
-## the columns (_build), handle presses (_handle_input) and say what happens as the pointer moves (_refresh); the
-## player opens and closes them.
+## and star maps, through MapScreen): placards in two columns either side of the screen's centre, over the running
+## game, which stays visible and slightly dimmed, with key hints along the bottom. The screen takes every mouse event
+## itself (its placards let them through) and keeps the pointer's position from them, so a gamepad can drive the same
+## pointer later. Subclasses build the columns (_build), handle presses (_handle_input) and say what happens as the
+## pointer moves (_refresh); the player opens and closes them.
 
 const DIM_COLOR := Color(0.02, 0.03, 0.045, 0.35)
 const INK_COLOR := Color(0.862745, 0.901961, 0.941176)
@@ -31,6 +31,11 @@ const MOUSE_BUTTON_NAMES := {MOUSE_BUTTON_LEFT: "LMB", MOUSE_BUTTON_RIGHT: "RMB"
 var is_open := false
 ## Where the pointer is, in this control's pixels.
 var pointer := Vector2.ZERO
+## Pixels at the top of the screen kept clear, for the ship's bar that stays over every screen at home.
+var top_inset := 0.0
+
+## Whether the screen is opening or closing to switch tabs with another (the map's): no fade and no sound.
+var _switching := false
 
 ## The columns left and right of the centre; subclasses fill them in _build().
 var _left_column: VBoxContainer
@@ -97,17 +102,20 @@ func hint_rect() -> Rect2:
 	return Rect2(_hint.position, _hint.size)
 
 
-## Shows the screen: takes the pointer from the mouse, fades in and lays out. Subclasses set up their contents first.
+## Shows the screen: takes the pointer from the mouse, fades in and lays out (switching tabs, it shows at once and
+## quietly). Subclasses set up their contents first.
 func _show_screen() -> void:
 	pointer = get_local_mouse_position()
 	is_open = true
 	visible = true
-	modulate.a = 0.0
 	if _fade:
 		_fade.kill()
-	_fade = create_tween()
-	_fade.tween_property(self, "modulate:a", 1.0, FADE_TIME)
-	_play(open_sound)
+	modulate.a = 1.0
+	if not _switching:
+		modulate.a = 0.0
+		_fade = create_tween()
+		_fade.tween_property(self, "modulate:a", 1.0, FADE_TIME)
+		_play(open_sound)
 	_layout()
 	# Labels and containers settle their sizes during the frame; lay out again once they have.
 	_layout.call_deferred()
@@ -116,7 +124,8 @@ func _show_screen() -> void:
 func _hide_screen() -> void:
 	is_open = false
 	visible = false
-	_play(close_sound)
+	if not _switching:
+		_play(close_sound)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -135,7 +144,8 @@ func _gui_input(event: InputEvent) -> void:
 
 
 ## Places the left column's right edge and the right column's left edge either side of the screen's centre, their
-## tops level and the taller column centred vertically; the key hints along the bottom, below the columns.
+## tops level and the taller column centred vertically below top_inset; the key hints along the bottom, below the
+## columns.
 func _layout() -> void:
 	if not is_open:
 		return
@@ -146,7 +156,7 @@ func _layout() -> void:
 	var tallest := maxf(left_size.y, right_size.y)
 	var hint_size := _hint.get_combined_minimum_size()
 	var hint_y := screen.y - hint_size.y - HINT_BOTTOM
-	var top := maxf(minf((screen.y - tallest) / 2.0, hint_y - 12.0 - tallest), 16.0)
+	var top := maxf(minf((screen.y + top_inset - tallest) / 2.0, hint_y - 12.0 - tallest), top_inset + 16.0)
 	if top + tallest + 12.0 > hint_y:
 		hint_y = minf(top + tallest + 12.0, screen.y - hint_size.y - 8.0)
 	_left_column.size = left_size

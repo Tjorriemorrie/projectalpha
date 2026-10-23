@@ -3,9 +3,11 @@ extends GdUnitTestSuite
 ## pushed into the viewport: interact on the terminal opens the hub's screen; items dragged from the stash into the
 ## sell crate show the hub's offer, and SELL sells them into the wallet; clicking an item in the shop buys one into
 ## the stash, unless the wallet is short or the stash is full; FILL UP fills the hydrogen tank as far as the wallet
-## pays; the card of the shop item under the pointer shows its price; closing puts what is left in the crate back into
-## the stash; at home the HUD shows the bitcoin in the wallet, the hydrogen and the day, except while trading; the
-## player stands still while trading; and away from the hub the terminal is out of range.
+## pays; ORDER orders the antimatter the tank is missing, one order at a time, and COLLECT, once it has arrived, fills
+## the tank at once and its gauge a block at a time; the card of the shop item under the pointer shows its price;
+## closing puts what is left in the crate back into the stash; at home the ship's bar shows the bitcoin in the wallet,
+## the hydrogen and the day, over the hub's screen too; the player stands still while trading; and away from the hub
+## the terminal is out of range.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: the stash room south of x = 12, with the trader
 ## terminal against its south wall at (13.35, 0, 5.8), facing north, its screen 1.5 m up.
 
@@ -100,15 +102,85 @@ func test_fill_up_with_an_empty_wallet_is_refused() -> void:
 	assert_str(_screen.status_text).starts_with("Not enough bitcoin for hydrogen")
 
 
-func test_at_home_the_hud_shows_the_hydrogen_and_the_day_except_while_trading() -> void:
+func test_order_buys_the_antimatter_the_tank_is_missing_which_arrives_days_later() -> void:
+	GameSession.antimatter = 4
+	GameSession.bitcoin = 5000
+	await _load_ship()
+	await _open_hub()
+	var price := GameSession.trader.antimatter_price(6)
+	assert_str(_screen.antimatter_text).is_equal("4/10")
+	assert_str(_screen.order_text).is_equal("ORDER  %s" % Bitcoin.format(price))
+	await _click(_screen.order_button_center())
+	assert_int(GameSession.order_units).is_equal(6)
+	assert_int(GameSession.bitcoin).is_equal(5000 - price)
+	assert_int(GameSession.antimatter).is_equal(4)
+	assert_str(_screen.order_text).is_equal("ARRIVES DAY 1")
+	assert_str(_screen.status_text).is_equal(
+		"Ordered 6 antimatter for %s. It arrives at the hub on day 1: board ships while you wait." % Bitcoin.format(price))
+	await _click(_screen.order_button_center())
+	assert_int(GameSession.bitcoin).is_equal(5000 - price)
+	assert_str(_screen.status_text).is_equal("Antimatter is on order already: 6 arriving at the hub on day 1.")
+
+
+func test_collect_fills_the_tank_a_block_every_tenth_of_a_second() -> void:
+	GameSession.order_units = 8
+	GameSession.order_day = 0
+	await _load_ship()
+	await _open_hub()
+	# Arrived antimatter waits at the hub until it is collected.
+	assert_int(GameSession.antimatter).is_equal(2)
+	assert_str(_screen.order_text).is_equal("COLLECT  ·  8")
+	await _click(_screen.order_button_center())
+	assert_int(GameSession.antimatter).is_equal(10)
+	assert_int(GameSession.order_units).is_equal(0)
+	assert_bool(_screen.is_filling()).is_true()
+	assert_str(_screen.order_text).is_equal("FILLING")
+	assert_str(_screen.antimatter_text).is_not_equal("10/10")
+	# The ship's bar fills with the gauge.
+	assert_str(_hud().antimatter_text).is_equal(_screen.antimatter_text)
+	# 8 blocks at 0.1 s each: under a second of game time.
+	await _physics_frames(60)
+	assert_bool(_screen.is_filling()).is_false()
+	assert_str(_screen.antimatter_text).is_equal("10/10")
+	assert_str(_hud().antimatter_text).is_equal("10/10")
+	assert_str(_screen.order_text).is_equal("FULL")
+	assert_str(_screen.status_text).is_equal("Collected 8 antimatter: the tank is full.")
+
+
+func test_closing_while_the_tank_fills_leaves_it_full() -> void:
+	GameSession.order_units = 8
+	GameSession.order_day = 0
+	await _load_ship()
+	await _open_hub()
+	await _click(_screen.order_button_center())
+	await _press(&"inventory")
+	assert_bool(_screen.is_filling()).is_false()
+	assert_int(GameSession.antimatter).is_equal(10)
+	assert_str(_hud().antimatter_text).is_equal("10/10")
+	await _open_hub()
+	assert_str(_screen.antimatter_text).is_equal("10/10")
+
+
+func test_order_with_too_little_bitcoin_is_refused() -> void:
+	GameSession.bitcoin = 100
+	await _load_ship()
+	await _open_hub()
+	await _click(_screen.order_button_center())
+	assert_int(GameSession.order_units).is_equal(0)
+	assert_int(GameSession.bitcoin).is_equal(100)
+	assert_str(_screen.status_text).starts_with("Not enough bitcoin for antimatter")
+
+
+func test_the_ships_bar_shows_the_hydrogen_and_the_day_while_trading_too() -> void:
 	GameSession.hydrogen = 20
 	GameSession.day = 3
 	await _load_ship()
 	assert_str(_hud().hydrogen_text).is_equal("20/24")
 	assert_str(_hud().day_text).is_equal("3")
 	await _open_hub()
-	assert_str(_hud().hydrogen_text).is_empty()
+	assert_str(_hud().hydrogen_text).is_equal("20/24")
 	await _click(_screen.fill_button_center())
+	assert_str(_hud().hydrogen_text).is_equal("24/24")
 	await _press(&"inventory")
 	assert_str(_hud().hydrogen_text).is_equal("24/24")
 
@@ -228,18 +300,19 @@ func test_closing_puts_whats_left_in_the_crate_back_in_the_stash() -> void:
 	assert_int(GameSession.bitcoin).is_equal(500)
 
 
-func test_at_home_the_hud_shows_the_wallet_except_while_trading() -> void:
+func test_the_ships_bar_shows_the_wallet_while_trading_too() -> void:
 	await _load_ship()
 	assert_str(_hud().wallet_text).is_equal("₿500")
 	await _open_hub()
-	# The hub's screen shows its own wallet.
-	assert_str(_hud().wallet_text).is_empty()
+	assert_str(_hud().wallet_text).is_equal("₿500")
 	var drive := _stash_item("base:data_drive", Vector2i(0, 0))
 	await _drag(_screen.cell_center(GameSession.stash, Vector2i(0, 0)),
 		_screen.cell_center(GameSession.crate, Vector2i(0, 0)))
 	await _click(_screen.sell_button_center())
+	var wallet := Bitcoin.format(500 + GameSession.trader.sell_price(drive.definition))
+	assert_str(_hud().wallet_text).is_equal(wallet)
 	await _press(&"inventory")
-	assert_str(_hud().wallet_text).is_equal(Bitcoin.format(500 + GameSession.trader.sell_price(drive.definition)))
+	assert_str(_hud().wallet_text).is_equal(wallet)
 
 
 func test_the_player_stands_still_while_trading() -> void:

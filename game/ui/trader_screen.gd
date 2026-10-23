@@ -3,27 +3,38 @@ extends GridScreen
 ## The trader hub's screen, part of the HUD (see GridScreen), opened from the ship's trader terminal: the hub on the
 ## left half, what the player owns on the right. The hub's side is the sell crate, with the hub's offer for what is in
 ## it and a SELL button, and the shop: every item, at the hub's buy price. The player's side is the wallet, the ship's
-## hydrogen tank with a FILL UP button, and the ship's stash. Items are dragged from the stash into the crate and back,
-## SELL sells the crate, clicking an item in the shop buys one into the stash, and FILL UP fills the tank as far as the
-## wallet pays. After every deal the wallet ticks to its new amount, with the change fading beside it, and a status
-## line says what happened (or why it couldn't). What is left in the crate goes back to the stash when the screen
-## closes. The trades go through the GameSession, which keeps the hub, the crate, the stash, the tank and the wallet.
-## The player opens and closes it, only while the ship is at the hub.
+## fuel (the hydrogen tank with a FILL UP button, and the antimatter tank with an ORDER button), and the ship's stash.
+## Items are dragged from the stash into the crate and back, SELL sells the crate, clicking an item in the shop buys
+## one into the stash, FILL UP fills the hydrogen tank as far as the wallet pays, and ORDER orders the antimatter the
+## tank is missing (every empty unit, or nothing), which arrives at the hub days later; once it has, the button reads
+## COLLECT, and collecting it fills the gauge a block at a time (the tank itself is full at once, so closing the
+## screen cuts only the animation). After every deal the wallet ticks to its new amount, with the change fading beside
+## it, and a status line says what happened (or why it couldn't). What is left in the crate goes back to the stash when the screen closes. The trades go through the
+## GameSession, which keeps the hub, the crate, the stash, the tanks and the wallet. The player opens and closes it,
+## only while the ship is at the hub.
+
+## The antimatter gauge shows a new amount while collected antimatter fills it, so the ship's bar can follow it.
+signal antimatter_shown(antimatter: int)
 
 ## Seconds the wallet takes to tick to a new amount, and the change beside it to fade out after it.
 const TICK_TIME := 0.45
 const DELTA_FADE_TIME := 1.4
 ## A shop tile's size, in grid cells, so the shop is about as wide as the crate.
 const TILE_CELLS := 1.4
+## Seconds each unit of collected antimatter takes to fill on the gauge.
+const FILL_STEP := 0.1
 
 ## What the readouts say, for tests: e.g. "OFFER  ₿340", "Sold 4 items for ₿340." and "₿500" (the amount the
 ## wallet is ticking to).
 var offer_text := ""
 var status_text := ""
 var bitcoin_text := ""
-## What the tank readout and its button say, for tests: e.g. "18/24" and "FILL UP  ₿30".
+## What the tank readouts and their buttons say, for tests: e.g. "18/24", "FILL UP  ₿30", "2/10" and
+## "ORDER  ₿800" (or "ARRIVES DAY 7", "COLLECT  ·  8" and "FILLING").
 var hydrogen_text := ""
 var fill_text := ""
+var antimatter_text := ""
+var order_text := ""
 
 var _crate_view: ItemGridView
 var _stash_view: ItemGridView
@@ -42,10 +53,21 @@ var _fill_button: PanelContainer
 var _fill_style: StyleBoxFlat
 var _fill_label: Label
 var _fill_hovered := false
+var _antimatter: Label
+var _antimatter_gauge: FuelGauge
+var _order_button: PanelContainer
+var _order_style: StyleBoxFlat
+var _order_label: Label
+var _order_hovered := false
+var _fuel_note: Label
 var _status: Label
 var _shown_bitcoin := 0
 var _tick: Tween
 var _delta_fade: Tween
+## The antimatter the gauge shows, which lags behind the tank while collected antimatter fills it.
+var _shown_antimatter := 0
+var _filling := false
+var _fill_tween: Tween
 
 
 func _build() -> void:
@@ -77,24 +99,27 @@ func _build() -> void:
 	_delta.custom_minimum_size = Vector2(64.0, 0.0)
 	_right_column.add_child(_placard("BITCOIN", _delta, _bitcoin))
 	var fuel_body := VBoxContainer.new()
-	fuel_body.add_theme_constant_override("separation", 8)
+	fuel_body.add_theme_constant_override("separation", 6)
 	_fuel_gauge = FuelGauge.new()
-	fuel_body.add_child(_fuel_gauge)
-	var fuel_footer := HBoxContainer.new()
-	fuel_footer.add_theme_constant_override("separation", 12)
-	var fuel_note := _label("Flies the ship within the system", 12, DIM_TEXT_COLOR, false)
-	fuel_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fuel_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	fuel_footer.add_child(fuel_note)
+	_hydrogen = _label("", 13, INK_COLOR, true)
 	_fill_style = _button_style()
 	_fill_button = PanelContainer.new()
 	_fill_button.add_theme_stylebox_override("panel", _fill_style)
 	_fill_label = _label("FILL UP", 13, INK_COLOR, true)
 	_fill_button.add_child(_fill_label)
-	fuel_footer.add_child(_fill_button)
-	fuel_body.add_child(fuel_footer)
-	_hydrogen = _label("", 13, INK_COLOR, true)
-	_right_column.add_child(_placard("HYDROGEN", _hydrogen, fuel_body))
+	fuel_body.add_child(_fuel_row("HYDROGEN", _hydrogen, _fuel_gauge, _fill_button))
+	_antimatter_gauge = FuelGauge.new()
+	_antimatter = _label("", 13, INK_COLOR, true)
+	_order_style = _button_style()
+	_order_button = PanelContainer.new()
+	_order_button.add_theme_stylebox_override("panel", _order_style)
+	_order_label = _label("ORDER", 13, INK_COLOR, true)
+	_order_button.add_child(_order_label)
+	fuel_body.add_child(_fuel_row("ANTIMATTER", _antimatter, _antimatter_gauge, _order_button))
+	_fuel_note = _label("", 12, DIM_TEXT_COLOR, false)
+	fuel_body.add_child(_fuel_note)
+	_right_column.add_child(_placard("FUEL", _label("Hydrogen flies, antimatter jumps", 12, DIM_TEXT_COLOR, false),
+		fuel_body))
 	_stash_size = _label("", 12, DIM_TEXT_COLOR, true)
 	_right_column.add_child(_placard("STASH", _stash_size, _stash_view))
 	_status = _label("", 13, DIM_TEXT_COLOR, false)
@@ -109,7 +134,7 @@ func _hints() -> Array:
 		[&"", "Click an item in the shop to buy one"], [&"inventory", "Close"]]
 
 
-## Opens the screen on the GameSession's hub, sell crate, stash and wallet.
+## Opens the screen on the GameSession's hub, sell crate, stash, tanks and wallet.
 func open() -> void:
 	var cell_px := _cell_size()
 	_crate_view.setup(GameSession.crate, cell_px)
@@ -117,17 +142,22 @@ func open() -> void:
 	_shop.setup(GameSession.trader, Trader.shelf(ContentRegistry.get_all(ItemDefinition)),
 		roundf(cell_px * TILE_CELLS), _font)
 	_stash_size.text = "%d × %d" % [GameSession.stash.size.x, GameSession.stash.size.y]
-	_fuel_gauge.custom_minimum_size = Vector2(cell_px * GameSession.STASH_SIZE.x, 10.0)
+	_fuel_gauge.custom_minimum_size = Vector2(cell_px * 3.0, 10.0)
+	_antimatter_gauge.custom_minimum_size = Vector2(cell_px * 3.0, 10.0)
+	_fuel_note.custom_minimum_size = Vector2(cell_px * GameSession.STASH_SIZE.x, 0.0)
 	if not GameSession.crate.changed.is_connected(_update_offer):
 		GameSession.crate.changed.connect(_update_offer)
 	if not GameSession.bitcoin_changed.is_connected(_on_bitcoin_changed):
 		GameSession.bitcoin_changed.connect(_on_bitcoin_changed)
 	if not GameSession.hydrogen_changed.is_connected(_update_fuel):
 		GameSession.hydrogen_changed.connect(_update_fuel)
+	if not GameSession.antimatter_changed.is_connected(_update_fuel):
+		GameSession.antimatter_changed.connect(_update_fuel)
 	if _tick:
 		_tick.kill()
 	if _delta_fade:
 		_delta_fade.kill()
+	_stop_filling()
 	_delta.modulate.a = 0.0
 	_show_bitcoin(GameSession.bitcoin)
 	bitcoin_text = Bitcoin.format(GameSession.bitcoin)
@@ -136,9 +166,10 @@ func open() -> void:
 	_update_offer()
 	_update_fuel(GameSession.hydrogen)
 	_show_screen()
-	Log.info("💰 Trader opened: hub=%s, bitcoin=%d, hydrogen=%d, shelf=%d, crate_items=%d, stash_items=%d, cell=%.0f px" % [
-		GameSession.trader.title, GameSession.bitcoin, GameSession.hydrogen, _shop.definitions.size(),
-		GameSession.crate.items.size(), GameSession.stash.items.size(), _cell_px])
+	Log.info("💰 Trader opened: hub=%s, bitcoin=%d, hydrogen=%d, antimatter=%d, order=%d, shelf=%d, crate_items=%d, stash_items=%d, cell=%.0f px" % [
+		GameSession.trader.title, GameSession.bitcoin, GameSession.hydrogen, GameSession.antimatter,
+		GameSession.order_units, _shop.definitions.size(), GameSession.crate.items.size(),
+		GameSession.stash.items.size(), _cell_px])
 
 
 ## Closes the screen: an item still being dragged goes back where it came from, and what is left in the crate goes
@@ -148,6 +179,8 @@ func close() -> void:
 		Log.info("💰 Trader screen not closed, it isn't open")
 		return
 	_hide_screen()
+	# Collected antimatter is in the tank already; only its filling on the gauge stops.
+	_stop_filling()
 	var left := GameSession.return_crate()
 	if GameSession.crate.changed.is_connected(_update_offer):
 		GameSession.crate.changed.disconnect(_update_offer)
@@ -155,6 +188,8 @@ func close() -> void:
 		GameSession.bitcoin_changed.disconnect(_on_bitcoin_changed)
 	if GameSession.hydrogen_changed.is_connected(_update_fuel):
 		GameSession.hydrogen_changed.disconnect(_update_fuel)
+	if GameSession.antimatter_changed.is_connected(_update_fuel):
+		GameSession.antimatter_changed.disconnect(_update_fuel)
 	Log.info("💰 Trader closed: bitcoin=%d, left_in_crate=%d, stash_items=%d" % [
 		GameSession.bitcoin, left, GameSession.stash.items.size()])
 
@@ -230,6 +265,78 @@ func refuel() -> int:
 	return units
 
 
+## Orders the antimatter that fills the tank: every empty unit, or nothing when the wallet can't pay for them all.
+## Returns the units ordered; when none, the status line says why.
+func order() -> int:
+	var missing := GameSession.ANTIMATTER_TANK - GameSession.antimatter
+	if GameSession.order_units > 0:
+		_play(bump_sound)
+		_set_status("Antimatter is on order already: %d arriving at the hub on day %d." % [
+			GameSession.order_units, GameSession.order_day], DIM_TEXT_COLOR)
+		Log.info("💰 Order refused, antimatter on order already: units=%d, arrives_day=%d" % [
+			GameSession.order_units, GameSession.order_day])
+		return 0
+	if missing <= 0:
+		_play(bump_sound)
+		_set_status("The antimatter tank is already full.", DIM_TEXT_COLOR)
+		Log.info("💰 Order refused, the tank is full: antimatter=%d" % GameSession.antimatter)
+		return 0
+	var bitcoin_before := GameSession.bitcoin
+	var units := GameSession.order_antimatter()
+	if units <= 0:
+		var price := GameSession.trader.antimatter_price(missing)
+		_play(bump_sound)
+		_set_status("Not enough bitcoin for antimatter: filling the tank takes %s, the wallet holds %s." % [
+			Bitcoin.format(price), Bitcoin.format(GameSession.bitcoin)], DANGER_COLOR)
+		Log.info("💰 Order refused, not enough bitcoin to fill the tank: missing=%d, price=%d, bitcoin=%d" % [
+			missing, price, GameSession.bitcoin])
+		return 0
+	var price := bitcoin_before - GameSession.bitcoin
+	_play(place_sound)
+	_set_status("Ordered %d antimatter for %s. It arrives at the hub on day %d: board ships while you wait." % [
+		units, Bitcoin.format(price), GameSession.order_day], DIM_TEXT_COLOR)
+	Log.info("💰 Antimatter ordered: units=%d, price=%d, arrives_day=%d, bitcoin=%d" % [
+		units, price, GameSession.order_day, GameSession.bitcoin])
+	return units
+
+
+## Collects the antimatter that has arrived at the hub: it is in the tank at once, and the gauge fills a block every
+## FILL_STEP seconds while the screen is open. Returns the units collected; when none, the status line says why.
+func collect() -> int:
+	var before := GameSession.antimatter
+	_filling = true
+	var units := GameSession.collect_antimatter()
+	if units <= 0:
+		_filling = false
+		_play(bump_sound)
+		_set_status("No antimatter has arrived to collect.", DIM_TEXT_COLOR)
+		Log.info("💰 Nothing to collect: order=%d, arrives_day=%d, day=%d" % [
+			GameSession.order_units, GameSession.order_day, GameSession.day])
+		return 0
+	_play(place_sound)
+	_set_status("Filling the antimatter tank...", DIM_TEXT_COLOR)
+	if _fill_tween:
+		_fill_tween.kill()
+	_fill_tween = create_tween()
+	_fill_tween.tween_method(_show_antimatter_fill, float(before), float(before + units), units * FILL_STEP)
+	_fill_tween.tween_callback(_finish_filling.bind(units))
+	_update_fuel(GameSession.hydrogen)
+	antimatter_shown.emit(_shown_antimatter)
+	Log.info("💰 Antimatter collected, filling the gauge: units=%d, from=%d, to=%d, fill=%.1f s" % [
+		units, before, GameSession.antimatter, units * FILL_STEP])
+	return units
+
+
+## Whether collected antimatter is still filling the gauge.
+func is_filling() -> bool:
+	return _filling
+
+
+## The middle of the ORDER (or COLLECT) button, in this control's pixels.
+func order_button_center() -> Vector2:
+	return get_global_transform().affine_inverse() * _order_button.get_global_rect().get_center()
+
+
 ## The middle of the FILL UP button, in this control's pixels.
 func fill_button_center() -> Vector2:
 	return get_global_transform().affine_inverse() * _fill_button.get_global_rect().get_center()
@@ -260,6 +367,12 @@ func _on_pressed() -> bool:
 	if _pointer_over(_fill_button):
 		refuel()
 		return true
+	if _pointer_over(_order_button):
+		if GameSession.order_arrived():
+			collect()
+		elif not _filling:
+			order()
+		return true
 	var definition := shop_item_at_pointer()
 	if definition:
 		buy(definition)
@@ -274,8 +387,10 @@ func _on_refreshed() -> void:
 		_sell_hovered = over_sell
 		_update_sell_button()
 	var over_fill := dragged == null and _pointer_over(_fill_button)
-	if over_fill != _fill_hovered:
+	var over_order := dragged == null and _pointer_over(_order_button)
+	if over_fill != _fill_hovered or over_order != _order_hovered:
 		_fill_hovered = over_fill
+		_order_hovered = over_order
 		_update_fuel(GameSession.hydrogen)
 
 
@@ -316,9 +431,11 @@ func _update_sell_button() -> void:
 	_sell_label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
 
 
-## The tank's readout and gauge, and FILL UP with what filling the tank costs: in the laser's blue when the wallet
-## buys some hydrogen, brighter under the pointer.
-func _update_fuel(_hydrogen_left: int) -> void:
+## The tanks' readouts and gauges, FILL UP with what filling the hydrogen tank costs, and ORDER with what filling the
+## antimatter tank costs, the day an order arrives, COLLECT once it has, or FILLING while it fills the gauge: FILL UP
+## in the laser's blue when the wallet buys some hydrogen, ORDER when it pays for the whole fill, COLLECT always,
+## brighter under the pointer.
+func _update_fuel(_fuel_left: int) -> void:
 	var missing := GameSession.HYDROGEN_TANK - GameSession.hydrogen
 	var units := GameSession.trader.affordable_hydrogen(missing, GameSession.bitcoin)
 	hydrogen_text = "%d/%d" % [GameSession.hydrogen, GameSession.HYDROGEN_TANK]
@@ -331,12 +448,96 @@ func _update_fuel(_hydrogen_left: int) -> void:
 		fill_text = "FILL UP  %s" % Bitcoin.format(GameSession.trader.hydrogen_price(units if units > 0 else missing))
 	_fill_label.text = fill_text
 	var active := units > 0
-	_fill_style.border_color = LASER_COLOR if active else Color(INK_COLOR, 0.25)
-	_fill_style.bg_color = Color(LASER_COLOR, 0.28 if _fill_hovered else 0.12) if active else Color(PLACARD_COLOR, 0.4)
-	_fill_label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
+	_style_fuel_button(_fill_style, _fill_label, active, _fill_hovered)
+	if not _filling:
+		_shown_antimatter = GameSession.antimatter
+	var missing_antimatter := GameSession.ANTIMATTER_TANK - GameSession.antimatter
+	# An order always fills the tank.
+	var fill_price := GameSession.trader.antimatter_price(missing_antimatter)
+	antimatter_text = "%d/%d" % [_shown_antimatter, GameSession.ANTIMATTER_TANK]
+	_antimatter.text = antimatter_text
+	_antimatter_gauge.set_state(GameSession.ANTIMATTER_TANK, _shown_antimatter, 0, 0)
+	var pending := GameSession.order_units > 0
+	var arrived := GameSession.order_arrived()
+	if _filling:
+		order_text = "FILLING"
+		_fuel_note.text = "Filling the antimatter tank: %d of %d." % [_shown_antimatter, GameSession.ANTIMATTER_TANK]
+	elif arrived:
+		order_text = "COLLECT  ·  %d" % GameSession.order_units
+		_fuel_note.text = "%d antimatter has arrived at the hub. Collect it to fill the tank." % GameSession.order_units
+	elif pending:
+		order_text = "ARRIVES DAY %d" % GameSession.order_day
+		_fuel_note.text = "%d antimatter on order, arriving here on day %d. Board ships while you wait." % [
+			GameSession.order_units, GameSession.order_day]
+	elif missing_antimatter <= 0:
+		order_text = "FULL"
+		_fuel_note.text = "The antimatter tank is full: a jump of up to %d light years." % GameSession.ANTIMATTER_TANK
+	else:
+		order_text = "ORDER  %s" % Bitcoin.format(fill_price)
+		_fuel_note.text = "An order fills the tank %d %s later. A jump burns a unit a light year." % [
+			Trader.DELIVERY_DAYS, "day" if Trader.DELIVERY_DAYS == 1 else "days"]
+	_order_label.text = order_text
+	var orderable := not pending and missing_antimatter > 0 and fill_price <= GameSession.bitcoin
+	_style_fuel_button(_order_style, _order_label, (arrived and not _filling) or orderable, _order_hovered)
 
 
-## A button's frame: SELL and FILL UP.
+func _show_antimatter_fill(value: float) -> void:
+	var blocks := floori(value + 0.0001)
+	if blocks == _shown_antimatter:
+		return
+	_shown_antimatter = blocks
+	_update_fuel(GameSession.hydrogen)
+	antimatter_shown.emit(_shown_antimatter)
+
+
+func _finish_filling(units: int) -> void:
+	_filling = false
+	_update_fuel(GameSession.hydrogen)
+	var full := GameSession.antimatter >= GameSession.ANTIMATTER_TANK
+	_set_status("Collected %d antimatter%s." % [units, ": the tank is full" if full else ""], DIM_TEXT_COLOR)
+	Log.info("💰 Antimatter tank filled on the gauge: units=%d, antimatter=%d" % [units, GameSession.antimatter])
+
+
+## Stops collected antimatter filling the gauge, which then shows the tank as it is.
+func _stop_filling() -> void:
+	if _fill_tween:
+		_fill_tween.kill()
+	var was_filling := _filling
+	_filling = false
+	_shown_antimatter = GameSession.antimatter
+	if was_filling:
+		antimatter_shown.emit(_shown_antimatter)
+
+
+## A tank's row: its name and readout over its gauge, with its button beside them.
+func _fuel_row(title: String, readout: Label, gauge: FuelGauge, button: PanelContainer) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var tank := VBoxContainer.new()
+	tank.add_theme_constant_override("separation", 4)
+	tank.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var header := HBoxContainer.new()
+	var name_label := _label(title, 10, DIM_TEXT_COLOR, true)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(name_label)
+	header.add_child(readout)
+	tank.add_child(header)
+	tank.add_child(gauge)
+	row.add_child(tank)
+	button.size_flags_vertical = Control.SIZE_SHRINK_END
+	button.custom_minimum_size = Vector2(150.0, 0.0)
+	row.add_child(button)
+	return row
+
+
+func _style_fuel_button(style: StyleBoxFlat, label: Label, active: bool, hovered: bool) -> void:
+	style.border_color = LASER_COLOR if active else Color(INK_COLOR, 0.25)
+	style.bg_color = Color(LASER_COLOR, 0.28 if hovered else 0.12) if active else Color(PLACARD_COLOR, 0.4)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
+
+
+## A button's frame: SELL, FILL UP and ORDER.
 func _button_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.set_border_width_all(1)

@@ -1,14 +1,18 @@
 extends Node
 ## The game session: what lasts while the game runs as the player goes between the ship and the wreck (nothing is
-## saved yet, so quitting starts a new game). It keeps the ship's stash, the bitcoin wallet, the hydrogen tank, the
-## day, the star system the ship is in (a StarSystem, with the wrecks still there to board) and its trader hub and sell
-## crate, where the ship is in the system (at the hub, docked with a wreck, or where a wreck it boarded was), the clone
-## number and the runs boarded. It hands what the player carries (the kit: their inventory, whose gun keeps its loaded
-## clip's heat) from one scene's player to the next, and the docked wreck's roll to the wreck boarded; records how each
-## run ended (RunSummary); and changes the scene between the ship and the wreck, playing the travel sounds itself so
-## they carry on through the change. Only the first clone of a new game gets the basic kit: a death hands no kit over,
-## and the next clone wakes empty-handed and arms from the stash. Flying within the system, refuelling, selling and
-## buying go through here, since the tank, the stash and the wallet live here; the last three only at the hub.
+## saved yet, so quitting starts a new game). It keeps the ship's stash, the bitcoin wallet, the hydrogen and
+## antimatter tanks with the antimatter on order, the day and the jump drive's recharge, the star system the ship is in
+## (a StarSystem, with the wrecks still there to board) and its trader hub and sell crate, every system revealed so far
+## (on arrival or by intel, each keeping what is left in it) with the visited ones' hubs, the route through them, where
+## the ship is in the system (at the hub, docked with a wreck, or where a wreck it boarded was), the clone number and
+## the runs boarded. It hands what the player carries (the kit: their inventory, whose gun keeps its loaded clip's heat)
+## from one scene's player to the next, and the docked wreck's roll to the wreck boarded; records how each run ended
+## (RunSummary); and changes the scene between the ship and the wreck, playing the travel sounds itself so they carry
+## on through the change. Only the first clone of a new game gets the basic kit: a death hands no kit over, and the
+## next clone wakes empty-handed and arms from the stash. Flying within the system, jumping to another, refuelling,
+## ordering antimatter, buying intel, selling and buying go through here, since the tanks, the stash and the wallet
+## live here; all but flying only at the hub. A system never strands the player: while the ship can't jump on yet,
+## easy wrecks turn up when too few are left to wait for it, or to earn the antimatter he can't afford.
 ## Autoloaded as GameSession, after ItemIcons. It has no class_name, which would clash with the autoload's name.
 
 ## Emitted whenever the game travels to another scene, with its path, also while travel_enabled is off.
@@ -17,11 +21,20 @@ signal travelled(scene_path: String)
 signal bitcoin_changed(bitcoin: int)
 ## Emitted whenever the hydrogen in the tank changes, with the new amount.
 signal hydrogen_changed(hydrogen: int)
-## Emitted whenever the ship flies somewhere in the system (and so docks with a wreck, or reaches the hub).
+## Emitted whenever the antimatter in the tank or on order changes, with the amount in the tank.
+signal antimatter_changed(antimatter: int)
+## Emitted whenever a day passes, with the new day.
+signal day_changed(day: int)
+## Emitted whenever the ship flies somewhere in the system (and so docks with a wreck, or reaches the hub), and when
+## it jumps to another system.
 signal ship_moved
 
 ## How the player arrives on the ship: waking as a new clone in the clone pod, or back through the airlock.
 enum Arrival { NEW_CLONE, EXTRACTED }
+## Whether a jump to a system can go ahead (OK), or why not.
+enum Jump { OK, HERE, OUT_OF_RANGE, AWAY_FROM_HUB, RECHARGING, ORDER_PENDING, SHORT_OF_ANTIMATTER }
+## Whether intel on a system can be bought (OK), or why not.
+enum Intel { OK, KNOWN, OUT_OF_RANGE, AWAY_FROM_HUB, SHORT_OF_BITCOIN }
 
 const SHIP_SCENE := "res://scenes/ship/ship.tscn"
 const STASH_SIZE := Vector2i(10, 8)
@@ -29,8 +42,20 @@ const STASH_SIZE := Vector2i(10, 8)
 const CRATE_SIZE := Vector2i(6, 4)
 ## The little bitcoin a new game starts with: not enough for antimatter, so the first system already needs runs.
 const STARTING_BITCOIN := 500
+## The antimatter a new game starts with: too little for any jump (the shortest burns 5), so the first order is
+## cheaper. A tuning lever.
+const STARTING_ANTIMATTER := 2
 ## How much hydrogen the ship's tank holds; a new game starts with it full.
 const HYDROGEN_TANK := 24
+## How much antimatter the ship's tank holds: a jump of up to 10 light years.
+const ANTIMATTER_TANK := 10
+## Days the jump drive recharges after a jump, so the player boards a ship in every system before jumping on.
+const RECHARGE_DAYS := 1
+## When the player can't afford the antimatter to move on and fewer than STRANDED_SHIPS wrecks are left, easy ones
+## turn up until the system holds STRANDED_TOP_UP of them; easy ones are rolled at EASY_LEVEL.
+const STRANDED_SHIPS := 3
+const STRANDED_TOP_UP := Vector2i(3, 4)
+const EASY_LEVEL := 1
 
 ## The ship's stash: safe whatever happens on a run.
 var stash: ItemGrid
@@ -38,10 +63,22 @@ var stash: ItemGrid
 var bitcoin := STARTING_BITCOIN
 ## Hydrogen in the tank, which flights within the system burn. Bought at the hub.
 var hydrogen := HYDROGEN_TANK
-## Days gone since the game started (day 0). Only boarding passes a day (and jumping, in 012).
+## Antimatter in the tank, which jumps burn. Ordered at the hub, it arrives there days later.
+var antimatter := 0
+## Antimatter on order and the day it arrives at the hub, where the player collects it; no order while order_units is 0.
+var order_units := 0
+var order_day := 0
+## Days gone since the game started (day 0). Only boarding and jumping pass a day.
 var day := 0
+## The day the jump drive is charged again after a jump.
+var drive_ready_day := 0
 ## The star system the ship is in, with the wrecks still there to board; null only when no system is registered.
 var system: StarSystem
+## Every system revealed so far, on arrival or by intel, by its definition's ID: what is left in it stays as it is
+## while the ship is elsewhere.
+var revealed: Dictionary[String, StarSystem] = {}
+## The systems the ship has arrived in, in order from the start system (one again for every return).
+var route: Array[StarSystemDefinition] = []
 ## Where the ship is on the system map, in map units from the star.
 var ship_position := Vector2.ZERO
 ## Whether the ship is at the system's trader hub, the only place to trade and refuel.
@@ -74,6 +111,8 @@ var travel_enabled := true
 var _carried: Inventory
 ## The roll of the wreck being boarded, until that wreck takes it.
 var _boarding: WreckRoll
+## Each visited system's hub, by its definition's ID, so its prices stay the same when the ship comes back.
+var _hubs: Dictionary[String, Trader] = {}
 var _value_in := 0
 var _sound: AudioStreamPlayer
 
@@ -85,14 +124,23 @@ func _ready() -> void:
 	new_game()
 
 
-## Starts over on day 0: an empty stash, a little bitcoin, a full tank, the ship at the hub of a random star system
-## (012 picks one on the outer ring), and the first clone waking up in the clone pod with the basic kit.
+## Starts over on day 0: an empty stash, a little bitcoin, a full hydrogen tank and a little antimatter, the ship
+## at the hub of a random star system on the galaxy's outer ring with nothing else revealed, and the first clone waking
+## up in the clone pod with the basic kit.
 func new_game() -> void:
 	stash = ItemGrid.new(STASH_SIZE)
 	crate = ItemGrid.new(CRATE_SIZE)
 	bitcoin = STARTING_BITCOIN
 	hydrogen = HYDROGEN_TANK
+	antimatter = STARTING_ANTIMATTER
+	order_units = 0
+	order_day = 0
 	day = 0
+	drive_ready_day = 0
+	system = null
+	revealed.clear()
+	route.clear()
+	_hubs.clear()
 	clone_number = 1
 	runs = 0
 	arrival = Arrival.NEW_CLONE
@@ -109,23 +157,62 @@ func new_game() -> void:
 		_dock_at_hub(Vector2.ZERO)
 		Log.error("🧬 New game with no star systems registered: no wrecks to board, hub=%s" % trader.title)
 		return
-	arrive_in(systems[randi_range(0, systems.size() - 1)])
-	Log.info("🧬 New game: stash=%s, bitcoin=%d, hydrogen=%d, day=%d, clone=%d, system=%s" % [
-		STASH_SIZE, bitcoin, hydrogen, day, clone_number, system.definition.id])
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	arrive_in(Galaxy.pick_start(systems, rng))
+	Log.info("🧬 New game: stash=%s, bitcoin=%d, hydrogen=%d, antimatter=%d, day=%d, clone=%d, system=%s, from_middle=%.1f ly" % [
+		STASH_SIZE, bitcoin, hydrogen, antimatter, day, clone_number, system.definition.id,
+		system.definition.map_position.length()])
 
 
-## The ship arrives in a star system, at its hub: the system is revealed, with its wrecks rolled now, and the hub's
-## prices with it.
+## The ship arrives in a star system, at its hub: the system is revealed if it wasn't yet, with its wrecks rolled now,
+## and otherwise holds what was left in it; its hub keeps its prices from an earlier visit. Then, if the ship can't jump
+## on yet and too few wrecks are left, easy ones turn up (see _keep_from_stranding()).
 func arrive_in(definition: StarSystemDefinition) -> void:
-	system = StarSystem.reveal(definition, ContentRegistry.get_all(WreckDefinition), RandomNumberGenerator.new())
-	trader = Trader.new(randi(), definition.hub_name())
+	var returning := known_system(definition) != null
+	system = reveal(definition)
+	if not _hubs.has(definition.id):
+		_hubs[definition.id] = Trader.new(randi(), definition.hub_name())
+	trader = _hubs[definition.id]
+	route.append(definition)
 	_dock_at_hub(system.hub_position)
-	if system.wrecks.is_empty():
-		Log.error("🧬 Arrived in a system with no wrecks, are no wreck layouts registered? system=%s" % definition.id)
+	var turned_up := _keep_from_stranding("arrival")
+	if system.wrecks.is_empty() and ContentRegistry.get_all(WreckDefinition).is_empty():
+		Log.error("🧬 Arrived in a system with no wrecks, no wreck layouts are registered: system=%s" % definition.id)
 		return
-	Log.info("🧬 Arrived in a star system: system=%s, map_id=%s, places=%d, wrecks=%d, hub=%s, layouts=%s" % [
-		definition.id, definition.map_id, definition.places.size(), system.wrecks.size(), trader.title,
-		system.wrecks.map(func(wreck: SystemWreck) -> String: return wreck.roll.definition.id)])
+	Log.info("🧬 Arrived in a star system: system=%s, map_id=%s, returning=%s, places=%d, wrecks=%d, turned_up=%d, hub=%s, route=%d, layouts=%s" % [
+		definition.id, definition.map_id, returning, definition.places.size(), system.wrecks.size(), turned_up,
+		trader.title, route.size(), system.wrecks.map(func(wreck: SystemWreck) -> String:
+			return wreck.roll.definition.id)])
+
+
+## A system revealed: the one already known (with what is left in it), or else rolled now, wrecks and all, and kept
+## from then on.
+func reveal(definition: StarSystemDefinition) -> StarSystem:
+	var known := known_system(definition)
+	if known:
+		Log.info("🧬 Star system already known: system=%s, wrecks=%d" % [definition.id, known.wrecks.size()])
+		return known
+	var rolled := StarSystem.reveal(definition, ContentRegistry.get_all(WreckDefinition), RandomNumberGenerator.new())
+	revealed[definition.id] = rolled
+	Log.info("🧬 Star system revealed: system=%s, wrecks=%d, revealed=%d" % [
+		definition.id, rolled.wrecks.size(), revealed.size()])
+	return rolled
+
+
+## What is known of a system: the one the ship is in, or one revealed before (visited, or by intel); null while it is
+## unknown.
+func known_system(definition: StarSystemDefinition) -> StarSystem:
+	if definition == null:
+		return null
+	if system and system.definition == definition:
+		return system
+	return revealed.get(definition.id)
+
+
+## Whether the ship has been in a system this game.
+func has_visited(definition: StarSystemDefinition) -> bool:
+	return route.has(definition) or (system != null and system.definition == definition)
 
 
 ## The kit handed over from the last scene's player, for this scene's player to carry on with, once; null when there
@@ -156,6 +243,17 @@ func hydrogen_needed(to: Vector2) -> int:
 	return flight_cost(to) + back
 
 
+## Whether the tank can fly the ship to any wreck in the system and from there back to the hub. When it can't, and
+## nothing is docked, the only flight left is back to the hub, to buy more hydrogen.
+func can_reach_a_wreck() -> bool:
+	if system == null:
+		return false
+	for wreck in system.wrecks:
+		if hydrogen_needed(wreck.position) <= hydrogen:
+			return true
+	return false
+
+
 ## Flies the ship to a wreck in the system and docks with it, burning hydrogen. Refused (false) when the wreck isn't
 ## in the system any more or the tank couldn't get the ship there and back to the hub.
 func fly_to_wreck(wreck: SystemWreck) -> bool:
@@ -179,8 +277,9 @@ func fly_to_wreck(wreck: SystemWreck) -> bool:
 	return true
 
 
-## Flies the ship back to the system's hub, burning hydrogen. Refused (false) when the tank is short, which the rule
-## for flying out (hydrogen_needed()) never lets happen.
+## Flies the ship back to the system's hub, burning hydrogen; antimatter on order that has arrived waits there to be
+## collected at the trader terminal. Refused (false) when the tank is short, which the rule for flying out
+## (hydrogen_needed()) never lets happen.
 func fly_to_hub() -> bool:
 	if system == null:
 		Log.warning("🧬 Can't fly to the hub, there is no system")
@@ -193,7 +292,8 @@ func fly_to_hub() -> bool:
 	_set_hydrogen(hydrogen - cost)
 	_dock_at_hub(system.hub_position)
 	ship_moved.emit()
-	Log.info("🧬 Flew back to the hub: hub=%s, burned=%d, hydrogen=%d" % [trader.title, cost, hydrogen])
+	Log.info("🧬 Flew back to the hub: hub=%s, burned=%d, hydrogen=%d, antimatter_to_collect=%d" % [
+		trader.title, cost, hydrogen, order_units if order_arrived() else 0])
 	return true
 
 
@@ -212,6 +312,165 @@ func refuel() -> int:
 	_set_hydrogen(hydrogen + units)
 	Log.info("🧬 Refuelled: units=%d, price=%d, hydrogen=%d, bitcoin=%d" % [units, price, hydrogen, bitcoin])
 	return units
+
+
+## The systems a jump from this one can reach, nearest first.
+func jump_targets() -> Array[StarSystemDefinition]:
+	if system == null:
+		return []
+	return Galaxy.in_range(system.definition, ContentRegistry.get_all(StarSystemDefinition))
+
+
+## Antimatter a jump from this system to another burns.
+func jump_cost(to: StarSystemDefinition) -> int:
+	return Galaxy.antimatter_between(system.definition, to) if system and to else 0
+
+
+## Whether the jump drive has recharged since the last jump.
+func drive_charged() -> bool:
+	return day >= drive_ready_day
+
+
+## Whether a jump to a system can go ahead now (Jump.OK), or why not: it is this one, it is out of range, the ship is
+## away from the hub, the drive is still recharging, antimatter is on order or waiting to be collected (a jump would
+## leave it behind), or the tank can't fly it.
+func check_jump(to: StarSystemDefinition) -> Jump:
+	if system == null or to == null:
+		return Jump.OUT_OF_RANGE
+	if to == system.definition:
+		return Jump.HERE
+	if Galaxy.distance(system.definition, to) > Galaxy.JUMP_RANGE:
+		return Jump.OUT_OF_RANGE
+	if not at_hub:
+		return Jump.AWAY_FROM_HUB
+	if not drive_charged():
+		return Jump.RECHARGING
+	if order_units > 0:
+		return Jump.ORDER_PENDING
+	if jump_cost(to) > antimatter:
+		return Jump.SHORT_OF_ANTIMATTER
+	return Jump.OK
+
+
+## Jumps the ship from the hub to another system's hub, burning antimatter by distance. It takes a day, and the drive
+## then recharges for RECHARGE_DAYS. The system left keeps what is left in it. Refused (false) unless check_jump()
+## says OK.
+func jump_to(to: StarSystemDefinition) -> bool:
+	var check := check_jump(to)
+	if check != Jump.OK:
+		Log.info("🧬 Jump refused: to=%s, why=%s, antimatter=%d, cost=%d, at_hub=%s, day=%d, drive_ready_day=%d, order=%d" % [
+			to.id if to else "none", Jump.keys()[check], antimatter, jump_cost(to), at_hub, day, drive_ready_day,
+			order_units])
+		return false
+	var from := system
+	var cost := jump_cost(to)
+	revealed[from.definition.id] = from
+	_set_antimatter(antimatter - cost)
+	_set_day(day + 1)
+	drive_ready_day = day + RECHARGE_DAYS
+	Log.info("🧬 Jumping: from=%s, to=%s, distance=%.1f ly, burned=%d, antimatter=%d, day=%d, wrecks_left_behind=%d" % [
+		from.definition.id, to.id, Galaxy.distance(from.definition, to), cost, antimatter, day, from.wrecks.size()])
+	arrive_in(to)
+	ship_moved.emit()
+	Log.info("🧬 Jumped: system=%s, wrecks=%d, drive_ready_day=%d, route=%d" % [
+		to.id, system.wrecks.size(), drive_ready_day, route.size()])
+	return true
+
+
+## Orders the antimatter that fills the tank at the hub, paid at once: an order always fills every empty unit, or is
+## refused. It arrives at the hub Trader.DELIVERY_DAYS later. Returns the units ordered: none away from the hub, with
+## an order already on its way, a full tank or a wallet that can't pay for filling it.
+func order_antimatter() -> int:
+	var missing := ANTIMATTER_TANK - antimatter
+	if not at_hub:
+		Log.warning("🧬 Can't order antimatter away from the hub: antimatter=%d, position=%s" % [antimatter, ship_position])
+		return 0
+	if order_units > 0:
+		Log.info("🧬 Antimatter already on order: units=%d, arrives_day=%d, day=%d" % [order_units, order_day, day])
+		return 0
+	if missing <= 0:
+		Log.info("🧬 No antimatter ordered, the tank is full: antimatter=%d" % antimatter)
+		return 0
+	var price := trader.antimatter_price(missing)
+	if price > bitcoin:
+		Log.info("🧬 No antimatter ordered, not enough bitcoin to fill the tank: missing=%d, price=%d, bitcoin=%d" % [
+			missing, price, bitcoin])
+		return 0
+	_set_bitcoin(bitcoin - price)
+	order_units = missing
+	order_day = day + Trader.DELIVERY_DAYS
+	antimatter_changed.emit(antimatter)
+	Log.info("🧬 Antimatter ordered to fill the tank: units=%d, price=%d, bitcoin=%d, day=%d, arrives_day=%d, hub=%s" % [
+		order_units, price, bitcoin, day, order_day, trader.title])
+	_keep_from_stranding("order")
+	return order_units
+
+
+## Whether antimatter is on order and has arrived at the hub, waiting there to be collected.
+func order_arrived() -> bool:
+	return order_units > 0 and day >= order_day
+
+
+## Collects the antimatter on order into the tank (from the trader terminal), once it has arrived and the ship is at
+## the hub. Returns the units loaded: none before then.
+func collect_antimatter() -> int:
+	if not at_hub or not order_arrived():
+		Log.info("🧬 No antimatter to collect: at_hub=%s, order=%d, arrives_day=%d, day=%d" % [
+			at_hub, order_units, order_day, day])
+		return 0
+	var units := mini(order_units, ANTIMATTER_TANK - antimatter)
+	order_units = 0
+	_set_antimatter(antimatter + units)
+	Log.info("🧬 Antimatter collected at the hub: units=%d, antimatter=%d, day=%d, hub=%s" % [
+		units, antimatter, day, trader.title])
+	return units
+
+
+## Days the player still has to board ships before the ship can jump on: for the antimatter on order to arrive, and
+## for the drive to recharge.
+func wait_days() -> int:
+	var delivery := order_day - day if order_units > 0 else 0
+	return maxi(maxi(delivery, drive_ready_day - day), 0)
+
+
+## Whether intel on a system can be bought now (Intel.OK), or why not: it is known already (the system the ship is in,
+## one visited, or one with intel), it is out of jump range, the ship is away from the hub, or the wallet is short.
+func check_intel(to: StarSystemDefinition) -> Intel:
+	if to == null or known_system(to) != null:
+		return Intel.KNOWN
+	if system == null or Galaxy.distance(system.definition, to) > Galaxy.JUMP_RANGE:
+		return Intel.OUT_OF_RANGE
+	if not at_hub:
+		return Intel.AWAY_FROM_HUB
+	if trader.intel_price() > bitcoin:
+		return Intel.SHORT_OF_BITCOIN
+	return Intel.OK
+
+
+## Buys intel on a system in jump range at the hub: the system is revealed now, its wrecks rolled and kept as they are
+## until the ship arrives. Returns the revealed system, or null unless check_intel() says OK.
+func buy_intel(to: StarSystemDefinition) -> StarSystem:
+	var check := check_intel(to)
+	if check != Intel.OK:
+		Log.info("🧬 Intel not bought: system=%s, why=%s, bitcoin=%d, at_hub=%s" % [
+			to.id if to else "none", Intel.keys()[check], bitcoin, at_hub])
+		return null
+	var price := trader.intel_price()
+	_set_bitcoin(bitcoin - price)
+	var known := reveal(to)
+	Log.info("🧬 Intel bought: system=%s, price=%d, bitcoin=%d, wrecks=%d, hub=%s" % [
+		to.id, price, bitcoin, known.wrecks.size(), trader.title])
+	return known
+
+
+## What everything the player owns on the ship would sell for at the hub: the stash, and the kit carried home from a
+## run.
+func ship_worth() -> int:
+	var items: Array[Item] = stash.items.duplicate()
+	if _carried:
+		for grid in _carried.grids():
+			items.append_array(grid.items)
+	return trader.offer(items)
 
 
 ## The docked wreck's roll, handed to the wreck being boarded, once; null when there is none for this layout (a
@@ -237,7 +496,7 @@ func board(carried: Inventory) -> void:
 		Log.error("🧬 Can't board, no wreck docked: run=%d, clone=%d" % [runs, clone_number])
 		return
 	runs += 1
-	day += 1
+	_set_day(day + 1)
 	_value_in = carried.value()
 	_carried = carried
 	_boarding = docked
@@ -277,10 +536,13 @@ func die(carried: Inventory) -> RunSummary:
 	return last_run
 
 
-## After the run summary: back to the ship, where the player arrives as arrival says.
+## After the run summary: back to the ship, where the player arrives as arrival says. If the ship can't jump on yet
+## and too few wrecks are left, easy ones turn up first (see _keep_from_stranding()).
 func continue_to_ship() -> void:
-	Log.info("🧬 Continuing to the ship: arrival=%s, clone=%d, kit=%s" % [
-		Arrival.keys()[arrival], clone_number, "carried" if _carried else "basic" if basic_kit_next else "none"])
+	var turned_up := _keep_from_stranding("run")
+	Log.info("🧬 Continuing to the ship: arrival=%s, clone=%d, kit=%s, wrecks_turned_up=%d" % [
+		Arrival.keys()[arrival], clone_number, "carried" if _carried else "basic" if basic_kit_next else "none",
+		turned_up])
 	_travel(SHIP_SCENE)
 
 
@@ -361,6 +623,57 @@ func _set_bitcoin(amount: int) -> void:
 func _set_hydrogen(amount: int) -> void:
 	hydrogen = amount
 	hydrogen_changed.emit(hydrogen)
+
+
+func _set_antimatter(amount: int) -> void:
+	antimatter = amount
+	antimatter_changed.emit(antimatter)
+
+
+func _set_day(value: int) -> void:
+	day = value
+	day_changed.emit(day)
+
+
+## A system never strands the player. While the ship can't jump on yet (the drive is recharging, or the tank and the
+## antimatter on order are short of the shortest jump out), easy wrecks turn up: when fewer are left than days still to
+## wait, enough to wait it out; and when the tank holds too little and the player can't afford to fill it (the wallet
+## plus what the ship holds would sell for) and fewer than STRANDED_SHIPS are left, until the system holds
+## STRANDED_TOP_UP. A player who can afford it but hasn't ordered it gets none. Returns how many turned up.
+func _keep_from_stranding(why: String) -> int:
+	if system == null:
+		Log.warning("🧬 No system to keep the player from being stranded in: why=%s" % why)
+		return 0
+	var targets := jump_targets()
+	if targets.is_empty():
+		Log.warning("🧬 No system in jump range, nowhere to move on to: why=%s, system=%s" % [why, system.definition.id])
+		return 0
+	var shortest := jump_cost(targets[0])
+	var coming := antimatter + order_units
+	var wait := wait_days()
+	var left := system.wrecks.size()
+	if wait == 0 and coming >= shortest:
+		Log.info("🧬 The ship can jump on, no wrecks need to turn up: why=%s, antimatter=%d, shortest_jump=%d, wrecks=%d" % [
+			why, coming, shortest, left])
+		return 0
+	var wanted := wait
+	# An order always fills the tank, so that is what moving on costs while the tank holds too little.
+	var missing := ANTIMATTER_TANK - coming if coming < shortest else 0
+	var worth := bitcoin + ship_worth()
+	var short := missing > 0 and trader.antimatter_price(missing) > worth
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	if short and left < STRANDED_SHIPS:
+		wanted = maxi(wanted, rng.randi_range(STRANDED_TOP_UP.x, STRANDED_TOP_UP.y))
+	if wanted <= left:
+		Log.info("🧬 Enough wrecks left to wait or earn the antimatter: why=%s, wrecks=%d, wait=%d, missing=%d, worth=%d, short=%s" % [
+			why, left, wait, missing, worth, short])
+		return 0
+	system.add_wrecks(ContentRegistry.get_all(WreckDefinition), wanted - left, rng, EASY_LEVEL)
+	var added := system.wrecks.size() - left
+	Log.info("🧬 Easy wrecks turned up so the player isn't stranded: why=%s, system=%s, added=%d, wrecks=%d, wait=%d, missing=%d, worth=%d, short=%s" % [
+		why, system.definition.id, added, system.wrecks.size(), wait, missing, worth, short])
+	return added
 
 
 ## Puts the ship at the hub, with nothing docked.

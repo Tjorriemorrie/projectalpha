@@ -1,36 +1,52 @@
 class_name SystemMapScreen
-extends MenuScreen
-## The system map, part of the HUD (see MenuScreen), opened from the cockpit console: the star system the ship is in
-## as an orbital diagram (SystemMapView) on the left, and on the right the system, the hydrogen in the tank, what the
+extends MapScreen
+## The system map, the first of the cockpit console's map tabs (see MapScreen): the star system the ship is in as an
+## orbital diagram (SystemMapView) on the left, and on the right the system, the hydrogen in the tank, what the
 ## pointer is on or was clicked last, a FLY button and a status line. A wreck shows what makes it dangerous, never a
 ## difficulty level: its type, where it lies, how many robots its scan expects and the gear it requires. Pointing at a
 ## wreck or the hub plots the course there and back to the hub, on the map and on the hydrogen gauge; clicking selects
 ## it, and FLY flies the ship there (docking with a wreck), unless the tank couldn't get it there and back to the hub.
-## Flying takes no time. The flights go through the GameSession, which keeps the system, the ship and the tank. The
-## player opens and closes it.
+## Flying takes no time in the game, but on the map the ship's marker flies the course for FLY_TIME_PER_UNIT a unit
+## of hydrogen, and the gauge (and the ship's bar) burns a unit at each share of the way: a 3-unit flight burns one
+## every third of it, while the thrusters roar for exactly as long. Away from the hub with too little hydrogen to reach any wreck and get back, the status line
+## says to fly back to the hub to buy more, the only flight left. The flights go through the GameSession, which keeps
+## the system, the ship and the tank. From the star map it can also show another known system (visited, or one with
+## intel), read-only: its places, its hub and its wrecks with their details, but no ship, course or FLY. The player
+## opens and closes it.
 
-## The map's side as a fraction of the screen height, and its limits in pixels.
-const MAP_FRACTION := 0.72
-const MIN_MAP := 320.0
-const MAX_MAP := 760.0
-## The width of the right column's placards, so it doesn't change with what they say.
-const PANEL_WIDTH := 300.0
+## The gauge shows a new amount while a flight burns its hydrogen, so the ship's bar can follow it.
+signal hydrogen_shown(hydrogen: int)
+
 const NONE := SystemMapView.NONE
 const HUB := SystemMapView.HUB
+## Seconds the ship's marker takes to fly a course on the map, per unit of hydrogen it burns, and at least.
+const FLY_TIME_PER_UNIT := 0.5
+const MIN_FLY_TIME := 1.0
+## Seconds the thrusters' roar takes to swell in under the ignition and to die away on arrival, and how quiet it is
+## before and after, in dB.
+const ENGINE_FADE_IN := 0.4
+const ENGINE_FADE_OUT := 0.15
+const ENGINE_QUIET_DB := -40.0
 
-@export var fly_sound: AudioStream = preload("res://assets/audio/ship/thruster_burn.wav")
+## The thrusters, lasting as long as the flight on the map: the ignition, the roar looping until the ship arrives, and
+## the stop as it does.
+@export var ignite_sound: AudioStream = preload("res://assets/audio/ship/thruster_ignite.wav")
+@export var engine_sound: AudioStream = preload("res://assets/audio/ship/thruster_loop.wav")
+@export var stop_sound: AudioStream = preload("res://assets/audio/ship/thruster_stop.wav")
 
-## What the readouts say, for tests: e.g. "18/24", "HAULER", "FLY  ·  4" and "Docked with the hauler at the Long
-## Fall." The details are the label and value of each row, e.g. "WHERE at the Long Fall · ROBOTS about 4 active".
+## What the readouts say, for tests: e.g. "18/24", "HAULER", "FLY  ·  4" and "MORI". The details are the label and
+## value of each row, e.g. "WHERE at the Long Fall · ROBOTS about 4 active".
 var hydrogen_text := ""
 var target_text := ""
 var details_text := ""
 var fly_text := ""
-var status_text := ""
+var system_text := ""
 ## The target clicked last (a wreck's index in the system's list, HUB or NONE), and the one whose details show.
 var selected := NONE
 var shown := NONE
 
+## Another known system shown read-only, or null while it shows the one the ship is in.
+var _viewing: StarSystem
 var _map: SystemMapView
 var _map_detail: Label
 var _system_name: Label
@@ -43,16 +59,32 @@ var _target_title: Label
 var _target_where: Label
 var _details: GridContainer
 var _fly_button: PanelContainer
-var _fly_style: StyleBoxFlat
-var _fly_label: Label
 var _fly_hovered := false
-var _status: Label
+## While a flight flies on the map: the hydrogen the tank held before it, what it burns, what the gauge shows (-1 when
+## no flight is under way), and what the status line says on arrival.
+var _burn_from := 0
+var _burn := 0
+var _shown_hydrogen := -1
+var _arrival_text := ""
+## The thrusters' looping roar, and their ignition and stop, apart from the screen's other sounds.
+var _engine: AudioStreamPlayer
+var _engine_shot: AudioStreamPlayer
+var _engine_fade: Tween
+var _engine_running := false
 
 
 func _build() -> void:
 	_centre_gap = 0.02
 	_map = SystemMapView.new()
+	_map.flight_progressed.connect(_on_flight_progressed)
+	_engine = AudioStreamPlayer.new()
+	_engine.name = "Engine"
+	add_child(_engine)
+	_engine_shot = AudioStreamPlayer.new()
+	_engine_shot.name = "EngineShot"
+	add_child(_engine_shot)
 	_map_detail = _label("", 12, DIM_TEXT_COLOR, true)
+	_left_column.add_child(_build_tabs())
 	_left_column.add_child(_placard("SYSTEM MAP", _map_detail, _map))
 	var system_body := VBoxContainer.new()
 	system_body.add_theme_constant_override("separation", 2)
@@ -82,59 +114,82 @@ func _build() -> void:
 	_details.add_theme_constant_override("h_separation", 14)
 	_details.add_theme_constant_override("v_separation", 6)
 	target_body.add_child(_details)
-	_fly_button = PanelContainer.new()
-	_fly_style = StyleBoxFlat.new()
-	_fly_style.set_border_width_all(1)
-	_fly_style.set_corner_radius_all(2)
-	_fly_style.content_margin_top = 6.0
-	_fly_style.content_margin_bottom = 6.0
-	_fly_button.add_theme_stylebox_override("panel", _fly_style)
-	_fly_label = _label("", 13, INK_COLOR, true)
-	_fly_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_fly_button.add_child(_fly_label)
+	_fly_button = _new_button()
 	target_body.add_child(_fly_button)
 	_target_title = _label("", 11, DIM_TEXT_COLOR, true)
 	_right_column.add_child(_sized(_placard("", _label("", 12, DIM_TEXT_COLOR, true), target_body, _target_title)))
-	_status = _label("", 13, DIM_TEXT_COLOR, false)
-	# It wraps within the column and keeps room for three lines, so a long message never moves the placards.
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.custom_minimum_size = Vector2(PANEL_WIDTH, 54.0)
-	_right_column.add_child(_status)
+	_build_status()
 
 
 func _hints() -> Array:
-	return [[&"inventory_drag", "Select"], [&"", "Click FLY to fly there"], [&"inventory", "Close"]]
+	return [[&"inventory_drag", "Select"], [&"", "Click FLY to fly there"], [&"map_tab", "Star map"],
+		[&"inventory", "Close"]]
 
 
-## Opens the map on the GameSession's system, ship and tank, with nothing selected.
-func open() -> void:
-	var system := GameSession.system
-	var side := clampf(roundf(get_viewport_rect().size.y * MAP_FRACTION), MIN_MAP, MAX_MAP)
-	_map.setup(system, side, _font, _label_font)
+func _tab() -> Tab:
+	return Tab.SYSTEM
+
+
+## Opens the map on the GameSession's system, ship and tank, with nothing selected; or, given another known system
+## (from the star map), on that one, read-only. switching opens it in place of the star map, quietly.
+func open(viewing: StarSystem = null, switching: bool = false) -> void:
+	_viewing = viewing if viewing and viewing != GameSession.system else null
+	var system := _system()
+	_map.setup(system, _map_side(), _font, _label_font, _viewing == null)
+	_shown_hydrogen = -1
+	_stop_engine(false)
 	selected = NONE
 	shown = NONE
+	system_text = system.definition.display_name.to_upper() if system else ""
 	_system_name.text = system.definition.display_name if system else "No system"
 	_system_kind.text = system.definition.describe() if system else ""
 	_day.text = "DAY %d" % GameSession.day
+	if _viewing:
+		_day.text = "LAST SEEN" if GameSession.has_visited(_viewing.definition) else "INTEL"
+	_fly_button.visible = _viewing == null
 	if not GameSession.hydrogen_changed.is_connected(_update_fuel):
 		GameSession.hydrogen_changed.connect(_update_fuel)
-	_set_status("", DIM_TEXT_COLOR)
+	if _viewing:
+		_set_status("Viewing %s from the star map, as %s. Press %s to go back." % [
+			_viewing.definition.display_name,
+			"you left it" if GameSession.has_visited(_viewing.definition) else "the intel shows it",
+			_binding_label(&"map_tab")], DIM_TEXT_COLOR)
+	elif _is_low_on_hydrogen():
+		_set_status(_low_hydrogen_text(), DANGER_COLOR)
+	else:
+		_set_status("", DIM_TEXT_COLOR)
 	_update()
+	_switching = switching
 	_show_screen()
-	Log.info("🪐 System map opened: system=%s, wrecks=%d, hydrogen=%d, at_hub=%s, docked=%s, map=%.0f px" % [
-		system.definition.id if system else "none", system.wrecks.size() if system else 0, GameSession.hydrogen,
-		GameSession.at_hub, GameSession.docked.definition.id if GameSession.docked else "none", side])
+	_switching = false
+	Log.info("🪐 System map opened: system=%s, viewing=%s, wrecks=%d, hydrogen=%d, at_hub=%s, docked=%s, switching=%s, map=%.0f px" % [
+		system.definition.id if system else "none", _viewing != null, system.wrecks.size() if system else 0,
+		GameSession.hydrogen, GameSession.at_hub, GameSession.docked.definition.id if GameSession.docked else "none",
+		switching, _map_side()])
 
 
-func close() -> void:
+## Closes the map; switching closes it for the star map to open in its place, quietly.
+func close(switching: bool = false) -> void:
 	if not is_open:
 		Log.info("🪐 System map not closed, it isn't open")
 		return
+	_switching = switching
 	_hide_screen()
+	_switching = false
+	# The ship is there already; only its flight on the map is cut short.
+	if _map.is_flying():
+		_map.stop_flight()
+		_end_flight(false)
 	if GameSession.hydrogen_changed.is_connected(_update_fuel):
 		GameSession.hydrogen_changed.disconnect(_update_fuel)
-	Log.info("🪐 System map closed: hydrogen=%d, at_hub=%s, docked=%s" % [
-		GameSession.hydrogen, GameSession.at_hub, GameSession.docked.definition.id if GameSession.docked else "none"])
+	Log.info("🪐 System map closed: hydrogen=%d, at_hub=%s, docked=%s, switching=%s" % [
+		GameSession.hydrogen, GameSession.at_hub, GameSession.docked.definition.id if GameSession.docked else "none",
+		switching])
+
+
+## Whether it shows another known system read-only, rather than the one the ship is in.
+func is_viewing_elsewhere() -> bool:
+	return _viewing != null
 
 
 ## Selects a target (a wreck's index in the system's list, HUB or NONE): its details show and its course is plotted.
@@ -147,6 +202,10 @@ func select(target: int) -> void:
 ## Flies the ship to the selected target. Returns whether it flew; when it can't, the status line says why.
 func fly() -> bool:
 	var target := selected
+	if _viewing:
+		_refuse("This is %s, seen from the star map. Jump there to fly to its wrecks." % _viewing.definition.display_name)
+		Log.info("🪐 Not flown, the map shows another system: viewing=%s" % _viewing.definition.id)
+		return false
 	if GameSession.system == null or target == NONE:
 		_refuse("Select a wreck or the hub on the map first.")
 		Log.info("🪐 Nothing selected to fly to")
@@ -155,30 +214,47 @@ func fly() -> bool:
 		_refuse("The ship is already there.")
 		Log.info("🪐 Not flown, the ship is already there: target=%s" % _target_name(target))
 		return false
+	if is_flying():
+		Log.info("🪐 Not flown, the ship is still flying: target=%s" % _target_name(target))
+		return false
 	var spot := _map.target_spot(target)
 	var needed := GameSession.hydrogen_needed(spot) if target != HUB else GameSession.flight_cost(spot)
 	if needed > GameSession.hydrogen:
-		_refuse("Not enough hydrogen: flying there and back to the hub takes %d, the tank holds %d. Refuel at the hub." % [
-			needed, GameSession.hydrogen])
+		var where := "Refuel at the trader terminal." if GameSession.at_hub else "Fly back to the hub to buy more."
+		_refuse("Not enough hydrogen: flying there and back to the hub takes %d, the tank holds %d. %s" % [
+			needed, GameSession.hydrogen, where])
 		Log.info("🪐 Not flown, not enough hydrogen: target=%s, needed=%d, hydrogen=%d" % [
 			_target_name(target), needed, GameSession.hydrogen])
 		return false
 	var wreck: SystemWreck = GameSession.system.wrecks[target] if target != HUB else null
+	var before := GameSession.hydrogen
 	var flown := GameSession.fly_to_wreck(wreck) if wreck else GameSession.fly_to_hub()
 	if not flown:
 		_refuse("The ship couldn't fly there.")
 		Log.warning("🪐 Flight refused by the session: target=%s" % _target_name(target))
 		return false
-	_play(fly_sound)
-	_map.fly_marker()
+	_burn_from = before
+	_burn = before - GameSession.hydrogen
+	_shown_hydrogen = before
+	var duration := maxf(MIN_FLY_TIME, _burn * FLY_TIME_PER_UNIT)
+	_start_engine()
+	_map.fly_marker(duration)
 	if wreck:
-		_set_status("Docked with the %s %s. Board it through the airlock." % [wreck.title().to_lower(), wreck.where()],
-			DIM_TEXT_COLOR)
+		_set_status("Flying to the %s %s..." % [wreck.title().to_lower(), wreck.where()], DIM_TEXT_COLOR)
+		_arrival_text = "Docked with the %s %s. Board it through the airlock." % [wreck.title().to_lower(), wreck.where()]
 	else:
-		_set_status("Back at the hub. Trade and refuel at the trader terminal.", DIM_TEXT_COLOR)
+		_set_status("Flying back to the hub...", DIM_TEXT_COLOR)
+		_arrival_text = "Back at the hub. Trade and refuel at the trader terminal."
 	_update()
-	Log.info("🪐 Flew: target=%s, hydrogen=%d" % [_target_name(target), GameSession.hydrogen])
+	hydrogen_shown.emit(_shown_hydrogen)
+	Log.info("🪐 Flying: target=%s, burn=%d, hydrogen=%d, duration=%.1f s" % [
+		_target_name(target), _burn, GameSession.hydrogen, duration])
 	return true
+
+
+## Says something in the status line, such as where the ship arrived after a jump.
+func say(text: String) -> void:
+	_set_status(text, DIM_TEXT_COLOR)
 
 
 ## Where a target is on the screen, in this control's pixels: where the pointer goes to pick it.
@@ -189,7 +265,7 @@ func target_center(target: int) -> Vector2:
 
 ## The middle of the FLY button, in this control's pixels.
 func fly_button_center() -> Vector2:
-	return get_global_transform().affine_inverse() * _fly_button.get_global_rect().get_center()
+	return _center_of(_fly_button)
 
 
 ## Whether the map is still flying the ship's marker along its course.
@@ -197,11 +273,18 @@ func is_flying() -> bool:
 	return _map.is_flying()
 
 
-func _handle_input(event: InputEvent) -> bool:
+## Whether the thrusters' roar is playing: from a flight's start until the ship arrives on the map.
+func is_engine_running() -> bool:
+	return _engine_running
+
+
+func _handle_map_input(event: InputEvent) -> bool:
 	if not event.is_action_pressed("inventory_drag"):
 		return false
 	if _pointer_over(_fly_button):
-		fly()
+		# A click on FLY while the ship is still flying does nothing.
+		if not is_flying():
+			fly()
 	elif _pointer_over(_map):
 		select(_map.target_at(_map_point()))
 	return true
@@ -221,17 +304,22 @@ func _refresh() -> void:
 	super()
 
 
+## The system on show: another known one from the star map, or else the one the ship is in.
+func _system() -> StarSystem:
+	return _viewing if _viewing else GameSession.system
+
+
 ## Shows the target under the pointer (or else the selected one): its details, its course on the map and the gauge,
-## and what FLY would do.
+## and what FLY would do. Another system, shown read-only, plots no course.
 func _update() -> void:
-	var system := GameSession.system
+	var system := _system()
 	var on_map := _pointer_over(_map) if is_open else false
 	var under := _map.target_at(_map_point()) if on_map else NONE
 	shown = under if under != NONE else selected
 	_map_detail.text = "%d WRECKS" % system.wrecks.size() if system else ""
 	var needed := 0
 	var burn := 0
-	if system and shown != NONE and not _is_here(shown):
+	if system and not _viewing and shown != NONE and not _is_here(shown):
 		var spot := _map.target_spot(shown)
 		burn = GameSession.flight_cost(spot)
 		needed = GameSession.hydrogen_needed(spot) if shown != HUB else burn
@@ -240,7 +328,11 @@ func _update() -> void:
 	_map.selected = selected
 	_map.course_ok = can_fly
 	_map.queue_redraw()
-	_gauge.set_state(GameSession.HYDROGEN_TANK, GameSession.hydrogen, burn, needed - burn)
+	if _shown_hydrogen >= 0:
+		# A flight under way: what is still to burn, in the laser's blue.
+		_gauge.set_state(GameSession.HYDROGEN_TANK, _shown_hydrogen, _shown_hydrogen - GameSession.hydrogen, 0)
+	else:
+		_gauge.set_state(GameSession.HYDROGEN_TANK, GameSession.hydrogen, burn, needed - burn)
 	_show_fuel_note(burn, needed, can_fly)
 	_show_target(shown)
 	_show_fly_button(shown, burn, can_fly)
@@ -251,27 +343,106 @@ func _update_fuel(_hydrogen_left: int) -> void:
 
 
 func _show_fuel_note(burn: int, needed: int, can_fly: bool) -> void:
-	hydrogen_text = "%d/%d" % [GameSession.hydrogen, GameSession.HYDROGEN_TANK]
+	var tank := _shown_hydrogen if _shown_hydrogen >= 0 else GameSession.hydrogen
+	hydrogen_text = "%d/%d" % [tank, GameSession.HYDROGEN_TANK]
 	_hydrogen.text = hydrogen_text
-	if burn == 0:
+	if _shown_hydrogen >= 0:
+		_gauge_note.text = "Burning hydrogen: %d to go" % (_shown_hydrogen - GameSession.hydrogen)
+	elif _viewing:
+		_gauge_note.text = "In the tank, for flights in the system the ship is in"
+	elif burn == 0:
 		_gauge_note.text = "Bought at the hub" if not GameSession.at_hub else "At the hub: refuel at the trader terminal"
 	elif shown == HUB:
 		_gauge_note.text = "%d to fly back to the hub" % burn
 	elif can_fly:
 		_gauge_note.text = "%d to fly there  ·  %d kept for the way back" % [burn, needed - burn]
 	else:
-		_gauge_note.text = "%d needed there and back, %d short" % [needed, needed - GameSession.hydrogen]
-	_gauge_note.add_theme_color_override("font_color", DIM_TEXT_COLOR if can_fly else DANGER_COLOR)
+		_gauge_note.text = "%d needed there and back, %d short%s" % [needed, needed - GameSession.hydrogen,
+			"" if GameSession.at_hub else ": fly back to the hub"]
+	_gauge_note.add_theme_color_override("font_color", DIM_TEXT_COLOR if can_fly or _shown_hydrogen >= 0 \
+		else DANGER_COLOR)
+
+
+## The ship's marker moved along its course: a unit of hydrogen burns at each share of the way, and on arrival the
+## status line says where the ship is.
+func _on_flight_progressed(progress: float) -> void:
+	if _shown_hydrogen < 0:
+		return
+	if progress >= 1.0:
+		_end_flight()
+		return
+	var shown_now := _burn_from - mini(floori(progress * _burn + 0.0001), _burn)
+	if shown_now == _shown_hydrogen:
+		return
+	_shown_hydrogen = shown_now
+	_update()
+	hydrogen_shown.emit(_shown_hydrogen)
+
+
+## The flight is over on the map: the thrusters stop (with the clamps' knock when the ship arrives rather than the map
+## closing), the gauge and the bar show the tank as it is, and the status line where the ship arrived, or that it is
+## too low on hydrogen to fly anywhere but the hub.
+func _end_flight(arrived: bool = true) -> void:
+	if _shown_hydrogen < 0:
+		return
+	_shown_hydrogen = -1
+	_stop_engine(arrived)
+	if _is_low_on_hydrogen():
+		_set_status(_low_hydrogen_text(), DANGER_COLOR)
+	else:
+		_set_status(_arrival_text, DIM_TEXT_COLOR)
+	_update()
+	hydrogen_shown.emit(GameSession.hydrogen)
+	Log.info("🪐 Flight over on the map: hydrogen=%d, at_hub=%s, docked=%s" % [
+		GameSession.hydrogen, GameSession.at_hub, GameSession.docked.definition.id if GameSession.docked else "none"])
+
+
+## Whether the ship, away from the hub with nothing docked, can't reach any wreck and get back: the hub is the only
+## flight left.
+func _is_low_on_hydrogen() -> bool:
+	return not _viewing and GameSession.system != null and not GameSession.at_hub and GameSession.docked == null \
+		and not GameSession.can_reach_a_wreck()
+
+
+## The thrusters light: the ignition plays while the roar swells in, and the roar loops until _stop_engine().
+func _start_engine() -> void:
+	_engine_shot.stream = ignite_sound
+	_engine_shot.play()
+	if _engine_fade:
+		_engine_fade.kill()
+	_engine.stream = engine_sound
+	_engine.volume_db = ENGINE_QUIET_DB
+	_engine.play()
+	_engine_running = true
+	_engine_fade = create_tween()
+	_engine_fade.tween_property(_engine, "volume_db", 0.0, ENGINE_FADE_IN)
+
+
+## The roar dies away; on arrival the stop plays too.
+func _stop_engine(arrived: bool) -> void:
+	if not _engine_running:
+		return
+	_engine_running = false
+	if _engine_fade:
+		_engine_fade.kill()
+	_engine_fade = create_tween()
+	_engine_fade.tween_property(_engine, "volume_db", ENGINE_QUIET_DB, ENGINE_FADE_OUT)
+	_engine_fade.tween_callback(_engine.stop)
+	if arrived:
+		_engine_shot.stream = stop_sound
+		_engine_shot.play()
+
+
+func _low_hydrogen_text() -> String:
+	return "Low on hydrogen: no wreck is in reach with enough left to get back. Fly back to the hub to buy more."
 
 
 ## The target placard: a wreck's type, where it lies, its robots and the gear it requires; the hub's name and what it
 ## is for; or how to pick something.
 func _show_target(target: int) -> void:
-	for child in _details.get_children():
-		_details.remove_child(child)
-		child.queue_free()
+	_clear(_details)
 	var rows: Array = []
-	var system := GameSession.system
+	var system := _system()
 	if target == NONE or system == null:
 		target_text = "NOTHING SELECTED"
 		_target_where.text = "Point at a wreck or the hub on the map to see what is there, and click to select it."
@@ -290,13 +461,7 @@ func _show_target(target: int) -> void:
 	_target_title.text = target_text
 	var lines: Array[String] = []
 	for row: Array in rows:
-		var name_label := _label(row[0], 10, DIM_TEXT_COLOR, true)
-		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var value_label := _label(row[1], 15, INK_COLOR, false)
-		value_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_details.add_child(name_label)
-		_details.add_child(value_label)
+		_add_detail_row(_details, row[0], row[1])
 		lines.append("%s %s" % row)
 	details_text = " · ".join(lines)
 
@@ -320,30 +485,18 @@ func _show_fly_button(target: int, burn: int, can_fly: bool) -> void:
 	else:
 		fly_text = "FLY  ·  %d" % burn
 		active = true
-	_fly_label.text = fly_text
-	_fly_style.border_color = LASER_COLOR if active else Color(DANGER_COLOR if target != NONE and not can_fly else INK_COLOR, 0.3)
-	_fly_style.bg_color = Color(LASER_COLOR, 0.28 if _fly_hovered else 0.12) if active else Color(PLACARD_COLOR, 0.4)
-	_fly_label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
+	_style_button(_fly_button, fly_text, active, _fly_hovered, target != NONE and not can_fly)
 
 
-## Whether the ship is at a target already: docked with that wreck, or at the hub.
+## Whether the ship is at a target already: docked with that wreck, or at the hub. Never in another system on show.
 func _is_here(target: int) -> bool:
+	if _viewing:
+		return false
 	if target == HUB:
 		return GameSession.at_hub
 	var system := GameSession.system
 	return system != null and target >= 0 and target < system.wrecks.size() \
 		and system.wrecks[target].roll == GameSession.docked
-
-
-func _refuse(message: String) -> void:
-	_play(bump_sound)
-	_set_status(message, DANGER_COLOR)
-
-
-func _set_status(text: String, color: Color) -> void:
-	status_text = text
-	_status.text = text
-	_status.add_theme_color_override("font_color", color)
 
 
 ## The pointer in the map's own pixels.
@@ -354,23 +507,7 @@ func _map_point() -> Vector2:
 func _target_name(target: int) -> String:
 	if target == HUB:
 		return "hub"
-	var system := GameSession.system
+	var system := _system()
 	if system and target >= 0 and target < system.wrecks.size():
 		return "%s %s" % [system.wrecks[target].roll.definition.id, system.wrecks[target].where()]
 	return "none"
-
-
-## A placard as wide as the column.
-func _sized(placard: PanelContainer) -> PanelContainer:
-	placard.custom_minimum_size = Vector2(PANEL_WIDTH, 0.0)
-	return placard
-
-
-## Centres the map and the column together, rather than each either side of the screen's centre.
-func _layout() -> void:
-	super()
-	if not is_open:
-		return
-	var shift := (_left_column.size.x - _right_column.size.x) / 2.0
-	_left_column.position.x += shift
-	_right_column.position.x += shift

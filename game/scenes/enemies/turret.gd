@@ -15,8 +15,9 @@ const SLUMP_TIME := 0.5
 const SERVO_FULL := 0.5
 
 @export_group("Turning")
-## Degrees across the arc the ring can turn within, centred on the turret's forward. 360 turns all the way round.
-@export var arc: float = 180.0
+## Degrees across the arc the ring can turn within, centred on the turret's forward. 360 (the default) turns all the
+## way round, so nothing is safe behind a turret.
+@export var arc: float = 360.0
 ## Degrees per second the ring and head turn while tracking or turning to a noise.
 @export var turn_speed: float = 120.0
 ## Degrees per second it sweeps while idle, and seconds it pauses at each end of the sweep.

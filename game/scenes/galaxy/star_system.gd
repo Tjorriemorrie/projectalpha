@@ -106,13 +106,17 @@ func name_on_left(spot: Vector2) -> bool:
 	return spot.x > NAME_FLIP * radius()
 
 
-## Rolls count wrecks (random layouts at random levels) and puts each at a random place, a place that already holds
-## wrecks less likely, or in open space.
-func add_wrecks(layouts: Array, count: int, rng: RandomNumberGenerator) -> void:
+## Rolls count wrecks (random layouts at random levels, or all at level when it is given, from the layouts that have
+## it) and puts each at a random place, a place that already holds wrecks less likely, or in open space.
+func add_wrecks(layouts: Array, count: int, rng: RandomNumberGenerator, level: int = 0) -> void:
+	var fitting := layouts if level <= 0 else layouts.filter(func(layout: WreckDefinition) -> bool:
+		return layout.levels.x <= level and level <= layout.levels.y)
 	for _i in count:
-		var roll := WreckRoll.random(layouts, rng)
+		var roll := WreckRoll.random(fitting, rng)
 		if roll == null:
 			return
+		if level > 0:
+			roll = WreckRoll.new(roll.definition, level, roll.roll_seed)
 		var place_index := -1
 		if definition.places.size() > 0 and rng.randf() >= OPEN_SPACE_CHANCE:
 			var weights := definition.places.map(func(place: SystemPlace) -> float:

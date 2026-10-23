@@ -128,8 +128,8 @@ const DROP_SCATTER := 0.2
 @export var death_summary_delay: float = 4.0
 ## Holstered on the ship: the pistol is lowered and can't aim or fire, but reloads still work.
 @export var holstered := false
-## At home on the ship the HUD shows the bitcoin in the wallet, the hydrogen in the tank and the day; on a wreck it
-## doesn't.
+## At home on the ship the HUD shows the bitcoin in the wallet, the hydrogen and antimatter in the tanks and the day;
+## on a wreck it doesn't.
 @export var shows_wallet := false
 
 @export_group("Travel")
@@ -138,6 +138,10 @@ const DROP_SCATTER := 0.2
 @export var arrive_fade_time: float = 1.5
 ## Docking clunks and hiss, playing through the fade when the player boards or extracts.
 @export var dock_sound: AudioStream
+## Seconds the screen takes to fade to black for a jump to another system, and to fade back in at the next hub; the
+## jump drive's sound plays through both.
+@export var jump_fade_time: float = 0.9
+@export var jump_sound: AudioStream = preload("res://assets/audio/ship/jump.wav")
 
 @export_group("Inventory")
 ## Cells of the pockets, for things at hand (a reload takes its clips from there), of the backpack, and of the weapon
@@ -224,6 +228,8 @@ var _lit_parts := {}
 var _lit_frame := -1
 ## The run summary is showing, and interact goes on to the ship.
 var _awaiting_continue := false
+## Whether a jump to another system is under way, between the fade to black and the fade back in.
+var _jumping := false
 
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _camera: Camera3D = $Camera3D
@@ -239,6 +245,7 @@ var _awaiting_continue := false
 @onready var _inventory_screen: InventoryScreen = _hud.get_inventory_screen()
 @onready var _trader_screen: TraderScreen = _hud.get_trader_screen()
 @onready var _system_map: SystemMapScreen = _hud.get_system_map_screen()
+@onready var _star_map: StarMapScreen = _hud.get_star_map_screen()
 
 
 func _ready() -> void:
@@ -257,10 +264,13 @@ func _ready() -> void:
 	_setup_combat()
 	_inventory_screen.dropped_on_floor.connect(_on_dropped_on_floor)
 	_inventory_screen.taken_from_floor.connect(_on_taken_from_floor)
+	_star_map.jump_confirmed.connect(jump_to)
 	if shows_wallet:
 		_hud.show_wallet(GameSession.bitcoin, GameSession.hydrogen, GameSession.day)
 		GameSession.bitcoin_changed.connect(_hud.set_wallet)
 		GameSession.hydrogen_changed.connect(_hud.set_hydrogen)
+		GameSession.antimatter_changed.connect(_hud.set_antimatter)
+		GameSession.day_changed.connect(_hud.set_day)
 	_update_camera()
 	_set_mouse_captured(true)
 	if GameSession.fade_in_next:
@@ -446,12 +456,22 @@ func get_system_map() -> SystemMapScreen:
 	return _system_map
 
 
+func get_star_map() -> StarMapScreen:
+	return _star_map
+
+
+## Whether either map tab is open: the system map or the star map.
 func is_viewing_map() -> bool:
-	return _system_map.is_open
+	return _system_map.is_open or _star_map.is_open
+
+
+func is_jumping() -> bool:
+	return _jumping
 
 
 ## Opens the system map, from the cockpit console: the system the ship is in, kept by the GameSession, where the
-## player inspects its wrecks and flies the ship. The player stands still until it closes.
+## player inspects its wrecks and flies the ship; its other tab is the star map. The player stands still until it
+## closes.
 func open_system_map() -> void:
 	if is_dead or is_leaving or _is_menu_open():
 		Log.info("🏃 System map not opened: dead=%s, leaving=%s, menu_open=%s" % [is_dead, is_leaving, _is_menu_open()])
@@ -466,7 +486,10 @@ func close_system_map() -> void:
 	if not is_viewing_map():
 		Log.info("🏃 System map not closed, it isn't open: position=%s" % global_position)
 		return
-	_system_map.close()
+	if _star_map.is_open:
+		_star_map.close()
+	else:
+		_system_map.close()
 	_leave_menu()
 	Log.info("🏃 System map closed: hydrogen=%d, at_hub=%s, docked=%s, position=%s" % [
 		GameSession.hydrogen, GameSession.at_hub,
@@ -782,9 +805,15 @@ func _gather_floor(picked: DroppedItem) -> ItemGrid:
 ## While the inventory, the hub or the system map is open the player stands still in their stance and can't look,
 ## peek or shoot; Tab, Esc and interact close it. The world keeps going, and a reload under way still finishes.
 func _update_while_sorting(delta: float) -> void:
-	if Input.is_action_just_pressed("inventory") or Input.is_action_just_pressed("pause") \
-			or Input.is_action_just_pressed("interact"):
+	var close_pressed := Input.is_action_just_pressed("inventory") or Input.is_action_just_pressed("pause") \
+		or Input.is_action_just_pressed("interact")
+	# A jump under way keeps the map open until the ship has arrived.
+	if close_pressed and not _jumping:
 		_close_menu()
+	elif Input.is_action_just_pressed("map_tab") and not _jumping and _star_map.is_open:
+		_star_map.switch_tab()
+	elif Input.is_action_just_pressed("map_tab") and not _jumping and _system_map.is_open:
+		_system_map.switch_tab()
 	_update_peek_state(false)
 	_set_movement_state(MovementRules.State.CROUCH_IDLE if is_crouched else MovementRules.State.IDLE)
 	_update_velocity(Vector2.ZERO, delta)
@@ -1011,6 +1040,38 @@ func extract() -> void:
 	get_tree().create_timer(leave_fade_time).timeout.connect(_show_summary.bind(summary))
 	Log.info("🏃 Extracting: position=%s, items=%d, value=%d, heat=%.0f%%, summary_in=%.1f s" % [
 		global_position, inventory.item_count(), inventory.value(), clips.heat * 100.0, leave_fade_time])
+
+
+## The ship jumps to another system, from the star map: the screen fades to black over the jump drive's sound, the
+## ship jumps (a day passes, see GameSession.jump_to()), and the screen fades back in on the system map of the system
+## it arrived in. The player stays where they are, at the console.
+func jump_to(to: StarSystemDefinition) -> void:
+	if _jumping or is_dead or is_leaving:
+		Log.info("🏃 Not jumping: to=%s, jumping=%s, dead=%s, leaving=%s" % [to.id, _jumping, is_dead, is_leaving])
+		return
+	_jumping = true
+	GameSession.play_travel_sound(jump_sound)
+	_hud.fade_out(jump_fade_time)
+	get_tree().create_timer(jump_fade_time).timeout.connect(_finish_jump.bind(to))
+	Log.info("🏃 Jumping: to=%s, from=%s, fade=%.1f s" % [
+		to.id, GameSession.system.definition.id if GameSession.system else "none", jump_fade_time])
+
+
+func _finish_jump(to: StarSystemDefinition) -> void:
+	if not is_inside_tree():
+		Log.warning("🏃 Jump cut short, the player has left the tree: to=%s" % to.id)
+		return
+	var jumped := GameSession.jump_to(to)
+	if jumped:
+		_hud.show_arrival("Arrived at %s on day %d. The jump drive recharges until a ship is boarded." % [
+			GameSession.trader.title, GameSession.day])
+	else:
+		_star_map.say("The jump to %s didn't go ahead." % to.display_name, true)
+	_hud.fade_in(jump_fade_time)
+	_jumping = false
+	Log.info("🏃 Jump finished: to=%s, jumped=%s, system=%s, day=%d, antimatter=%d" % [
+		to.id, jumped, GameSession.system.definition.id if GameSession.system else "none", GameSession.day,
+		GameSession.antimatter])
 
 
 ## The player boards the wreck through the ship's airlock: the screen fades to black over the docking sound, and then

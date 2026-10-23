@@ -5,7 +5,11 @@ extends Control
 ## chevrons with the robots the scan expects aboard, and the ship as a laser-blue ring with a slow transponder ping.
 ## The target on show (hovered, or else selected) gets the course plotted to it from the ship, with the hydrogen the
 ## flight burns, and on from there back to the hub; a course the tank can't fly is drawn in red. Targets are picked
-## by index: a wreck's in the system's list, HUB or NONE. It decides nothing; the screen tells it what to show.
+## by index: a wreck's in the system's list, HUB or NONE. Another system, shown read-only from the star map, has no
+## ship and no courses. It decides nothing; the screen tells it what to show.
+
+## The ship's marker moved along its course, as a share of the way from 0 to 1.
+signal flight_progressed(progress: float)
 
 const NONE := -1
 const HUB := -2
@@ -24,8 +28,7 @@ const STAR_COLORS := {
 const EDGE_MARGIN := 12.0
 ## How close the pointer must be to a target to pick it, in pixels.
 const PICK_RADIUS := 14.0
-## Seconds the ship's marker takes to fly along its course, and between transponder pings.
-const FLY_TIME := 0.7
+## Seconds between transponder pings.
 const PING_PERIOD := 2.4
 
 var system: StarSystem
@@ -35,6 +38,8 @@ var ship_spot := Vector2.ZERO
 var shown := NONE
 var selected := NONE
 var course_ok := true
+## Whether the ship and courses show: off for another system, shown read-only.
+var show_ship := true
 ## The place under the pointer, whose note shows under its name, or -1.
 var hovered_place := -1
 
@@ -43,10 +48,12 @@ var _label_font: Font
 var _ping := 0.0
 var _flight: Tween
 var _flying := false
+var _flight_from := Vector2.ZERO
 
 
-func setup(star_system: StarSystem, side: float, font: Font, label_font: Font) -> void:
+func setup(star_system: StarSystem, side: float, font: Font, label_font: Font, with_ship: bool = true) -> void:
 	system = star_system
+	show_ship = with_ship
 	custom_minimum_size = Vector2(side, side)
 	_font = font
 	_label_font = label_font
@@ -104,24 +111,35 @@ func place_at(point: Vector2) -> int:
 	return -1
 
 
-## Flies the ship's marker along its course to where the ship is now.
-func fly_marker() -> void:
+## Flies the ship's marker along its course to where the ship is now, over duration seconds, easing in and out;
+## flight_progressed tells how far along it is.
+func fly_marker(duration: float) -> void:
 	if _flight:
 		_flight.kill()
 	_flying = true
+	_flight_from = ship_spot
 	_flight = create_tween()
-	_flight.tween_method(_move_marker, ship_spot, GameSession.ship_position, FLY_TIME) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_flight.tween_method(_move_marker, 0.0, 1.0, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_flight.tween_callback(func() -> void: _flying = false)
+
+
+## Puts the ship's marker where the ship is at once, cutting a flight short.
+func stop_flight() -> void:
+	if _flight:
+		_flight.kill()
+	_flying = false
+	ship_spot = GameSession.ship_position
+	queue_redraw()
 
 
 func is_flying() -> bool:
 	return _flying
 
 
-func _move_marker(spot: Vector2) -> void:
-	ship_spot = spot
+func _move_marker(progress: float) -> void:
+	ship_spot = _flight_from.lerp(GameSession.ship_position, progress)
 	queue_redraw()
+	flight_progressed.emit(progress)
 
 
 func _process(delta: float) -> void:
@@ -155,9 +173,10 @@ func _draw() -> void:
 	_draw_hub()
 	for index in system.wrecks.size():
 		_draw_wreck(index)
-	if shown != NONE and not _flying:
+	if show_ship and shown != NONE and not _flying:
 		_draw_course(shown)
-	_draw_ship()
+	if show_ship:
+		_draw_ship()
 	if selected != NONE:
 		_draw_reticle(to_pixels(target_spot(selected)), LASER_COLOR)
 	if shown != NONE and shown != selected:

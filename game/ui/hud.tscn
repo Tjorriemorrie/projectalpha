@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://ui/run_summary_card.gd" id="8_summary"]
 [ext_resource type="Script" path="res://ui/trader_screen.gd" id="9_trader"]
 [ext_resource type="Script" path="res://ui/system_map_screen.gd" id="10_system_map"]
+[ext_resource type="Script" path="res://ui/star_map_screen.gd" id="11_star_map"]
 
 [sub_resource type="SystemFont" id="SystemFont_placard"]
 font_names = PackedStringArray("Bahnschrift", "DIN Alternate", "Arial Narrow")
@@ -65,6 +66,15 @@ corner_radius_top_left = 2
 corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar"]
+content_margin_left = 28.0
+content_margin_top = 7.0
+content_margin_right = 28.0
+content_margin_bottom = 7.0
+bg_color = Color(0.0431373, 0.0588235, 0.0784314, 0.82)
+border_width_bottom = 1
+border_color = Color(0.862745, 0.901961, 0.941176, 0.18)
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_edges"]
 shader = ExtResource("2_edges")
@@ -302,65 +312,106 @@ text = "4 fresh  ·  0 spent"
 
 [node name="Wallet" type="PanelContainer" parent="Root"]
 visible = false
-offset_left = 28.0
-offset_top = 28.0
-offset_right = 28.0
-offset_bottom = 28.0
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_placard")
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
 
 [node name="Columns" type="HBoxContainer" parent="Root/Wallet"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 22
+theme_override_constants/separation = 36
 
-[node name="Bitcoin" type="VBoxContainer" parent="Root/Wallet/Columns"]
+[node name="Bitcoin" type="HBoxContainer" parent="Root/Wallet/Columns"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Root/Wallet/Columns/Bitcoin"]
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
 theme_override_fonts/font = SubResource("FontVariation_label")
 theme_override_font_sizes/font_size = 11
 text = "BITCOIN"
 
 [node name="Value" type="Label" parent="Root/Wallet/Columns/Bitcoin"]
-custom_minimum_size = Vector2(110, 0)
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
 theme_override_fonts/font = SubResource("SystemFont_placard")
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 18
 text = "₿500"
 
-[node name="Hydrogen" type="VBoxContainer" parent="Root/Wallet/Columns"]
+[node name="Hydrogen" type="HBoxContainer" parent="Root/Wallet/Columns"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Root/Wallet/Columns/Hydrogen"]
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
 theme_override_fonts/font = SubResource("FontVariation_label")
 theme_override_font_sizes/font_size = 11
 text = "HYDROGEN"
 
 [node name="Value" type="Label" parent="Root/Wallet/Columns/Hydrogen"]
-custom_minimum_size = Vector2(80, 0)
+custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
 theme_override_fonts/font = SubResource("SystemFont_placard")
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 18
 text = "24/24"
 
-[node name="Day" type="VBoxContainer" parent="Root/Wallet/Columns"]
+[node name="Antimatter" type="HBoxContainer" parent="Root/Wallet/Columns"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="Root/Wallet/Columns/Antimatter"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
+theme_override_fonts/font = SubResource("FontVariation_label")
+theme_override_font_sizes/font_size = 11
+text = "ANTIMATTER"
+
+[node name="Value" type="Label" parent="Root/Wallet/Columns/Antimatter"]
+custom_minimum_size = Vector2(44, 0)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
+theme_override_fonts/font = SubResource("SystemFont_placard")
+theme_override_font_sizes/font_size = 18
+text = "2/10"
+
+[node name="Note" type="Label" parent="Root/Wallet/Columns/Antimatter"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.62, 0.82, 1, 1)
+theme_override_fonts/font = SubResource("FontVariation_label")
+theme_override_font_sizes/font_size = 11
+text = "8 ARRIVING DAY 1"
+
+[node name="Spacer" type="Control" parent="Root/Wallet/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Day" type="HBoxContainer" parent="Root/Wallet/Columns"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Root/Wallet/Columns/Day"]
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_colors/font_color = Color(0.721569, 0.768627, 0.815686, 1)
 theme_override_fonts/font = SubResource("FontVariation_label")
 theme_override_font_sizes/font_size = 11
@@ -368,9 +419,10 @@ text = "DAY"
 
 [node name="Value" type="Label" parent="Root/Wallet/Columns/Day"]
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_colors/font_color = Color(0.862745, 0.901961, 0.941176, 1)
 theme_override_fonts/font = SubResource("SystemFont_placard")
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 18
 text = "0"
 
 [node name="InventoryScreen" type="Control" parent="Root"]
@@ -402,6 +454,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("10_system_map")
+
+[node name="StarMapScreen" type="Control" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("11_star_map")
 
 [node name="DeathFade" type="ColorRect" parent="Root"]
 layout_mode = 1

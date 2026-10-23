@@ -33,6 +33,13 @@ including hold or toggle behaviour, and update both in the Controls table in `do
 change. When asking the user about a control, ask about both devices together. Never leave one device's
 binding missing or out of date.
 
+## Sounds last as long as their animations
+
+A sound that goes with an animation (a flight on the map, a fade, a gauge filling) lasts exactly as long as the
+animation. When the animation's length is fixed, generate the sound at that length. When it varies, build the sound
+from a start, a seamless loop that plays for as long as the animation runs, and an end that plays as it finishes.
+Whenever an animation's length changes, change its sound in the same change.
+
 ## Keep `.gitignore` up to date
 
 Whenever a change introduces files or directories that should not be committed, update

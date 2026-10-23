@@ -84,7 +84,7 @@ dies.
 - **Screens.** `MenuScreen` (`ui/`) is the new base of the HUD's full-screen screens (placards, columns, hints,
   pointer); `GridScreen` extends it with the dragging. `SystemMapScreen` holds the map (`SystemMapView`, drawn in
   code) and the side column; `FuelGauge` draws the tank like the heat gauge. Its logs use 🪐. The flight plays
-  `thruster_burn.wav` (`art-source/audio/ship_sounds.py`).
+  thrusters (`art-source/audio/ship_sounds.py`; since 012 an ignition, a loop as long as the flight and a stop).
 - **Tests.** `tests/galaxy/star_system_test.gd`, `tests/galaxy/system_map_test.gd` (real mouse events through the
   console), and the session, trader, ship, extraction and content suites.
 

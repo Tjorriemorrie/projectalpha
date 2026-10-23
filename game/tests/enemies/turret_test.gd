@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
-## Plays the turret in the robot test level: lock-on times, peeking, firing and how its fire walks in, venting, a
-## charged shot to the eye, the wreckage and the salvage pried out of it, the combat music, and seeing in the dark. The drone is taken out so it
-## can't interfere.
+## Plays the turret in the robot test level: turning all the way round, lock-on times, peeking, firing and how its
+## fire walks in, venting, a charged shot to the eye, the wreckage and the salvage pried out of it, the combat music,
+## and seeing in the dark. The drone is taken out so it can't interfere.
 ## Positions refer to the layout of res://scenes/test/robot_test.tscn: the turret hangs from the hall's ceiling at
 ## (0, 3, -5.5), facing south down the lit hall towards the door at (0, 0, 2), clear of the pillar in the middle of
 ## the hall; the entrance stub south of the corridor is dark and out of its sight.
@@ -51,6 +51,20 @@ func test_turret_hangs_from_its_mount_facing_its_arc() -> void:
 	assert_vector(-_turret.global_basis.z).is_equal_approx(Vector3.BACK, Vector3.ONE * 0.01)
 	assert_int(_turret.mind.state).is_equal(RobotMind.State.IDLE)
 	assert_float(_turret.get_health().health).is_equal(200.0)
+
+
+func test_turret_turns_all_the_way_round_to_a_noise_behind_it() -> void:
+	assert_float(_turret.arc).is_equal(360.0)
+	# North of the turret, which faces south: outside a half circle.
+	var behind := _turret.global_position + Vector3(0.0, -3.0, -2.0)
+	Hearing.make_noise(_player, behind, 20.0, &"test")
+	var turned_round := false
+	for _frame in 3 * FRAMES_PER_SECOND:
+		await _physics_frames(1)
+		if absf(rad_to_deg(_turret.yaw)) > 150.0:
+			turned_round = true
+			break
+	assert_bool(turned_round).is_true()
 
 
 func test_idle_turret_locks_on_in_about_0_8_seconds() -> void:

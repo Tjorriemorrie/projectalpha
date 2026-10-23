@@ -46,10 +46,10 @@ The 3 core ideas every feature should support. If a feature doesn't serve a pill
   A run takes a day whether the android extracts or dies.
 - **Between runs (on your ship):** break loot down into components, craft and upgrade gear, decrypt drives, then fly
   to the next wreck on hydrogen.
-- **Star system (about five runs):** every system has a trader hub to sell and restock at, and ships and stations to
-  board. It takes the loot of about five of them to buy the antimatter to move on, and the fuel takes days to arrive,
-  so the player picks which ones are worth the risk and flies a loop through them. Then he jumps to a neighbouring
-  system (one day). See [Travel and fuel](#travel-and-fuel).
+- **Star system (a few runs):** every system has a trader hub to sell and restock at, and ships and stations to
+  board. The player boards them to pay for the antimatter to move on and to fill the days it takes to arrive: a
+  couple of runs in the first systems, more later as the wait grows. He picks which ones are worth the risk and flies
+  a loop through them, then jumps to a neighbouring system (one day). See [Travel and fuel](#travel-and-fuel).
 - **Journey (the whole game):** triangulate where she is from her ship's ping, collect the parts of the cure and
   reach her before her time runs out (see [Rescue clock](#rescue-clock), [Finding her](#finding-her) and
   [The cure](#the-cure)).
@@ -130,7 +130,7 @@ Gamepad is supported. There is no jump, prone or slide.
 | Aim out of cover: hold together with peek, in either order, to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory: open and close (Esc and interact also close it) | Tab | View / Select (B also closes it) |
-| In the inventory, the trader hub and the system map: move the cursor | Mouse | Left stick / D-pad |
+| In the inventory, the trader hub and the system and star maps: move the cursor | Mouse | Left stick / D-pad |
 | In the inventory and the trader hub: drag an item | Left click (hold) | A (hold) |
 | In the inventory and the trader hub: rotate the dragged item 90° | Right click | Right bumper |
 | In the inventory and the trader hub: mirror the dragged item | Middle click or mouse wheel | Left bumper |
@@ -138,11 +138,18 @@ Gamepad is supported. There is no jump, prone or slide.
 | In the trader hub: buy one of an item (it goes to the stash) | Left click on it on the shelf | A |
 | In the trader hub: sell what is in the sell crate | Left click on SELL | A |
 | In the trader hub: fill the hydrogen tank | Left click on FILL UP | A |
+| In the trader hub: order a full tank of antimatter | Left click on ORDER | A |
+| In the trader hub: collect antimatter that has arrived (ORDER reads COLLECT) | Left click on COLLECT | A |
 | Trader hub: close | Tab, Esc or E | View / Select or B |
+| In the system and star maps: switch between the two tabs (the console opens on the system map) | Q, or left click on a tab's header | Left or right bumper, or A on a tab's header |
 | In the system map: see a wreck's or the hub's details and the course there | Point at it | Point at it |
 | In the system map: select a wreck or the hub | Left click on it | A |
 | In the system map: fly to the selected wreck or the hub | Left click on FLY | A |
-| System map: close | Tab, Esc or E | View / Select or B |
+| In the star map: see a system's details and the jump there | Point at it | Point at it |
+| In the star map: select a system | Left click on it | A |
+| In the star map: buy intel on the selected system (at the hub) | Left click on BUY INTEL | A |
+| In the star map: jump to the selected system (at the hub) | Hold left click on JUMP (1 s) | Hold A on JUMP (1 s) |
+| System and star maps: close | Tab, Esc or E | View / Select or B |
 | Pause | Esc | Menu / Start |
 
 Gamepad bindings are a first draft.
@@ -209,13 +216,20 @@ The ship runs on two fuels, both bought at the trader hubs:
 
 | Fuel | What it does |
 |------|--------------|
-| Antimatter | Feeds the jump drive: one jump to the next star system, which takes a day. Rare and expensive. The tank holds one jump, which reaches at most 10 light years, so the distances on the star map decide where the ship can go (see [galaxy.md](galaxy.md#4-the-map)) |
+| Antimatter | Feeds the jump drive: a jump to another star system, which takes a day. Rare and expensive. A jump burns it by distance and a full tank reaches at most 10 light years, so the distances on the star map decide where the ship can go (see [galaxy.md](galaxy.md#4-the-map)); a short jump leaves some for the next |
 | Hydrogen | Flies the ship within a system, between its planets, moons, asteroids, anomalies and battlefields, to the ships and stations there and back to the hub. Cheap and common |
 
-- It takes the loot of about five ships or stations per system to afford the antimatter to move on.
+- Early on the player is weak and can only take on the smallest wrecks, couriers, so a full tank of antimatter
+  costs about the loot of a run or two on them, and the first systems take only a couple of runs. The wait for
+  delivery grows through the game, so later systems take more.
 - Antimatter isn't on the shelf: the hub needs days to procure it, and those days grow gradually through the game.
   The player can't wait without boarding, so he can't board one ship and jump; he boards ships while he waits. The
   procurement time is one of the hidden pacing levers (see [Rescue clock](#rescue-clock)).
+- Nothing stores antimatter but the ship's tank, and an order always fills it. The player collects it at the hub
+  once it has arrived, and the ship jumps only from the hub. After a jump the drive recharges for a day, so even with
+  antimatter left over the player boards at least one ship in every system.
+- A system never strands the player: while he can't jump on yet, easy ships turn up when too few are left to wait out
+  a delivery, or to earn the antimatter when he can't afford it.
 - Hydrogen is always on the shelf, and flying within a system or visiting the hub takes no time.
 - Trading and refuelling only happen at the hub, and the ship never flies further than its tank can get it back to
   the hub, so it can't be stranded.
@@ -242,9 +256,9 @@ Her messages don't say where she is: the player finds her by triangulation.
   and the star map shows all of it from the start; from any system there are about five systems he can jump to.
   What is in a system shows only on arrival or through [intel](#mechanics). The pacing picks which systems in reach
   have an ingredient or a hub still.
-- **Budget.** The clock gives about 90 days, and every system costs about six (about five runs plus the jump), so the
-  whole journey crosses only about 15 to 18 systems (18 means closer to four runs per system). Her random location
-  has to fit within that.
+- **Budget.** The clock gives about 90 days, and every system costs about five or six on average (a couple of runs
+  in the first systems and more later, plus the jump), so the whole journey crosses only about 15 to 18 systems.
+  Her random location has to fit within that.
 - The ping is not a way to talk. There are no comms: he can't reach her, and she doesn't know he is coming.
 
 ### The cure
@@ -309,8 +323,8 @@ the kinds can be introduced gradually as the game goes on.
 - Her company's ships, the only ones that carry the encrypted drives, are medium risk: the player needs better gear
   and upgrades before boarding them (see [The cure](#the-cure)).
 - On day 0 the player starts in a random system on the outer ring of the map (see
-  [galaxy.md](galaxy.md#4-the-map)) with three androids, the basic kit and a little bitcoin: not enough
-  for antimatter, so the first system already needs runs.
+  [galaxy.md](galaxy.md#4-the-map)) with three androids, the basic kit, a little antimatter (too little for any
+  jump) and a little bitcoin: not enough for more antimatter, so the first system already needs runs.
 - Gear and technology gate harder locations. Progression mostly means unlocking access to riskier, richer wrecks.
 - Early game uses quiet wrecks only. Timers, oxygen and escalation are introduced later as the pressure ramps up
   (see [Run pressure](#run-pressure)).

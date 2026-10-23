@@ -8,27 +8,27 @@ in time ([story](docs/game-design.md#3-world-and-story)). The build still has yo
 ## Status
 
 The MVP (features 001–008 in [docs/roadmap.md](docs/roadmap.md)) is built: player controller, wreck section kit,
-content registry, free peek and cover, laser pistol and health, robot turrets and drones, loot containers and the grid
-inventory, and the extraction, death and clone loop. So are 009, the trader hub (bitcoin wallet, trading, guns in a
-weapon slot), 010, wreck variety (three layouts, robots and loot rolled to a hidden difficulty), and 011, the system
-map (a star system's wrecks, flying on hydrogen, the day counter). Placeholder (greybox) art throughout. Nothing is
-saved yet: quitting starts a new game.
+content registry, free peek and cover, laser pistol and health, robots, loot and the grid inventory, and the
+extraction, death and clone loop. So are 009 (trader hub, bitcoin), 010 (wreck variety), 011 (system map, hydrogen,
+days) and 012 (star map: antimatter, jumps, intel). Greybox art throughout; nothing is saved yet.
 
 ## The loop
 
-1. Wake up in the clone pod on your ship, at the trader hub of a random star system on day 0; the HUD shows your
-   bitcoin, hydrogen and the day. Move loot between the **stash** (safe, 10×8) and your weapon slot (the gun in
-   hand; holstered on the ship, but it reloads), pockets and backpack (at risk).
-2. At the hub only, trade at the **trader terminal** beside the stash (**E**): drag loot into the sell crate and press
-   SELL, click a shop item to buy one, or FILL UP the hydrogen tank (24 units, ₿5 each). You start with ₿500 and a
-   full tank. Selling pays an item's value and buying costs twice it, give or take 5% per hub.
+1. Wake up in the clone pod on your ship, at the trader hub of a star system on the galaxy's outer ring on day 0;
+   the bar at the top shows your bitcoin, hydrogen, antimatter and the day. Move loot between the **stash** (safe,
+   10×8) and your weapon slot (the gun in hand; holstered on the ship, but it reloads), pockets and backpack.
+2. At the hub only, trade at the **trader terminal** beside the stash (**E**): SELL loot dragged into the crate, buy
+   from the shop (twice an item's value, ±5%), FILL UP hydrogen (24 units, ₿5 each) or ORDER a full tank of
+   antimatter (₿100 a unit, paid at once, to COLLECT at the hub a day later). You start with ₿500 and 2 antimatter.
 3. At the **cockpit console** (**E**) open the system map: point at a wreck for its type, place, robots and course,
    click it and FLY (a unit of hydrogen per map unit; the tank must also get you back to the hub). Flying takes no
    time. Then hold **E** on the airlock's outer door to board it. Boarding takes a day, and the wreck is gone after.
-4. Fight the turrets and drones, pry open containers and robot wreckage, and pack what is worth the space.
-5. Hold **E** on the wreck's airlock door for 3 s to return to the ship: you keep everything carried. Cycling is
-   loud, so robots come to look.
-6. Die and you lose everything carried, gun included. Only the first clone gets the basic kit (pistol, 2 clips in
+   **Q** switches to the star map: buy intel on a system within 10 ly (₿200) to see its ships, and from the hub
+   hold JUMP for a second to jump there (a unit of antimatter a light year, a day, then a day's recharge). Systems
+   keep what you left, and easy wrecks turn up only when you'd be stuck waiting for antimatter.
+4. Fight the turrets and drones, pry open containers and robot wreckage, and pack what is worth the space. Hold **E**
+   on the wreck's airlock door for 3 s to return to the ship with everything carried; cycling is loud.
+5. Die and you lose everything carried, gun included. Only the first clone gets the basic kit (pistol, 2 clips in
    the pockets); later ones wake empty-handed: arm from the stash, buy a gun, or board unarmed: the easiest wrecks
    always hold a gun. A run summary shows either way; press **E** to continue.
 
@@ -43,9 +43,9 @@ saved yet: quitting starts a new game.
 | Aim / aim out of cover | Right mouse | Shoot (hold to charge) | Left mouse |
 
 In the inventory and the hub, drag with the left button, rotate with the right, mirror with the middle button or
-wheel; in the hub, a left click on a shop item buys one, on SELL sells the crate and on FILL UP refuels; on the map,
-a left click selects a wreck or the hub and on FLY flies there. Tab, Esc or E close every screen. Gamepad
-bindings are planned in [docs/game-design.md](docs/game-design.md#controls) but not wired yet.
+wheel, and click shop items, SELL, FILL UP and ORDER or COLLECT; on the maps, Q switches tabs, a click selects,
+FLY flies, BUY INTEL buys intel and holding JUMP jumps. Tab, Esc or E close every screen. Gamepad bindings are
+planned in [docs/game-design.md](docs/game-design.md#controls) but not wired yet.
 
 ## Tech stack, setup and run
 
@@ -74,15 +74,14 @@ Test reports go to `game/reports/` (ignored by git). No environment variables or
 |------|------|
 | `docs/` | Game design, galaxy and characters lore, technical design, roadmap and one spec per feature (`docs/features/NNN-name.md`) |
 | `art-source/` | Model, sound and galaxy-map generating scripts (not imported by Godot) |
-| `game/autoload/` | `ContentRegistry`, `ItemIcons`, `GameSession` (stash, wallet, hydrogen, day, star system and ship's place in it, trader hub, clone number, docked wreck, kit, travel) |
+| `game/autoload/` | `ContentRegistry`, `ItemIcons`, `GameSession` (stash, wallet, fuel and antimatter order, day, star systems revealed and the route, the ship's place, hubs, clone number, docked wreck, kit, travel) |
 | `game/content/base/` | The base content pack: sections, weapons, enemies, items, containers (with loot tables), wreck layouts, the 50 star systems, one folder each |
 | `game/scenes/` | Framework code and scenes by feature: player, combat, weapons, enemies, loot, sections, wreck, ship, run, trade, galaxy, test |
-| `game/ui/` | HUD, the inventory, trader hub and system map screens (on a shared `MenuScreen` base), run summary card |
+| `game/ui/` | HUD, the inventory, trader hub, system map and star map screens (on a shared `MenuScreen` base), run summary card |
 | `game/tests/` | GdUnit4 suites mirroring the folders they test |
 
-All content is data-driven: definitions register by ID (`base:<name>`) from `content/<pack>/<kind>/<name>/`, and the
-base game loads exactly like a future mod. Conventions and architecture are in
-[docs/technical-design.md](docs/technical-design.md); the workflow for features is in [CLAUDE.md](CLAUDE.md).
+Content is data-driven: definitions register by ID (`base:<name>`) from `content/<pack>/<kind>/<name>/`, as a mod's
+would. Conventions: [docs/technical-design.md](docs/technical-design.md); workflow: [CLAUDE.md](CLAUDE.md).
 
 ## Gotchas
 
@@ -90,10 +89,12 @@ base game loads exactly like a future mod. Conventions and architecture are in
   must not touch the tree for the rest of that frame.
 - Headless runs: windows are 64×64 (UI suites set 1280×720 and push real mouse events), the mouse can't be captured
   (tests check the player instead), and "ObjectDB instances were leaked" at exit while audio plays is harmless.
-- `-s` scratch scripts compile before autoloads exist: keep variables of autoload-dependent types untyped.
+- `-s` scratch scripts compile before autoloads exist (keep autoload-dependent types untyped) and start before the
+  content loads (set state up a few frames in). A new `class_name` needs `--import` before tests see it. The HUD's
+  screens only get mouse events: the player reads the keys that work them (close, switch map tabs).
 
 ## Known limitations and next steps
 
-- One star system per game (no star map or jumping until 012): once its 6–8 wrecks are boarded nothing is left, and a
-  broke player at the hub with an empty tank is stuck. No breakdown, crafting, saving, menus or gamepad; the 10×8 stash
-  refuses buys when full; prices, loot, robots and hydrogen are untuned. All are in [docs/roadmap.md](docs/roadmap.md).
+- The journey has no goal yet: no triangulation, her messages or countdown. A broke player at the hub with an empty
+  hydrogen tank is stuck. No breakdown, crafting, saving, menus or gamepad; the 10×8 stash refuses buys when full;
+  prices, loot, robots and fuel are untuned. All are in [docs/roadmap.md](docs/roadmap.md).

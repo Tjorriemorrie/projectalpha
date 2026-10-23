@@ -1,10 +1,15 @@
 """Generates the ship and travel placeholder sounds: the ship's low engine hum, the airlock cycling while interact is
 held on its outer door, docking (clunks and a hiss, playing through the fade when boarding or extracting), the
-thrusters burning when the ship flies within a system, and the clone pod's hiss when a new clone wakes up.
+thrusters when the ship flies within a system, the jump drive taking the ship to another system, and the clone pod's
+hiss when a new clone wakes up.
+
+A sound lasts as long as the animation it goes with. A flight's length varies, so the thrusters come in three parts
+that fit any length: the ignition, a seamless loop that plays for as long as the flight, and the stop as the ship
+arrives. The jump lasts the fade to black and back (2 x the player's jump_fade_time, 0.9 s).
 
 Run from the repository root: python art-source/audio/ship_sounds.py
-Writes 16-bit mono 44.1 kHz WAVs into game/assets/audio/ship/. ship_hum.wav and airlock_cycle.wav loop seamlessly
-and are imported looping.
+Writes 16-bit mono 44.1 kHz WAVs into game/assets/audio/ship/. ship_hum.wav, airlock_cycle.wav and
+thruster_loop.wav loop seamlessly and are imported looping.
 """
 
 import math
@@ -15,7 +20,12 @@ SHIP = synth.GAME / "assets" / "audio" / "ship"
 # Each loop lasts a whole number of cycles of every steady tone in it; its noise is crossfaded across the seam.
 HUM_DURATION = 4.0
 CYCLE_DURATION = 1.0
+THRUSTER_LOOP_DURATION = 2.0
 CROSSFADE = 0.4
+# The jump lasts the player's fade to black and back: 2 x jump_fade_time.
+JUMP_DURATION = 1.8
+# The thrusters' drone, in Hz: a whole number of cycles in THRUSTER_LOOP_DURATION.
+THRUSTER_HZ = 54.0
 
 
 def looped(samples: list[float], crossfade: float) -> list[float]:
@@ -73,14 +83,42 @@ def dock() -> list[float]:
     return synth.mix((first, 1.0, 0.0), (second, 0.8, 0.45), (clink, 0.15, 0.5), (release, 0.35, 0.75))
 
 
-def thruster_burn() -> list[float]:
-    """Flying within the system: the thrusters light with a thump, roar as the ship crosses and die away, and the
-    clamps knock as it comes to rest."""
+def thruster_ignite() -> list[float]:
+    """A flight's start: the thrusters light with a thump and the roar swells, while thruster_loop.wav fades in under
+    it."""
     ignition = knock(0.4, 38.0, 8.0, seed=69, grit=0.6)
-    roar = synth.fade(synth.noise(1.3, seed=70, smoothing=0.92), 0.15, 0.7)
-    drone = synth.fade(synth.sweep(1.3, 46.0, 62.0, (1.0, 0.5, 0.3)), 0.2, 0.7)
+    roar = synth.fade(synth.noise(0.6, seed=70, smoothing=0.92), 0.15, 0.35)
+    drone = synth.fade(synth.sweep(0.6, 40.0, THRUSTER_HZ, (1.0, 0.5, 0.3)), 0.2, 0.35)
+    return synth.mix((ignition, 0.8, 0.0), (roar, 4.5, 0.05), (drone, 0.5, 0.05))
+
+
+def thruster_loop() -> list[float]:
+    """The thrusters roaring as the ship crosses: a steady drone over a rushing roar, looping seamlessly for as long as
+    the flight lasts."""
+    roar = looped(synth.noise(THRUSTER_LOOP_DURATION + CROSSFADE, seed=74, smoothing=0.92), CROSSFADE)
+    drone = synth.sweep(THRUSTER_LOOP_DURATION, THRUSTER_HZ, THRUSTER_HZ, (1.0, 0.5, 0.3))
+    return [r * 4.5 + d * 0.5 for r, d in zip(roar, drone)]
+
+
+def thruster_stop() -> list[float]:
+    """A flight's end, as the ship arrives: the clamps knock and the roar dies away."""
     clamp = knock(0.4, 60.0, 11.0, seed=71, grit=0.3)
-    return synth.mix((ignition, 0.8, 0.0), (roar, 4.5, 0.05), (drone, 0.5, 0.05), (clamp, 0.6, 1.2))
+    roar = synth.fade(synth.noise(0.4, seed=75, smoothing=0.92), 0.0, 0.35)
+    drone = synth.fade(synth.sweep(0.4, THRUSTER_HZ, 38.0, (1.0, 0.5, 0.3)), 0.0, 0.35)
+    return synth.mix((clamp, 0.6, 0.0), (roar, 4.5, 0.0), (drone, 0.5, 0.0))
+
+
+def jump() -> list[float]:
+    """Jumping to another system, lasting the fade to black and back: the drive's whine climbs as it charges through
+    the fade out, a deep thump as the ship goes through, then a falling shimmer and a rumble that die away as the
+    screen fades in at the next hub."""
+    half = JUMP_DURATION / 2.0
+    charge = synth.fade(synth.sweep(half, 110.0, 880.0, (1.0, 0.4, 0.2), curve=0.6), 0.4, 0.05)
+    thump = knock(half, 30.0, 4.0, seed=72, grit=0.7)
+    shimmer = synth.fade(synth.sweep(half, 760.0, 90.0, (0.6, 0.3, 0.2), curve=2.0), 0.02, 0.7)
+    rumble = synth.fade(synth.noise(half, seed=73, smoothing=0.95), 0.05, 0.8)
+    start = half
+    return synth.mix((charge, 0.3, 0.0), (thump, 1.0, start), (shimmer, 0.2, start), (rumble, 6.0, start))
 
 
 def pod_hiss() -> list[float]:
@@ -95,7 +133,10 @@ def main() -> None:
     synth.write(SHIP / "airlock_cycle.wav", airlock_cycle(), peak=0.6)
     synth.write(SHIP / "dock.wav", dock(), peak=0.8)
     synth.write(SHIP / "pod_hiss.wav", pod_hiss(), peak=0.5)
-    synth.write(SHIP / "thruster_burn.wav", thruster_burn(), peak=0.6)
+    synth.write(SHIP / "thruster_ignite.wav", thruster_ignite(), peak=0.6)
+    synth.write(SHIP / "thruster_loop.wav", thruster_loop(), peak=0.45)
+    synth.write(SHIP / "thruster_stop.wav", thruster_stop(), peak=0.55)
+    synth.write(SHIP / "jump.wav", jump(), peak=0.7)
 
 
 if __name__ == "__main__":

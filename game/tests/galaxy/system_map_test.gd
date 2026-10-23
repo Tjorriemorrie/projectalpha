@@ -1,9 +1,10 @@
 extends GdUnitTestSuite
 ## Flies the ship from the system map on the player's ship, with travel turned off, through the cockpit console and
 ## mouse events pushed into the viewport: interact on the console opens the map; pointing at a wreck shows its details
-## and plots its course; clicking selects it and FLY flies there, docking it at the airlock and burning hydrogen;
-## a flight the tank couldn't fly there and back to the hub is refused; FLY back to the hub; Tab and Esc close the map;
-## and the HUD's readouts hide while it is open.
+## and plots its course; clicking selects it and FLY flies there, docking it at the airlock and burning hydrogen, a
+## unit at each share of the way on the map and the bar; a flight the tank couldn't fly there and back to the hub is
+## refused, and away from the hub with no wreck in reach the map says to fly back; FLY back to the hub; Tab and Esc
+## close the map; and the ship's bar stays over it.
 ## The ship is in Praetor, with its wrecks swapped for a hand-made few at known spots: the hub at (-1, 0), the hauler
 ## at the Granary at (2, 0) (3 from the hub), the courier at (2, 4) (5 from the hub, 4 from the hauler) and the
 ## freighter at (-1, -4). Positions in the ship refer to res://scenes/ship/ship.tscn: the cockpit console at
@@ -59,8 +60,9 @@ func test_interact_on_the_console_opens_the_map() -> void:
 	assert_bool(_player.is_viewing_map()).is_true()
 	assert_str(_screen.hydrogen_text).is_equal("24/24")
 	assert_str(_screen.target_text).is_equal("NOTHING SELECTED")
-	assert_str(_hud().wallet_text).is_empty()
-	assert_str(_hud().day_text).is_empty()
+	# The ship's bar stays over the map.
+	assert_str(_hud().wallet_text).is_equal("₿500")
+	assert_str(_hud().day_text).is_equal("0")
 
 
 func test_tab_and_esc_close_it() -> void:
@@ -96,7 +98,7 @@ func test_clicking_a_wreck_and_fly_docks_it_at_the_airlock() -> void:
 	await _open_map()
 	await _click(_screen.target_center(0))
 	assert_int(_screen.selected).is_equal(0)
-	await _click(_screen.fly_button_center())
+	await _fly()
 	assert_object(GameSession.docked).is_same(_hauler.roll)
 	assert_int(GameSession.hydrogen).is_equal(21)
 	assert_bool(GameSession.at_hub).is_false()
@@ -113,14 +115,14 @@ func test_a_loop_flies_from_wreck_to_wreck_and_back_to_the_hub() -> void:
 	await _load_ship()
 	await _open_map()
 	await _click(_screen.target_center(0))
-	await _click(_screen.fly_button_center())
+	await _fly()
 	await _click(_screen.target_center(1))
 	assert_str(_screen.fly_text).is_equal("FLY  ·  4")
-	await _click(_screen.fly_button_center())
+	await _fly()
 	assert_object(GameSession.docked).is_same(_courier.roll)
 	await _click(_screen.target_center(SystemMapView.HUB))
 	assert_str(_screen.fly_text).is_equal("FLY  ·  5")
-	await _click(_screen.fly_button_center())
+	await _fly()
 	assert_bool(GameSession.at_hub).is_true()
 	assert_object(GameSession.docked).is_null()
 	assert_int(GameSession.hydrogen).is_equal(24 - 3 - 4 - 5)
@@ -134,22 +136,22 @@ func test_a_flight_the_tank_couldnt_get_back_from_is_refused() -> void:
 	await _click(_screen.target_center(1))
 	# The courier is 5 there and 5 back to the hub.
 	assert_str(_screen.fly_text).is_equal("NOT ENOUGH HYDROGEN")
-	await _click(_screen.fly_button_center())
+	await _fly()
 	assert_bool(GameSession.at_hub).is_true()
 	assert_int(GameSession.hydrogen).is_equal(9)
-	assert_str(_screen.status_text).is_equal(
-		"Not enough hydrogen: flying there and back to the hub takes 10, the tank holds 9. Refuel at the hub.")
+	assert_str(_screen.status_text).is_equal("Not enough hydrogen: flying there and back to the hub takes 10, "
+		+ "the tank holds 9. Refuel at the trader terminal.")
 
 
 func test_fly_with_nothing_selected_says_what_to_do() -> void:
 	await _load_ship()
 	await _open_map()
-	await _click(_screen.fly_button_center())
+	await _fly()
 	assert_str(_screen.status_text).is_equal("Select a wreck or the hub on the map first.")
 	await _click(_screen.target_center(SystemMapView.HUB))
 	assert_str(_screen.target_text).is_equal("PRAETOR HANSE")
 	assert_str(_screen.fly_text).is_equal("AT THE HUB")
-	await _click(_screen.fly_button_center())
+	await _fly()
 	assert_str(_screen.status_text).is_equal("The ship is already there.")
 
 
@@ -162,6 +164,68 @@ func test_clicking_empty_space_on_the_map_clears_the_selection() -> void:
 	var empty := _screen.target_center(SystemMapView.HUB) + Vector2(0.0, 80.0)
 	await _click(empty)
 	assert_int(_screen.selected).is_equal(SystemMapView.NONE)
+
+
+func test_a_flight_burns_its_hydrogen_a_unit_at_a_time() -> void:
+	await _load_ship()
+	await _open_map()
+	await _click(_screen.target_center(0))
+	_mouse_button(_screen.fly_button_center(), true)
+	await _physics_frames(1)
+	_mouse_button(_screen.fly_button_center(), false)
+	# The ship is docked at once; on the map the hauler's 3 units burn one at each third of the way, and the bar too.
+	assert_object(GameSession.docked).is_same(_hauler.roll)
+	var seen: Array[String] = []
+	var frames := 0
+	while _screen.is_flying() and frames < 600:
+		if seen.is_empty() or seen.back() != _screen.hydrogen_text:
+			seen.append(_screen.hydrogen_text)
+		assert_str(_hud().hydrogen_text).is_equal(_screen.hydrogen_text)
+		# The thrusters roar for as long as the flight.
+		assert_bool(_screen.is_engine_running()).is_true()
+		await _physics_frames(1)
+		frames += 1
+	await _physics_frames(1)
+	assert_bool(_screen.is_engine_running()).is_false()
+	assert_array(seen).is_equal(["24/24", "23/24", "22/24"])
+	assert_str(_screen.hydrogen_text).is_equal("21/24")
+	assert_str(_hud().hydrogen_text).is_equal("21/24")
+	# Half a second a unit: 1.5 s of game time at 60 physics frames a second.
+	assert_int(frames).is_between(80, 100)
+	assert_str(_screen.status_text).is_equal("Docked with the hauler at the Granary. Board it through the airlock.")
+
+
+func test_closing_the_map_mid_flight_stops_the_engine_with_the_ship_there() -> void:
+	await _load_ship()
+	await _open_map()
+	await _click(_screen.target_center(0))
+	await _click(_screen.fly_button_center())
+	assert_bool(_screen.is_engine_running()).is_true()
+	await _press(&"inventory")
+	assert_bool(_screen.is_engine_running()).is_false()
+	assert_object(GameSession.docked).is_same(_hauler.roll)
+	assert_str(_hud().hydrogen_text).is_equal("21/24")
+
+
+func test_low_on_hydrogen_away_from_the_hub_only_the_hub_is_left() -> void:
+	# The ship boarded the hauler and sits where it was, 3 from the hub, with 3 hydrogen: no other wreck is in reach.
+	GameSession.system.remove(_hauler)
+	GameSession.ship_position = _hauler.position
+	GameSession.at_hub = false
+	GameSession.hydrogen = 3
+	await _load_ship()
+	await _open_map()
+	assert_str(_screen.status_text).is_equal(
+		"Low on hydrogen: no wreck is in reach with enough left to get back. Fly back to the hub to buy more.")
+	await _click(_screen.target_center(0))
+	await _fly()
+	assert_bool(GameSession.at_hub).is_false()
+	assert_str(_screen.status_text).ends_with("Fly back to the hub to buy more.")
+	await _click(_screen.target_center(SystemMapView.HUB))
+	await _fly()
+	assert_bool(GameSession.at_hub).is_true()
+	assert_int(GameSession.hydrogen).is_equal(0)
+	assert_str(_screen.status_text).is_equal("Back at the hub. Trade and refuel at the trader terminal.")
 
 
 func _load_ship() -> void:
@@ -190,6 +254,15 @@ func _open_map() -> void:
 	await _press(&"interact")
 	assert_bool(_screen.is_open).is_true()
 	await _physics_frames(1)
+
+
+## Clicks FLY and waits for the flight to end on the map.
+func _fly() -> void:
+	await _click(_screen.fly_button_center())
+	for _frame in 600:
+		if not _screen.is_flying():
+			break
+		await _physics_frames(1)
 
 
 func _click(at: Vector2) -> void:

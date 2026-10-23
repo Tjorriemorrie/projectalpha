@@ -100,8 +100,9 @@ projectalpha/
 
 The session lives in memory in `GameSession` (008): the stash, the clone number, the runs boarded and the kit
 handed between scenes, since 009 the wallet, the hub's price seed and the sell crate, since 010 the docked
-wreck's roll, and since 011 the star system with the wrecks still in it, where the ship is, the hydrogen and the
-day. Nothing is saved yet, so quitting starts a new game. TBD: what is saved, file format, where
+wreck's roll, since 011 the star system with the wrecks still in it, where the ship is, the hydrogen and the
+day, and since 012 the antimatter and its order, the drive's recharge, every system revealed with its hub, and the
+route. Nothing is saved yet, so quitting starts a new game. TBD: what is saved, file format, where
 (`user://`).
 
 ## 5. Systems
@@ -236,8 +237,11 @@ so WASD keeps its position on other keyboard layouts.
 | `inventory_drag` | Left mouse button (hold): drags an item in the inventory |
 | `inventory_rotate` | Right mouse button: turns the dragged item a quarter turn |
 | `inventory_mirror` | Middle mouse button and the wheel: mirrors the dragged item |
+| `map_tab` | Q: switches between the system map and the star map |
 
 The inventory actions share buttons with `shoot` and `aim`; while the inventory is open the weapon takes no input.
+The HUD's screens get only mouse events (they don't take keyboard focus), so the keys that work them (`inventory`,
+`pause` and `interact` to close, `map_tab` to switch the map's tabs) are read by the player in `_physics_process`.
 
 Prompts show the bound key by reading the Input Map (`as_text_physical_keycode()`), never a hard-coded letter.
 
@@ -356,7 +360,7 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
   destroyed) and lock-on, and fires once locked; `RobotHeat` makes it vent. Its fire starts wide and walks in the
   longer it keeps the player in sight (`RobotRules.aim_spread`), and it aims where the player was a moment ago
   (`AimTrail`), so moving draws misses. `Turret` and `Drone` extend it for how
-  they move. A robot scene's root is the robot, with unique nodes `%Eye` (faces −Z; it sees and fires from there),
+  they move; a turret turns all the way round by default (`Turret.arc` 360°, since 012's playtest). A robot scene's root is the robot, with unique nodes `%Eye` (faces −Z; it sees and fires from there),
   `%Searchlight`, `%Health`, `%Model` and its sounds. Robots join the `robots` group and find the player through the
   `player` group. They wake a physics frame after the end of their first frame, once the wreck's CSG walls have
   rebuilt; before that they would see through walls.
@@ -396,8 +400,10 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
   before the key cap and fills a second ring, in the placards' ink, round the centre dot. The clip readout hides
   while the player is unarmed (`Hud.hide_clips()`). The inventory screen (007), the trader hub's screen (009) and
   the system map (011) are part of the HUD; all extend `MenuScreen` (placards in two columns, key hints, the pointer
-  from mouse events, fade), the first two through `GridScreen` (dragging items). At home the top left shows the
-  bitcoin, the hydrogen and the day (`Hud.show_wallet()`), hidden while the hub's screen or the map is open. So is the run summary (008), a placard drawn on the black screen after a run (`RunSummaryCard`,
+  from mouse events, fade), the first two through `GridScreen` (dragging items). At home a bar across the top shows
+  the bitcoin, the hydrogen, the antimatter and the day (`Hud.show_wallet()`), over every screen, which keep
+  `MenuScreen.top_inset` clear for it (012). So is the run summary (008), a placard drawn on the black screen after
+  a run (`RunSummaryCard`,
   with the clone's lifeline traced in the laser's blue, or flatlining in red after a death); `Hud.fade_in()` lifts the
   black on arrival.
 
@@ -462,7 +468,8 @@ Built in [008](features/008-extraction-and-clone-loop.md).
   screen through `Player.open_trader()` (009), only while the ship is at the hub (011); elsewhere its screen reads
   "OUT OF RANGE" and it is off.
 - **Cockpit console.** `SystemConsole` in front of the pilot seat; its `Interactable` ("System map") opens the
-  system map through `Player.open_system_map()` (011), and its screen names the system.
+  system map through `Player.open_system_map()` (011), whose second tab is the star map (012), and its screen names
+  the system, again after a jump (`GameSession.ship_moved`).
 - **Outside.** The space beyond the cockpit window is the ship environment's star sky shader
   (`scenes/ship/starfield.gdshader`) and the wreck's dark hull as CSG on render layer 2 (`exterior`), lit only by a
   directional light whose cull mask is that layer, so it never lights the ship's inside. The hull and docking tube
@@ -490,8 +497,8 @@ Built in [009](features/009-trader-hub.md).
   or refusal. Selling is from the stash only, so carried loot goes into the stash first.
 - **Bitcoin.** The only currency is bitcoin: every amount the player sees goes through `Bitcoin.format()`
   (`scripts/bitcoin.gd`): the ₿ symbol, commas between thousands, and a sign for changes (`₿1,240`, `−₿50`,
-  `+₿154`). At home the HUD shows the wallet in the top left: the ship's player has `shows_wallet` on, calls
-  `Hud.show_wallet()` and feeds it `GameSession.bitcoin_changed`; the readout hides while the hub's screen is open.
+  `+₿154`). At home the HUD's bar across the top shows the wallet: the ship's player has `shows_wallet` on, calls
+  `Hud.show_wallet()` and feeds it `GameSession.bitcoin_changed`; the bar stays over the hub's screen (012).
 
 ### Wreck layouts and rolls
 
@@ -525,9 +532,9 @@ Built in [010](features/010-wreck-variety.md).
 Built in [011](features/011-system-map.md).
 
 - **Systems.** All 50 systems of [galaxy.md](galaxy.md) are content (`StarSystemDefinition`, `scenes/galaxy/`): map
-  ID, star, owner, `map_position` (light years, for 012) and places (`SystemPlace`: name, kind, habitable, note),
+  ID, star, owner, `map_position` (light years, used by 012) and places (`SystemPlace`: name, kind, habitable, note),
   from the star outwards with each moon after its planet. They are written by `art-source/galaxy/systems.py`; edit
-  galaxy.md or `galaxy.json` and rerun it. A new game arrives in a random one (`GameSession.arrive_in()`).
+  galaxy.md or `galaxy.json` and rerun it. A new game arrives in one on the outer ring (012, see below).
 - **The map.** `StarSystem` (node-free) lays a system out in map units: one orbit per place, a unit apart, at angles
   seeded from the map ID and kept at least `ORBIT_ANGLE_GAP` apart, a moon just below its planet and the hub just
   above the first habitable world (y down, as drawn), so names don't collide. `StarSystem.reveal()` rolls 6 to 8
@@ -543,8 +550,46 @@ Built in [011](features/011-system-map.md).
   dark scope, and a column with the system, the hydrogen (`FuelGauge`, segmented like the heat gauge), the target
   and FLY. Targets are indices (a wreck's in `system.wrecks`, `HUB`, `NONE`): the one under the pointer, or else
   the selected one, shows its details and its course (dashed, with the hydrogen per leg, red when refused) on the
-  map and the gauge. FLY slides the ship's marker along the course and plays `thruster_burn.wav`. Clicks use
+  map and the gauge. FLY slides the ship's marker along the course with the thrusters roaring for as long (an
+  ignition, a loop and a stop; see the asset pipeline). Since 012 the
+  marker takes `FLY_TIME_PER_UNIT` (0.5 s) a unit of hydrogen, at least `MIN_FLY_TIME` (1 s), and the gauge burns a
+  unit at each share of the way (`SystemMapView.flight_progressed`), the ship's bar with it (`hydrogen_shown`); the
+  session has the ship there at once. FLY does nothing mid-flight. Away from the hub with nothing docked and no
+  wreck in reach and back (`GameSession.can_reach_a_wreck()`), the status line says to fly back to the hub. Clicks use
   `inventory_drag` like the hub's screen.
+
+### Travel between systems
+
+Built in [012](features/012-star-map-and-travel.md).
+
+- **The galaxy.** `Galaxy` (`scenes/galaxy/`, node-free) works on `map_position` in light years: `distance()`,
+  `antimatter_between()` (a unit per light year, rounded up, at least one), `in_range()` (within `JUMP_RANGE`,
+  10 ly, nearest first: 4 to 6 per system, 5 to 10 units a jump) and `pick_start()`: the `outer_ring()` system
+  (`OUTER_RING`, 28 ly from the middle) nearest a random direction.
+- **Antimatter.** `GameSession` keeps `antimatter` (tank 10, `STARTING_ANTIMATTER` 2) and one order (`order_units`,
+  `order_day`). `order_antimatter()` (hub only) fills the tank, every empty unit or nothing, at
+  `Trader.antimatter_price()` (₿100 a unit within the hub's ±5%), paid at once; it arrives
+  `Trader.DELIVERY_DAYS` later (1, fixed for now) and waits at the hub until `collect_antimatter()`, from COLLECT on
+  the hub's screen, loads it; the screen fills the gauge a block every `FILL_STEP` (0.1 s), and the bar follows it
+  (`antimatter_shown`). `antimatter_changed` fires on ordering and collecting.
+- **Jumps.** `check_jump()` says why a jump can't go (`Jump`: here, out of range, away from the hub, recharging,
+  order pending, short of antimatter); `jump_to()` burns the antimatter, passes a day (`day_changed`), sets
+  `drive_ready_day` (`RECHARGE_DAYS` 1) and calls `arrive_in()`, which reuses a known system (`revealed`, by ID) and
+  its hub, appends to `route` and docks at the hub, then emits `ship_moved`.
+- **Intel.** `check_intel()` (`Intel`: known, out of range, away from the hub, short) and `buy_intel()`
+  (`Trader.intel_price()`, ₿200 within ±5%) reveal a system in range: `reveal()` rolls its wrecks now and keeps it.
+  `known_system()` is what the player knows of a system: the current one, or one revealed.
+- **Never stranded.** `_keep_from_stranding()` runs on arrival, on ordering and in `continue_to_ship()`: while the
+  ship can't jump on yet, it adds level-1 wrecks (`StarSystem.add_wrecks(..., level)`) to cover `wait_days()`, or
+  up to 3 or 4 when the tank holds too little for the shortest jump and the wallet plus `ship_worth()` (the stash
+  and the kit carried home, at the hub's offer) can't pay to fill it.
+- **Screens.** `MapScreen` (a `MenuScreen`) is the base of both map tabs: tab headers, buttons, the status line and
+  centring. `tab_requested` asks the `Hud` to close one tab and open the other quietly (`MenuScreen._switching`). The
+  `StarMapScreen` holds `StarMapView` (the cluster drawn in code, north up: territory halos, the trail, the range
+  circle with a lane and burn per system in range) and a column with the system, the antimatter (`FuelGauge`), the
+  target with its ships, BUY INTEL and JUMP. Holding JUMP for `JUMP_HOLD_TIME` emits `jump_confirmed`;
+  `Player.jump_to()` fades out over `jump.wav`, jumps, has the HUD show the arrival on the system map
+  (`Hud.show_arrival()`) and fades in. `SystemMapScreen.open(viewing)` shows another known system read-only.
 
 ### Lighting
 
@@ -590,6 +635,11 @@ Built in [011](features/011-system-map.md).
   `art-source/audio/`, which write `.wav` files into the content folder of the piece of content they belong to
   (or `game/assets/audio/` for shared sounds). Run them from the repository root, e.g.
   `python art-source/audio/elevator_ding.py`.
+- A sound that goes with an animation lasts as long as it (the rule is in [CLAUDE.md](../CLAUDE.md)). A fixed one is
+  generated at that length (the jump: twice the player's `jump_fade_time`, 1.8 s). A varying one comes in three
+  parts: a start, a seamless loop imported looping (`edit/loop_mode=2` in its `.wav.import`, like `ship_hum.wav`),
+  and an end; the thrusters on the system map play `thruster_ignite.wav`, loop `thruster_loop.wav` for as long as
+  the flight and play `thruster_stop.wav` on arrival.
 
 ## 7. Performance targets
 

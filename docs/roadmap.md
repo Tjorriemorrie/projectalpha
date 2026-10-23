@@ -44,7 +44,7 @@ Ordered, but only roughly. Re-order freely once the MVP is played.
 | 009 | [Trader hub](features/009-trader-hub.md) | done |
 | 010 | [Wreck variety](features/010-wreck-variety.md) | done |
 | 011 | [System map](features/011-system-map.md) | done |
-| 012 | [Star map and travel](features/012-star-map-and-travel.md) | planned |
+| 012 | [Star map and travel](features/012-star-map-and-travel.md) | done |
 
 Later, roughly in this order: triangulation, her messages and the rescue clock's countdown, the company's ships and
 the cure, and the android stock (together with swapping the clone fiction for the android link). Saving has to land
@@ -79,8 +79,11 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
   tables, container weights and the expected robots per level of each layout (010), which ships and stations spawn
   in a system when it is revealed (how many, now 6 to 8, which kinds, how risky and how many in open space; 011,
   012), the hydrogen tank (24), what a flight burns and hydrogen's price (₿5 a unit; 011), intel's price (012),
-  antimatter's price and procurement days, ingredient and android prices, decryption delay, how quickly the pings
-  narrow, the countdown's length, and run difficulty (aiming at about half of all runs extracting).
+  the antimatter tank and what a jump burns (10 units, one a light year; 012), antimatter's price (₿100 a unit; 012),
+  the antimatter a new game starts with (2 of 10; more if antimatter gets dearer; 012), the days antimatter takes to
+  arrive (fixed at 1 for now; the design has them grow through the game; 012), the drive's recharge (a day; 012), the
+  ships that turn up when a player would be stranded (012), ingredient and android prices, decryption delay, how
+  quickly the pings narrow, the countdown's length, and run difficulty (aiming at about half of all runs extracting).
 - Blueprint-based wreck generation: a blueprint per ship class and a generator that snaps sections together on the
   grid every run; 010 builds its layouts by hand.
 - The ship's window shows the docked wreck's own hull (010 keeps one dark hull for every layout).
@@ -92,3 +95,8 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
 - A way through (nice to have, much later; it needs a cutscene): the last stretch to her is cut off by a nebula,
   minefield, anomaly or blockade, and charts, codes or a drive upgrade get the player past it.
 - Job-board leads at the hubs (nice to have, much later): tips about particular ships or stations in the system.
+- Maybe let a jump reach any system the tank can reach, not just the neighbours on the jump network (012 limits a
+  jump to the systems within 10 ly, the lanes on the star map).
+- Ships the player can survive: 012's rule against being stranded counts the wrecks left, not whether he can handle
+  them, so an early system that rolls one courier among haulers and freighters pushes a weak player onto a harder
+  ship. The hidden pacing should pick a mix that suits him (enough couriers early on).

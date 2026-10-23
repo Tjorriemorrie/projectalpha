@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
 ## Unit tests for Trader, a hub's prices: selling pays an item's value and buying costs twice that, each varied a
-## little and always the same way by the hub's seed; hydrogen's price and how much a wallet buys; the offer for a
-## crate; and the shelf's order.
+## little and always the same way by the hub's seed; hydrogen's and antimatter's prices, how much hydrogen a wallet buys;
+## intel's price; the offer for a crate; and the shelf's order.
 
 var _clip: ItemDefinition
 var _coil: ItemDefinition
@@ -43,6 +43,21 @@ func test_the_wallet_buys_as_much_hydrogen_as_it_pays_for() -> void:
 		var units := trader.affordable_hydrogen(24, bitcoin)
 		assert_int(trader.hydrogen_price(units)).is_less_equal(bitcoin)
 		assert_int(trader.hydrogen_price(units + 1)).is_greater(bitcoin)
+
+
+func test_a_full_tank_of_antimatter_costs_about_1000_give_or_take_the_variance() -> void:
+	for hub_seed in [1, 7, 42, 99]:
+		var trader := Trader.new(hub_seed)
+		assert_int(trader.antimatter_price(10)).is_between(950, 1050)
+		assert_int(trader.antimatter_price(0)).is_equal(0)
+		assert_int(trader.antimatter_price(4)).is_less(trader.antimatter_price(10))
+
+
+func test_intel_costs_about_200_at_every_hub() -> void:
+	for hub_seed in [1, 7, 42, 99]:
+		assert_int(Trader.new(hub_seed).intel_price()).is_between(190, 210)
+	assert_int(Trader.new(5).intel_price()).is_equal(Trader.new(5).intel_price())
+
 
 
 func test_a_hub_always_quotes_the_same_price() -> void:
