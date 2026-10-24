@@ -3,8 +3,8 @@ extends CharacterBody3D
 ## First-person player controller: walking, sprinting, crouching, mouse look, stepping onto low obstacles,
 ## riding elevators, the flashlight, using interactables by looking at them (pressing interact, or holding it to pry
 ## a container open), peeking and aiming out of cover, the hitboxes enemies can hit, the weapon (aim down sights
-## zoom, kick) and health (hit feedback, death), the inventory (weapon slot, pockets and backpack, searching
-## containers, picking up and dropping items), trading at the hub from the ship, and what enemies sense of the player:
+## zoom, kick) and health (hit feedback, death), the inventory (weapon and ammo slots, pockets and backpack,
+## searching containers, picking up and dropping stacks), trading at the hub from the ship, and what enemies sense of the player:
 ## footsteps they can hear, and which parts are lit so they can be seen from afar. MovementRules and PeekRules make the
 ## decisions; this script applies them to the body, head and camera. The Weapon fires and reloads the gun in the weapon
 ## slot (none: unarmed), Health counts the damage, the HUD's InventoryScreen moves the items and its TraderScreen
@@ -12,7 +12,7 @@ extends CharacterBody3D
 ## A run ends by dying or by leaving through an airlock (extracting from a wreck, or boarding one from the ship): the
 ## player stops, the screen fades to black, and the GameSession takes what they carry on to the next scene. The
 ## player takes it over in turn when it is ready; with none, the first clone of a new game builds the basic kit and a
-## clone after a death starts empty-handed.
+## clone after a death starts empty-handed. After an extraction the run summary can unload the haul into the stash.
 
 ## Emitted when the movement state changes, so systems such as noise and footsteps can react to it.
 signal movement_state_changed(previous: MovementRules.State, current: MovementRules.State)
@@ -101,11 +101,10 @@ const DROP_SCATTER := 0.2
 @export var interact_reach: float = 2.0
 
 @export_group("Peek")
-## Metres the head reaches to either side, up and down while peeking.
+## Metres the head reaches while peeking: to either side when standing, up when crouched (the only ways it goes).
 @export var peek_side_reach: float = 0.4
 @export var peek_up_reach: float = 0.35
-@export var peek_down_reach: float = 0.15
-## Metres the head reaches to either side and up while aiming out of cover; down stays at peek_down_reach.
+## Metres the head reaches to either side (standing) or up (crouched) while aiming out of cover.
 @export var aim_out_side_reach: float = 0.6
 @export var aim_out_up_reach: float = 0.5
 ## Degrees the view tilts at a full sideways peek; 0 turns the tilt off.
@@ -144,16 +143,16 @@ const DROP_SCATTER := 0.2
 @export var jump_sound: AudioStream = preload("res://assets/audio/ship/jump.wav")
 
 @export_group("Inventory")
-## Cells of the pockets, for things at hand (a reload takes its clips from there), of the backpack, and of the weapon
-## slot, which holds one gun.
-@export var pocket_size := Vector2i(4, 1)
-@export var backpack_size := Vector2i(6, 5)
-@export var weapon_slot_size := Vector2i(3, 2)
-## Fresh thermal clips in the basic kit besides the loaded one, in the pockets and in the backpack: the first clone of
-## a new game wakes with it, and so does a player in a level started on its own. A player arriving from another scene
-## carries on with what they had instead, and a clone after a death wakes empty-handed. Test levels pack two in the
-## backpack.
-@export var starting_pocket_clips: int = 2
+## Slots of the ammo slots, which take thermal clips only (a reload takes its clip from there), of the pockets, for
+## things at hand, and of the backpack. The weapon slot holds one gun.
+@export var ammo_size := Vector2i(2, 1)
+@export var pocket_size := Vector2i(2, 1)
+@export var backpack_size := Vector2i(6, 1)
+## Fresh thermal clips in the basic kit besides the loaded one, as a stack in the ammo slots and one in the backpack:
+## the first clone of a new game wakes with it, and so does a player in a level started on its own. A player arriving
+## from another scene carries on with what they had instead, and a clone after a death wakes empty-handed. Test
+## levels pack two in the backpack.
+@export var starting_ammo_clips: int = 2
 @export var starting_backpack_clips: int = 0
 ## Whether dropped items lie on the floor here. There is no floor on the ship: nothing can be dropped there.
 @export var has_floor := true
@@ -185,7 +184,7 @@ var head_offset := Vector2.ZERO
 ## The thermal clips the player carries for the gun in hand; the weapon fires from them. The clips themselves are items
 ## in the inventory, and the loaded clip's heat lives on the gun.
 var clips: ThermalClips
-## What the player carries: the weapon slot, the pockets and the backpack.
+## What the player carries: the weapon and ammo slots, the pockets and the backpack.
 var inventory: Inventory
 var is_dead := false
 ## Leaving through an airlock: the player stands still and can't be hit while the screen fades to black.
@@ -263,6 +262,7 @@ func _ready() -> void:
 	_setup_head()
 	_setup_combat()
 	_inventory_screen.dropped_on_floor.connect(_on_dropped_on_floor)
+	_inventory_screen.floor_topped_up.connect(_on_floor_topped_up)
 	_inventory_screen.taken_from_floor.connect(_on_taken_from_floor)
 	_star_map.jump_confirmed.connect(jump_to)
 	if shows_wallet:
@@ -277,9 +277,9 @@ func _ready() -> void:
 		GameSession.fade_in_next = false
 		_hud.fade_in(arrive_fade_time)
 	Log.info(("🏃 Player ready: position=%s, walk=%.1f, sprint=%.1f, crouch=%.1f m/s, max_step=%.2f m, fov=%.0f°, "
-		+ "peek=%.2f/%.2f/%.2f m, aim_out=%.2f/%.2f m, wallet=%s") % [
+		+ "peek=%.2f side/%.2f up m, aim_out=%.2f/%.2f m, wallet=%s") % [
 		global_position, walk_speed, sprint_speed, crouch_speed, max_step_height, horizontal_fov,
-		peek_side_reach, peek_up_reach, peek_down_reach, aim_out_side_reach, aim_out_up_reach,
+		peek_side_reach, peek_up_reach, aim_out_side_reach, aim_out_up_reach,
 		Bitcoin.format(GameSession.bitcoin) if shows_wallet else "hidden"])
 
 
@@ -315,6 +315,8 @@ func _physics_process(delta: float) -> void:
 		# Changing the scene takes this one out of the tree at once, so nothing more may run this frame.
 		_continue_to_ship()
 		return
+	if _awaiting_continue and Input.is_action_just_pressed("unload_haul"):
+		unload_haul()
 	if is_dead or is_leaving:
 		# The body comes to rest where it fell (or stands in the airlock); only interact, past the summary, does
 		# anything any more.
@@ -371,11 +373,12 @@ func set_look(yaw: float, pitch: float = 0.0) -> void:
 	Log.info("🏃 Look set: yaw=%.1f°, pitch=%.1f°" % [rad_to_deg(_yaw), rad_to_deg(_pitch)])
 
 
-## Moves the head while peeking, by a mouse motion in pixels (right and down are positive, as on screen).
-## The gamepad's right stick will feed it too. The head follows over the next physics frames.
+## Moves the head while peeking, by a mouse motion in pixels (right and down are positive, as on screen): only the
+## sideways part counts while standing, and only upwards while crouched. The gamepad's right stick will feed it too.
+## The head follows over the next physics frames.
 func move_head(motion: Vector2) -> void:
-	_peek_target = PeekRules.clamp_to_range(_peek_target + Vector2(motion.x, -motion.y) * peek_sensitivity,
-		peek_side_reach, peek_up_reach, peek_down_reach)
+	var wanted := PeekRules.restrict(_peek_target + Vector2(motion.x, -motion.y) * peek_sensitivity, is_crouched)
+	_peek_target = PeekRules.clamp_to_range(wanted, peek_side_reach, peek_up_reach, 0.0)
 
 
 ## The parts of the player enemies can hit. Only the active ones are out (see Hitbox.is_active()).
@@ -578,7 +581,7 @@ func _setup_combat() -> void:
 	if carried:
 		inventory = carried
 	else:
-		inventory = Inventory.new(pocket_size, backpack_size, weapon_slot_size)
+		inventory = Inventory.new(ammo_size, pocket_size, backpack_size)
 		kit = "basic" if GameSession.basic_kit_next else "none"
 		if GameSession.basic_kit_next:
 			_pack_basic_kit()
@@ -589,14 +592,14 @@ func _setup_combat() -> void:
 	_arm()
 	inventory.weapon.changed.connect(_arm)
 	_hud.set_health(_health.health, _health.max_health, false)
-	Log.info(("🏃 Combat ready: health=%.0f, weapon=%s, kit=%s, pockets=%s, backpack=%s, items=%d, fresh=%d, "
-		+ "packed=%d, heat=%.0f%%, holstered=%s, critical_health=%.0f") % [_health.health,
-		_weapon.definition.id if _weapon.is_equipped() else "none", kit, pocket_size, backpack_size,
+	Log.info(("🏃 Combat ready: health=%.0f, weapon=%s, kit=%s, ammo=%s, pockets=%s, backpack=%s, items=%d, "
+		+ "fresh=%d, packed=%d, heat=%.0f%%, holstered=%s, critical_health=%.0f") % [_health.health,
+		_weapon.definition.id if _weapon.is_equipped() else "none", kit, ammo_size, pocket_size, backpack_size,
 		inventory.item_count(), clips.fresh, clips.packed, clips.heat * 100.0, holstered, critical_health])
 
 
-## The basic kit: the starting gun, with a fresh clip loaded, in the weapon slot, and fresh clips for it in the
-## pockets and the backpack.
+## The basic kit: the starting gun, with a fresh clip loaded, in the weapon slot, and stacks of fresh clips for it in
+## the ammo slots and the backpack.
 func _pack_basic_kit() -> void:
 	var gun := ContentRegistry.get_definition(starting_weapon_id) as WeaponDefinition
 	if gun == null:
@@ -607,12 +610,12 @@ func _pack_basic_kit() -> void:
 	if clip == null:
 		Log.error("🏃 Basic kit has no clips, not a registered item: weapon=%s, clip_item=%s" % [gun.id, gun.clip_item])
 		return
-	for i in starting_pocket_clips:
-		inventory.pockets.add(Item.new(clip))
-	for i in starting_backpack_clips:
-		inventory.backpack.add(Item.new(clip))
-	Log.info("🏃 Basic kit packed: gun=%s, pocket_clips=%d, backpack_clips=%d" % [
-		gun.id, starting_pocket_clips, starting_backpack_clips])
+	if starting_ammo_clips > 0:
+		inventory.ammo.add(Item.new(clip, starting_ammo_clips))
+	if starting_backpack_clips > 0:
+		inventory.backpack.add(Item.new(clip, starting_backpack_clips))
+	Log.info("🏃 Basic kit packed: gun=%s, ammo_clips=%d, backpack_clips=%d" % [
+		gun.id, inventory.ammo.count(clip), inventory.backpack.count(clip)])
 
 
 ## Holds the gun in the weapon slot: equips it with its clips when it changed, and puts the weapon away when the slot
@@ -637,6 +640,7 @@ func _arm() -> void:
 		Log.error("🏃 Weapon clips are not registered items: weapon=%s, clip_item=%s, spent_clip_item=%s" % [
 			definition.id, definition.clip_item, definition.spent_clip_item])
 	clips = ThermalClips.new(inventory, fresh_clip, spent_clip, gun)
+	clips.overflowed.connect(_on_clip_overflowed)
 	var own_hitboxes: Array[RID] = []
 	for hitbox in get_hitboxes():
 		own_hitboxes.append(hitbox.get_rid())
@@ -648,7 +652,7 @@ func _arm() -> void:
 ## The peek follows the peek and aim actions (see PeekRules.next_state). Releasing peek centres the peek target,
 ## so the next peek starts from the body. Runs every physics frame, so it only logs when the state changes.
 func _update_peek_state(allowed: bool = true) -> void:
-	var centred := PeekRules.is_centred(_peek_target, peek_side_reach, peek_up_reach, peek_down_reach)
+	var centred := PeekRules.is_centred(_peek_target, peek_side_reach, peek_up_reach, 0.0)
 	var next := PeekRules.next_state(peek_state, Input.is_action_pressed("peek"), Input.is_action_pressed("aim"),
 		centred) if allowed else PeekRules.State.NONE
 	if next == peek_state:
@@ -658,17 +662,20 @@ func _update_peek_state(allowed: bool = true) -> void:
 	if next == PeekRules.State.NONE:
 		_peek_target = Vector2.ZERO
 	_arm_hitbox.set_active(next == PeekRules.State.AIM_OUT)
-	Log.info("🏃 Peek state changed: %s -> %s, peek_target=%s, head=%s, position=%s" % [
-		PeekRules.State.keys()[previous], PeekRules.State.keys()[next], _peek_target, head_offset, global_position])
+	Log.info("🏃 Peek state changed: %s -> %s, peek_target=%s, head=%s, crouched=%s, position=%s" % [
+		PeekRules.State.keys()[previous], PeekRules.State.keys()[next], _peek_target, head_offset, is_crouched,
+		global_position])
 	peek_state_changed.emit(previous, next)
 
 
 ## Moves the head towards where the peek wants it (further out in the same direction while aiming out, back to
-## the body when not peeking), stops it at walls, and moves the hitboxes with it. Runs every physics frame.
+## the body when not peeking), stops it at walls, and moves the hitboxes with it. Crouching or standing up mid-peek
+## keeps the peek to the new stance's way (sideways standing, up crouched). Runs every physics frame.
 func _update_head(delta: float) -> void:
+	_peek_target = PeekRules.restrict(_peek_target, is_crouched)
 	var target := _peek_target
 	if peek_state == PeekRules.State.AIM_OUT:
-		target = PeekRules.aim_out_offset(_peek_target, peek_side_reach, peek_up_reach, peek_down_reach,
+		target = PeekRules.aim_out_offset(_peek_target, peek_side_reach, peek_up_reach, 0.0,
 			aim_out_side_reach, aim_out_up_reach)
 	_head_offset_previous = head_offset
 	head_offset = _clear_head_path(head_offset.move_toward(target, head_speed * delta))
@@ -712,7 +719,7 @@ func _update_interact_target() -> void:
 	var action := target.prompt if target else ""
 	var dropped := target.get_parent() as DroppedItem if target else null
 	if dropped:
-		action = "Pick up %s" % dropped.item.definition.display_name.to_lower()
+		action = "Pick up %s" % dropped.item.label()
 	var hold := target != null and target.hold_time > 0.0
 	if target != interact_target:
 		interact_target = target
@@ -757,7 +764,7 @@ func _end_hold() -> void:
 	_hold = -1.0
 
 
-## Uses an interactable: a dropped item opens the inventory with it on the floor, to be dragged into a grid; loot is
+## Uses an interactable: a dropped stack opens the inventory with it on the floor, to be dragged into a slot; loot is
 ## searched once it is open; anything else is interacted with.
 func _use(target: Interactable) -> void:
 	var dropped := target.get_parent() as DroppedItem
@@ -771,8 +778,8 @@ func _use(target: Interactable) -> void:
 		open_inventory(loot)
 
 
-## The floor for the inventory screen: the dropped items in sight within floor_reach of the feet (and picked, if
-## given), nearest first, laid out in a grid InventoryScreen.FLOOR_COLUMNS wide that grows to hold them all.
+## The floor for the inventory screen: the dropped stacks in sight within floor_reach of the feet (and picked, if
+## given), nearest first, each in a slot of its own (InventoryScreen.make_floor(), which grows to hold them all).
 func _gather_floor(picked: DroppedItem) -> ItemGrid:
 	var space := get_world_3d().direct_space_state
 	var eye := _camera.global_position
@@ -792,12 +799,11 @@ func _gather_floor(picked: DroppedItem) -> ItemGrid:
 	nearby.sort_custom(func(a: DroppedItem, b: DroppedItem) -> bool:
 		return a.global_position.distance_squared_to(global_position) \
 			< b.global_position.distance_squared_to(global_position))
-	var floor := ItemGrid.new(Vector2i(InventoryScreen.FLOOR_COLUMNS, InventoryScreen.FLOOR_SPARE_ROWS))
+	var floor := InventoryScreen.make_floor()
 	for dropped in nearby:
-		if not floor.add(dropped.item):
-			floor.grow_to(floor.size.y + ItemShape.size_of(dropped.item.definition.get_cells()).y)
-			floor.add(dropped.item)
-	Log.info("🏃 Gathered the floor: items=%d, reach=%.1f m, picked=%s" % [
+		# Each lies in the world on its own, so stacks of the same kind keep slots of their own here.
+		floor.place(dropped.item, floor.first_free(dropped.item.definition))
+	Log.info("🏃 Gathered the floor: stacks=%d, reach=%.1f m, picked=%s" % [
 		floor.items.size(), floor_reach, picked.item.definition.id if picked else "none"])
 	return floor
 
@@ -823,8 +829,9 @@ func _update_while_sorting(delta: float) -> void:
 	_weapon.physics_update(delta, false, true, false)
 
 
-## An item was dragged onto the inventory screen's floor (or out of the inventory): it lands in front of the
-## player's feet (at their feet when a wall is in the way), and clatters, a noise enemies hear.
+## A stack landed on the inventory screen's floor as its own (dragged there or out of the inventory, or a clip with
+## no room): it lands in front of the player's feet (at their feet when a wall is in the way), and clatters, a noise
+## enemies hear.
 func _on_dropped_on_floor(item: Item) -> void:
 	var forward := -global_basis.z
 	var chest := global_position + up_direction * 0.5
@@ -841,23 +848,60 @@ func _on_dropped_on_floor(item: Item) -> void:
 	body.global_position = global_position + forward * distance + aside + up_direction * 0.3
 	body.rotation.y = randf() * TAU
 	body.linear_velocity = forward * 0.4
-	Log.info("🏃 Dropped item: item=%s, position=%s, distance=%.2f m, wall_in_front=%s" % [
-		item.definition.id, body.global_position, distance, not hit.is_empty()])
+	Log.info("🏃 Dropped item: item=%s, quantity=%d, position=%s, distance=%.2f m, wall_in_front=%s" % [
+		item.definition.id, item.quantity, body.global_position, distance, not hit.is_empty()])
 	Hearing.make_noise(body, body.global_position, drop_loudness, &"item_drop")
 
 
-## An item was dragged off the inventory screen's floor into a grid: it leaves the world.
+## More landed on a stack lying on the floor: it clatters again, as loud as a drop.
+func _on_floor_topped_up(item: Item) -> void:
+	var dropped := _dropped_body(item)
+	if dropped == null:
+		Log.warning("🏃 Floor stack topped up with no dropped item in the world: item=%s" % item.definition.id)
+		return
+	dropped.clatter()
+	Hearing.make_noise(dropped, dropped.global_position, drop_loudness, &"item_drop")
+	Log.info("🏃 Dropped stack topped up: item=%s, quantity=%d, position=%s" % [
+		item.definition.id, item.quantity, dropped.global_position])
+
+
+## A clip out of the gun found no room in the inventory: on a wreck it drops on the floor (onto the screen's floor
+## when the inventory is open), with its clatter; on the ship, which has no floor, it goes into the stash.
+func _on_clip_overflowed(clip: Item) -> void:
+	if not has_floor:
+		GameSession.stash.add(clip)
+		Log.info("🏃 Clip had no room, put in the stash: item=%s, stash_stacks=%d" % [
+			clip.definition.id, GameSession.stash.items.size()])
+		return
+	if _inventory_screen.is_open and _inventory_screen.put_on_floor(clip):
+		Log.info("🏃 Clip had no room, dropped on the open floor: item=%s" % clip.definition.id)
+		return
+	_on_dropped_on_floor(clip)
+	Log.info("🏃 Clip had no room, dropped on the floor: item=%s, position=%s" % [clip.definition.id, global_position])
+
+
+## A stack left the inventory screen's floor altogether: it leaves the world.
 func _on_taken_from_floor(item: Item) -> void:
+	var dropped := _dropped_body(item)
+	if dropped == null:
+		Log.warning("🏃 Item taken from the floor had no dropped item in the world: item=%s" % item.definition.id)
+		return
+	var grid := inventory.grid_of(item)
+	Log.info("🏃 Picked up item: item=%s, quantity=%d, position=%s, into=%s" % [
+		item.definition.id, item.quantity, dropped.global_position,
+		"pockets" if grid == inventory.pockets else "backpack" if grid == inventory.backpack
+		else "ammo" if grid == inventory.ammo else "weapon" if grid == inventory.weapon else "elsewhere"])
+	dropped.remove_from_group(DroppedItem.GROUP)
+	dropped.queue_free()
+
+
+## The dropped item in the world holding a stack, or null.
+func _dropped_body(item: Item) -> DroppedItem:
 	for node in get_tree().get_nodes_in_group(DroppedItem.GROUP):
 		var dropped := node as DroppedItem
 		if dropped and dropped.item == item:
-			Log.info("🏃 Picked up item: item=%s, position=%s, into=%s" % [
-				item.definition.id, dropped.global_position, "pockets" if inventory.grid_of(item) == inventory.pockets
-				else "backpack" if inventory.grid_of(item) else "container"])
-			dropped.remove_from_group(DroppedItem.GROUP)
-			dropped.queue_free()
-			return
-	Log.warning("🏃 Item taken from the floor had no dropped item in the world: item=%s" % item.definition.id)
+			return dropped
+	return null
 
 
 func _update_crouch(wants_crouch: bool) -> void:
@@ -1140,6 +1184,18 @@ func _show_summary(summary: RunSummary) -> void:
 	_awaiting_continue = true
 	_hud.show_summary(summary)
 	Log.info("🏃 Run summary shown, waiting for interact: %s" % summary)
+
+
+## On the summary after an extraction: unloads the haul in the pockets and the backpack into the stash, and the
+## summary says what went. Returns the items unloaded; none after a death, or once it is done.
+func unload_haul() -> int:
+	if not _awaiting_continue or run_summary == null or not run_summary.can_unload():
+		Log.info("🏃 No haul to unload: awaiting_continue=%s, summary=%s" % [_awaiting_continue, run_summary])
+		return 0
+	var items := GameSession.unload(inventory)
+	_hud.show_unloaded(run_summary)
+	Log.info("🏃 Haul unloaded from the summary: items=%d, carried_now=%d" % [items, inventory.item_count()])
+	return items
 
 
 func _continue_to_ship() -> void:

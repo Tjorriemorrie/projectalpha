@@ -71,11 +71,11 @@ func intel_price() -> int:
 
 
 
-## What the hub pays for all these items together, in bitcoin.
+## What the hub pays for all these stacks together, every item in them, in bitcoin.
 func offer(items: Array[Item]) -> int:
 	var total := 0
 	for item in items:
-		total += sell_price(item.definition)
+		total += sell_price(item.definition) * item.quantity
 	return total
 
 

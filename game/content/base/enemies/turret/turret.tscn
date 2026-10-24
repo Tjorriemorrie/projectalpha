@@ -35,6 +35,7 @@ script = ExtResource("1_script")
 investigate_chirp = ExtResource("6_investigate")
 alarm_chirp = ExtResource("7_alarm")
 lost_chirp = ExtResource("8_lost")
+solid_wreckage = false
 salvage_box = Vector3(0.6, 0.6, 0.6)
 salvage_offset = Vector3(0, -0.3, 0)
 

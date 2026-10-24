@@ -1,11 +1,14 @@
 extends Node
-## Renders the grid icon of every registered item from its model once, after the content registry has loaded:
-## seen from straight above through an orthographic camera fitted to the item's shape (PIXELS_PER_CELL a cell, on a
-## transparent background), so the icon covers exactly the item's cells in its first orientation. Without a renderer
-## (headless runs and tests) there are no icons, and the grid draws the item's cells instead. Autoloaded as
-## ItemIcons, after ContentRegistry. It has no class_name, which would clash with the autoload's name.
+## Renders the slot icon of every registered item from its model once, after the content registry has loaded: a
+## square seen from straight above through an orthographic camera fitted round the model (ICON_PIXELS square, on a
+## transparent background), so the whole model shows in its slot, whatever its shape. Without a renderer (headless
+## runs and tests) there are no icons, and the slots are tinted instead. Autoloaded as ItemIcons, after
+## ContentRegistry. It has no class_name, which would clash with the autoload's name.
 
-const PIXELS_PER_CELL := 64
+## Pixels along each side of an icon.
+const ICON_PIXELS := 128
+## Room round the model inside its icon, as a fraction of the model's longer side.
+const MARGIN := 0.12
 ## Metres above the item the camera looks down from.
 const CAMERA_HEIGHT := 2.0
 ## Most a glowing part glows in an icon, so it keeps its colour instead of burning white.
@@ -28,14 +31,14 @@ func _ready() -> void:
 	_render_all.call_deferred()
 
 
-## The icon of an item in its first orientation, or null while it isn't rendered (or never will be).
+## The icon of an item, or null while it isn't rendered (or never will be).
 func get_icon(definition: ItemDefinition) -> Texture2D:
 	return _icons.get(definition.id) if definition else null
 
 
 func _render_all() -> void:
 	var definitions := ContentRegistry.get_all(ItemDefinition)
-	Log.info("🎒 Rendering item icons: items=%d, pixels_per_cell=%d" % [definitions.size(), PIXELS_PER_CELL])
+	Log.info("🎒 Rendering item icons: items=%d, pixels=%d" % [definitions.size(), ICON_PIXELS])
 	var rendered := 0
 	for definition: ItemDefinition in definitions:
 		if await _render(definition):
@@ -51,12 +54,14 @@ func _render(definition: ItemDefinition) -> bool:
 	if scene == null:
 		Log.warning("🎒 Item icon not rendered, model missing: item=%s, model=%s" % [definition.id, path])
 		return false
-	var cells := ItemShape.size_of(definition.get_cells())
 	var model := scene.instantiate() as Node3D
 	_tame_glow(model)
 	_viewport.add_child(model)
-	_viewport.size = cells * PIXELS_PER_CELL
-	_camera.size = cells.y * ItemDefinition.CELL_SIZE
+	var bounds := DroppedItem.model_bounds(model)
+	var centre := bounds.get_center()
+	_viewport.size = Vector2i.ONE * ICON_PIXELS
+	_camera.size = maxf(bounds.size.x, bounds.size.z) * (1.0 + 2.0 * MARGIN)
+	_camera.position = Vector3(centre.x, CAMERA_HEIGHT, centre.z)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	await RenderingServer.frame_post_draw
 	var image := _viewport.get_texture().get_image()
@@ -83,8 +88,8 @@ func _tame_glow(model: Node3D) -> void:
 			mesh_instance.set_surface_override_material(surface, material)
 
 
-## A little photo studio of its own: the viewport with its own world, a camera looking straight down (rows of the
-## shape run down the image), a key light from the top left and a soft fill.
+## A little photo studio of its own: the viewport with its own world, a camera looking straight down (the model's
+## +Z runs down the image), a key light from the top left and a soft fill.
 func _build_studio() -> void:
 	_viewport = SubViewport.new()
 	_viewport.name = "IconStudio"

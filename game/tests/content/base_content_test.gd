@@ -73,24 +73,35 @@ func test_registers_the_items() -> void:
 	assert_array(ids).is_equal(ITEMS)
 
 
-func test_every_item_model_is_built_to_its_shape() -> void:
+func test_every_item_has_a_value_a_stack_size_and_a_model_on_the_floor() -> void:
 	for definition: ItemDefinition in ContentRegistry.get_all(ItemDefinition):
 		assert_str(definition.display_name).override_failure_message(
 			"%s has no display name" % definition.id).is_not_empty()
 		assert_int(definition.value).override_failure_message("%s has no value" % definition.id).is_greater(0)
+		assert_int(definition.stack_size).override_failure_message(
+			"%s has no stack size" % definition.id).is_greater_equal(1)
 		var model: Node3D = auto_free((load(definition.get_model_path()) as PackedScene).instantiate())
-		var bounds := AABB()
-		for node in model.find_children("*", "MeshInstance3D", true, false):
-			var mesh := node as MeshInstance3D
-			bounds = bounds.merge(mesh.transform * mesh.get_aabb())
-		# Seen from above it covers its cells, give or take a few millimetres of bevel.
-		var footprint := Vector2(ItemShape.size_of(definition.get_cells())) * ItemDefinition.CELL_SIZE
-		assert_float(bounds.size.x).override_failure_message("%s is too wide" % definition.id).is_less_equal(
-			footprint.x + 0.01)
-		assert_float(bounds.size.z).override_failure_message("%s is too deep" % definition.id).is_less_equal(
-			footprint.y + 0.01)
-		assert_float(bounds.get_center().x).is_equal_approx(0.0, 0.03)
-		assert_float(bounds.position.y).is_equal_approx(0.0, 0.005)
+		var bounds := DroppedItem.model_bounds(model)
+		# It stands on the floor, its footprint round its origin.
+		assert_float(bounds.get_center().x).override_failure_message(
+			"%s is off centre" % definition.id).is_equal_approx(0.0, 0.03)
+		assert_float(bounds.position.y).override_failure_message(
+			"%s doesn't stand on the floor" % definition.id).is_equal_approx(0.0, 0.005)
+
+
+func test_stacks_are_set_by_bulk_and_only_clips_are_ammo() -> void:
+	var stacks := {"base:circuit_board": 4, "base:conduit": 3, "base:data_drive": 5, "base:gyroscope": 2,
+		"base:hull_plating": 2, "base:laser_pistol": 1, "base:plasma_coil": 2, "base:power_cell": 2,
+		"base:servo_motor": 3, "base:spent_thermal_clip": 5, "base:thermal_clip": 5}
+	for id: String in stacks:
+		var definition := ContentRegistry.get_definition(id) as ItemDefinition
+		assert_int(definition.stack_size).override_failure_message("%s stacks wrong" % id).is_equal(stacks[id])
+		assert_bool(definition.ammo).override_failure_message("%s is ammo or isn't" % id).is_equal(
+			id.ends_with("thermal_clip"))
+	assert_str((ContentRegistry.get_definition("base:hull_plating") as ItemDefinition).name_for(2)).is_equal(
+		"2 hull plating")
+	assert_str((ContentRegistry.get_definition("base:circuit_board") as ItemDefinition).name_for(3)).is_equal(
+		"3 circuit boards")
 
 
 func test_registers_the_containers() -> void:

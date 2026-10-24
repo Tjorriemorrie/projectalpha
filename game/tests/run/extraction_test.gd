@@ -1,10 +1,11 @@
 extends GdUnitTestSuite
 ## Plays the end of a run on the hauler with travel turned off and its robots taken out: holding interact on the
 ## airlock's outer door extracts after its time, letting go cancels, cycling is a noise robots hear, the run summary
-## shows on the black screen and a real key press continues to the ship with the kit handed over; a death shows its
-## summary and the next clone wakes empty-handed; and a player boarding from the ship arrives with what they carried,
-## their gun's loaded clip keeping its heat. The player starts with the basic kit: the laser pistol (₿200) in the
-## weapon slot and two thermal clips (₿25 each) in the pockets.
+## shows on the black screen and a real key press continues to the ship with the kit handed over, after another
+## unloads the haul into the stash when there is one; a death shows its summary and the next clone wakes empty-handed;
+## and a player boarding from the ship arrives with what they carried, their gun's loaded clip keeping its heat. The
+## player starts with the basic kit: the laser pistol (₿200) in the weapon slot and two thermal clips (₿25 each) in
+## the ammo slots.
 ## Positions refer to the layout of res://content/base/wrecks/hauler/hauler.tscn: the player starts in the airlock at
 ## (-0.6, 0, 4), facing east into the wreck, with the outer door behind them at x = -1.72.
 
@@ -107,6 +108,29 @@ func test_the_summary_shows_the_haul_and_a_key_press_continues_to_the_ship() -> 
 	assert_object(GameSession.take_carried()).is_same(_player.inventory)
 
 
+func test_a_key_press_on_the_summary_unloads_the_haul_into_the_stash() -> void:
+	await _load_wreck()
+	var gyroscope := Item.new(_item("base:gyroscope"))
+	_player.inventory.backpack.add(gyroscope)
+	await _extract()
+	await _physics_frames(roundi((_player.leave_fade_time + 0.2) * FRAMES_PER_SECOND))
+	assert_str(_hud().summary_text()).is_equal(
+		"RUN COMPLETE | Haul 4 items  ·  ₿410 | Gained +₿410 | Q Unload haul into stash | E Continue")
+	await _runner.simulate_key_pressed(KEY_Q)
+	await _physics_frames(3)
+	assert_str(_hud().summary_text()).is_equal(
+		"RUN COMPLETE | Haul 4 items  ·  ₿410 | Gained +₿410 | Unloaded 1 item  ·  ₿160 into the stash | E Continue")
+	assert_bool(GameSession.stash.has(gyroscope)).is_true()
+	assert_bool(_player.inventory.backpack.has(gyroscope)).is_false()
+	# The gun and the clips in the ammo slots stay; a second press unloads nothing more.
+	assert_object(_player.inventory.gun()).is_not_null()
+	assert_int(_player.clips.fresh).is_equal(2)
+	assert_int(_player.unload_haul()).is_equal(0)
+	await _runner.simulate_key_pressed(KEY_E)
+	await _physics_frames(3)
+	assert_array(_travelled).is_equal([GameSession.SHIP_SCENE])
+
+
 func test_a_death_shows_its_summary_and_the_next_clone_wakes_empty_handed() -> void:
 	await _load_wreck()
 	_player.get_health().take_damage(1000.0, _player.global_position + Vector3(3.0, 1.0, 0.0))
@@ -123,7 +147,7 @@ func test_a_death_shows_its_summary_and_the_next_clone_wakes_empty_handed() -> v
 
 func test_a_player_boarding_from_the_ship_arrives_with_what_they_carried() -> void:
 	var carried := Inventory.new()
-	carried.pockets.add(Item.new(_item("base:thermal_clip")))
+	carried.ammo.add(Item.new(_item("base:thermal_clip")))
 	carried.backpack.add(Item.new(_item("base:gyroscope")))
 	var gun := Item.new(_item("base:laser_pistol"))
 	gun.clip_heat = 0.3
@@ -141,7 +165,8 @@ func test_a_player_boarding_from_the_ship_arrives_with_what_they_carried() -> vo
 	await _extract()
 	await _physics_frames(roundi((_player.leave_fade_time + 0.2) * FRAMES_PER_SECOND))
 	# Carried in ₿385 and carried it out again.
-	assert_str(_hud().summary_text()).is_equal("RUN COMPLETE | Haul 3 items  ·  ₿385 | Gained ₿0 | E Continue")
+	assert_str(_hud().summary_text()).is_equal(
+		"RUN COMPLETE | Haul 3 items  ·  ₿385 | Gained ₿0 | Q Unload haul into stash | E Continue")
 
 
 func _load_wreck() -> void:

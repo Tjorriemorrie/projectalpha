@@ -35,7 +35,7 @@ The 3 core ideas every feature should support. If a feature doesn't serve a pill
    how much to gamble. Playing it safe is a risk too: every day spent is one she may not have, so taking too long can
    mean reaching her too late.
 2. **Everything is salvage.** Every item can be looted, broken down, crafted or sold, so every run feeds progress.
-   Space is limited (grid inventory), so the player keeps deciding what is worth carrying out.
+   Space is limited (a few slots), so the player keeps deciding what is worth carrying out.
 3. **Lose it all.** Death is permanent loss, which makes extracting tense and meaningful.
 
 ## 2. Gameplay
@@ -76,14 +76,14 @@ High-level list only. Each mechanic gets a detailed spec in `features/` when it 
 |----------|-------------|---------|
 | Boarding and extraction | Board a station or ship, then get out alive to keep what you found. Boarding is always done in secret: if anyone aboard knew, they would be waiting at the airlock, so the suspense is in moving through the ship unnoticed | [008](features/008-extraction-and-clone-loop.md) |
 | First-person combat | Cover-based shooting aboard stations and ships. Forgiving enough to get through many fights in a run: about ten hits kill the player, but health doesn't come back during a run, so every fight wears the player down | [005](features/005-weapon-and-health.md), [004](features/004-free-peek-and-cover.md) |
-| Laser weapons and thermal clips | Weapons are lasers. Every shot heats the weapon, and a thermal clip (as in Mass Effect 2) soaks up the heat. Holding the trigger charges a shot that hits harder, kicks more and puts more heat into the clip; when the clip is saturated the player swaps it for a fresh one, which is the reload. The spent clip goes back into the inventory as salvage (to re-cool, break down or sell later) instead of being dropped. Thermal clips fit every weapon, take space in the grid inventory and are lost on death like everything else. Guns are items too: the one in the weapon slot is in hand, the rest are carried or stashed, all are lost on death, and the hubs sell them | [005](features/005-weapon-and-health.md), [009](features/009-trader-hub.md) |
-| Free peek | Hold Alt and move the mouse to peek out of cover in any direction (replaces fixed left/right lean). Peeking is look-only: you can't shoot, but you are hard to hit. To shoot from cover, hold right click to aim out, which exposes more of you and makes you easier to hit | [004](features/004-free-peek-and-cover.md) |
+| Laser weapons and thermal clips | Weapons are lasers. Every shot heats the weapon, and a thermal clip (as in Mass Effect 2) soaks up the heat. Holding the trigger charges a shot that hits harder, kicks more and puts more heat into the clip; when the clip is saturated the player swaps it for a fresh one, which is the reload. The spent clip goes back into the inventory as salvage (to re-cool, break down or sell later) instead of being dropped. Thermal clips fit every weapon, take space in the inventory and are lost on death like everything else. Guns are items too: the one in the weapon slot is in hand, the rest are carried or stashed, all are lost on death, and the hubs sell them | [005](features/005-weapon-and-health.md), [009](features/009-trader-hub.md) |
+| Peek | Hold Alt and move the mouse to peek out of cover: standing, the head leans left or right round a corner; crouched, it rises up over low cover (replaces fixed left/right lean). Peeking is look-only: you can't shoot, but you are hard to hit. To shoot from cover, hold right click to aim out, which exposes more of you and makes you easier to hit | [004](features/004-free-peek-and-cover.md) |
 | Vents | Crouch-only routes through ventilation shafts | [002](features/002-wreck-section-kit.md) |
 | Flashlight | Lights up dark wrecks, but lights you up for enemies too; toggled on and off, no battery | [002](features/002-wreck-section-kit.md), [006](features/006-robot-enemy.md) |
 | Elevators | The only way between decks: call with a button, ride, and the arrival ding can be heard | [002](features/002-wreck-section-kit.md) |
 | Enemy senses | Enemies see, hear and feel the player. In the dark they only see you up close, unless you are lit by a lamp, your flashlight or your own muzzle flash. Shots, sprinting and the elevator's ding carry far; walking is quieter and crouching quietest. Moving fast, shooting and lighting the way are risks you choose | [006](features/006-robot-enemy.md) |
 | Looting | Pry open containers and robot wreckage, in real time while the wreck is still dangerous, and carry the items out | [007](features/007-loot-and-grid-inventory.md), [010](features/010-wreck-variety.md) |
-| Grid inventory | Items take up tetris-like shapes in a backpack grid, a strip of pockets for things at hand (reloads take thermal clips from the pockets) and a weapon slot for the gun in hand; the player rotates, mirrors and arranges them to fit more loot, and drops what isn't worth the space. Every item is moved by dragging it, with no quick-move shortcuts, can be selected, and shows an item card (value, size, description) under the pointer; dropped items lie on the floor, which the inventory shows as a grid of its own | [007](features/007-loot-and-grid-inventory.md), [009](features/009-trader-hub.md) |
+| Inventory | Every item takes one square slot, and a slot holds a stack of one kind of item: a weapon slot for the gun in hand, ammo slots for thermal clips (reloads take from them), pockets for things at hand and a backpack; the player drops what isn't worth a slot. Items are dragged, a shortcut moves a stack to the other side and another splits it, and at the hub a click sells one and a hold the stack; every item can be selected and shows an item card (value, description) under the pointer; dropped items lie on the floor, which the inventory shows as slots of its own. After an extraction the haul can be unloaded into the stash in one go | [007](features/007-loot-and-grid-inventory.md), [009](features/009-trader-hub.md), [013](features/013-inventory-management-revamp.md) |
 | Trader hubs | Menu-based stations, one in every star system, traded with from a console on the ship while it is at the hub: sell loot from the stash for bitcoin and buy anything in the game, guns and fuel included. Prices vary a little from hub to hub. Ask one for a cure ingredient and it tells you which systems have it, and the hubs of those systems sell it; some can tell you that she passed through | [009](features/009-trader-hub.md) |
 | Breakdown | Break any item down into components (like Arc Raiders) | — |
 | Crafting and upgrades | Craft any item from components; upgrade gear | — |
@@ -124,19 +124,22 @@ Gamepad is supported. There is no jump, prone or slide.
 | Aim down sights | Right click (hold) | Left trigger (hold) |
 | Reload | R | X / Square |
 | Interact / loot: hold to pry a container open; on a dropped item, opens the floor in the inventory; opens the ship's stash, trader terminal and system map console; hold on an airlock's outer door to board the wreck or return to the ship; continues past the run summary | E | A / Cross |
+| Run summary after an extraction: unload the haul (pockets and backpack) into the stash | Q | X / Square |
 | Sprint (e.g. to run for extraction) | Shift (hold) | Left stick click (lasts until you stop pushing forward) |
 | Crouch (e.g. to move through vents) | Ctrl (hold) / C (toggle) | B / Circle (tap to toggle, hold to crouch until released) |
-| Peek: hold, then move the mouse or right stick to move the head out of cover in that direction (look only) | Alt (hold) | Left bumper (hold) |
+| Peek: hold, then move the mouse or right stick sideways to lean left or right while standing, or up to rise over cover while crouched (look only) | Alt (hold) | Left bumper (hold) |
 | Aim out of cover: hold together with peek, in either order, to lean further out and shoot | Right click (hold) | Left trigger (hold) |
 | Flashlight | F (toggle) | D-pad up (toggle) |
 | Inventory: open and close (Esc and interact also close it) | Tab | View / Select (B also closes it) |
 | In the inventory, the trader hub and the system and star maps: move the cursor | Mouse | Left stick / D-pad |
 | In the inventory and the trader hub: drag an item | Left click (hold) | A (hold) |
-| In the inventory and the trader hub: rotate the dragged item 90° | Right click | Right bumper |
-| In the inventory and the trader hub: mirror the dragged item | Middle click or mouse wheel | Left bumper |
-| In the inventory: drop an item on the floor | Drag it onto the floor grid, or release it outside the inventory | Y / Triangle |
+| In the inventory: move a stack straight to the other side (container, stash or floor ↔ the player's slots) | Shift + left click, or double-click | X / Square |
+| In the inventory and the trader hub: split a stack (take half into hand) | Right click (hold), release to put it down | Right bumper, A to put it down |
+| In the inventory and the trader hub, while splitting: take one more or one fewer | Mouse wheel up / down | Right bumper / left bumper |
+| In the inventory: drop an item on the floor | Drag it onto the floor, or release it outside the inventory | Y / Triangle |
 | In the trader hub: buy one of an item (it goes to the stash) | Left click on it on the shelf | A |
-| In the trader hub: sell what is in the sell crate | Left click on SELL | A |
+| In the trader hub: sell one of an item in the stash | Left click on it | A |
+| In the trader hub: sell a whole stack in the stash | Hold left click on it (1 s) | Hold A on it (1 s) |
 | In the trader hub: fill the hydrogen tank | Left click on FILL UP | A |
 | In the trader hub: order a full tank of antimatter | Left click on ORDER | A |
 | In the trader hub: collect antimatter that has arrived (ORDER reads COLLECT) | Left click on COLLECT | A |
@@ -455,7 +458,7 @@ Sound is crucial to the tension. The player must be able to hear threats before 
 
 ## 7. User interface
 
-- **Menus:** main menu, pause, settings, inventory (grid), crafting and breakdown, star map, trader hub.
+- **Menus:** main menu, pause, settings, inventory (slots), crafting and breakdown, star map, trader hub.
 - **HUD:** classic, with corner indicators for health, thermal clip heat, oxygen (on breached wrecks) and the wreck timer
   (on doomed wrecks), and at home on the ship the bitcoin in the wallet.
 

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Power cell"
-shape = PackedStringArray("#.", "#.", "##")
+stack_size = 2
 value = 120
 description = "A heavy battery cell. Its charge window still glows."
 model = "res://content/base/items/power_cell/power_cell.glb"

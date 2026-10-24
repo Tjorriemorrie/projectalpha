@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Thermal clip"
-shape = PackedStringArray("#")
+stack_size = 5
+ammo = true
 value = 25
-description = "Soaks up a laser's heat: about 20 shots from the pistol. Reloads take clips from the pockets."
+description = "Soaks up a laser's heat: about 20 shots from the pistol. Reloads take clips from the ammo slots."
 model = "res://content/base/items/thermal_clip/thermal_clip.glb"

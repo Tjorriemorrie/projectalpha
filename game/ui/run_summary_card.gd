@@ -3,8 +3,9 @@ extends Control
 ## The run summary, a placard in the HUD's style centred on the black screen after a run: the title (RUN COMPLETE,
 ## or SIGNAL LOST in red), the clone's lifeline, a heartbeat trace that keeps beating in the laser's blue after an
 ## extraction and goes flat in red after a death, then what was carried out and gained, or what was lost and which
-## clone wakes up next, and the key to continue. It fades in and the trace draws itself once. It shows what the
-## player passes it and takes no input: the player reads interact.
+## clone wakes up next, and the key to continue. After an extraction with a haul in the pockets and the backpack it
+## also offers the key that unloads it into the stash, and once it has, says what went there. It fades in and the
+## trace draws itself once. It shows what the player passes it and takes no input: the player reads the keys.
 
 const INK_COLOR := Color(0.862745, 0.901961, 0.941176)
 const DIM_COLOR := Color(0.721569, 0.768627, 0.815686)
@@ -22,8 +23,11 @@ const TRACE_TIME := 1.4
 const BEATS: Array[float] = [0.12, 0.34, 0.56, 0.78]
 const FLATLINE_AFTER := 2
 
-## What the card says, for tests: e.g. "RUN COMPLETE | Haul 9 items · ₿1,240 | Gained +₿1,050 | E Continue".
+## What the card says, for tests: e.g. "RUN COMPLETE | Haul 9 items · ₿1,240 | Gained +₿1,050 | Q Unload haul
+## into stash | E Continue".
 var text := ""
+
+@export var unload_sound: AudioStream = preload("res://assets/audio/loot/item_place.wav")
 
 var _summary: RunSummary
 var _panel: PanelContainer
@@ -32,6 +36,12 @@ var _clone: Label
 var _lifeline: Control
 var _rows: VBoxContainer
 var _key: Label
+var _unload_row: HBoxContainer
+var _unload_cap: PanelContainer
+var _unload_key: Label
+var _unload_label: Label
+var _lines: Array[String] = []
+var _sound: AudioStreamPlayer
 var _font: SystemFont
 var _label_font: FontVariation
 var _body_font: SystemFont
@@ -51,11 +61,14 @@ func _ready() -> void:
 	_label_font = FontVariation.new()
 	_label_font.base_font = _font
 	_label_font.spacing_glyph = 3
+	_sound = AudioStreamPlayer.new()
+	add_child(_sound)
 	_build()
 
 
-## Shows a run's summary; key is the key that continues, from the Input Map.
-func show_summary(summary: RunSummary, key: String) -> void:
+## Shows a run's summary; key is the key that continues and unload_key the one that unloads the haul, from the
+## Input Map.
+func show_summary(summary: RunSummary, key: String, unload_key: String = "Q") -> void:
 	_summary = summary
 	var color := LASER_COLOR if summary.extracted else DANGER_COLOR
 	_title.text = "RUN COMPLETE" if summary.extracted else "SIGNAL LOST"
@@ -78,8 +91,13 @@ func show_summary(summary: RunSummary, key: String) -> void:
 		_add_row("Next", "Clone %d activated" % summary.clone_number, INK_COLOR)
 		lines.append_array(["Lost %s" % carried, "Clone %d activated" % summary.clone_number])
 	_key.text = key
-	lines.append("%s Continue" % key)
-	text = " | ".join(lines)
+	_unload_row.visible = summary.can_unload()
+	_unload_cap.visible = true
+	_unload_key.text = unload_key
+	_unload_label.text = "Unload haul into stash"
+	_unload_label.add_theme_color_override("font_color", DIM_COLOR)
+	_lines = lines
+	_update_text()
 	_lifeline.set_meta(&"color", color)
 	_layout()
 	# Labels settle their sizes during the frame; centre the placard again once they have.
@@ -93,6 +111,19 @@ func show_summary(summary: RunSummary, key: String) -> void:
 	_tween.tween_property(self, "modulate:a", 1.0, FADE_TIME)
 	_tween.parallel().tween_method(_set_trace, 0.0, 1.0, TRACE_TIME).set_ease(Tween.EASE_OUT)
 	Log.info("🏃 Run summary card shown: %s" % text)
+
+
+## The haul went into the stash: the unload line says what went, and the key cap goes.
+func show_unloaded(summary: RunSummary) -> void:
+	_unload_cap.visible = false
+	_unload_label.text = "Unloaded %d %s  ·  %s into the stash" % [summary.unloaded_items,
+		"item" if summary.unloaded_items == 1 else "items", Bitcoin.format(summary.unloaded_value)]
+	_unload_label.add_theme_color_override("font_color", LASER_COLOR)
+	_sound.stream = unload_sound
+	_sound.play()
+	_update_text()
+	_layout.call_deferred()
+	Log.info("🏃 Run summary shows the haul unloaded: %s" % text)
 
 
 func hide_summary() -> void:
@@ -139,9 +170,28 @@ func _build() -> void:
 	rule.color = PLACARD_EDGE
 	rule.custom_minimum_size = Vector2(0.0, 1.0)
 	column.add_child(rule)
+	_unload_row = HBoxContainer.new()
+	_unload_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_unload_row.add_theme_constant_override("separation", 10)
+	_unload_key = _label("Q", _font, 16, INK_COLOR)
+	_unload_cap = _key_cap(_unload_key)
+	_unload_row.add_child(_unload_cap)
+	_unload_label = _label("Unload haul into stash", _body_font, 17, DIM_COLOR)
+	_unload_row.add_child(_unload_label)
+	column.add_child(_unload_row)
 	var footer := HBoxContainer.new()
 	footer.alignment = BoxContainer.ALIGNMENT_CENTER
 	footer.add_theme_constant_override("separation", 10)
+	_key = _label("E", _font, 16, INK_COLOR)
+	footer.add_child(_key_cap(_key))
+	footer.add_child(_label("Continue", _body_font, 17, DIM_COLOR))
+	column.add_child(footer)
+	for node in find_children("*", "Control", true, false):
+		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+## A key cap round a key's label.
+func _key_cap(key: Label) -> PanelContainer:
 	var cap := PanelContainer.new()
 	var cap_style := StyleBoxFlat.new()
 	cap_style.bg_color = Color(0.0431373, 0.0588235, 0.0784314, 0.55)
@@ -153,14 +203,18 @@ func _build() -> void:
 	cap_style.content_margin_top = 1.0
 	cap_style.content_margin_bottom = 1.0
 	cap.add_theme_stylebox_override("panel", cap_style)
-	_key = _label("E", _font, 16, INK_COLOR)
-	_key.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cap.add_child(_key)
-	footer.add_child(cap)
-	footer.add_child(_label("Continue", _body_font, 17, DIM_COLOR))
-	column.add_child(footer)
-	for node in find_children("*", "Control", true, false):
-		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	key.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cap.add_child(key)
+	return cap
+
+
+## What the card says, for tests: its lines, the unload line while it shows, and the key to continue.
+func _update_text() -> void:
+	var lines := _lines.duplicate()
+	if _unload_row.visible:
+		lines.append(("%s %s" % [_unload_key.text, _unload_label.text]) if _unload_cap.visible else _unload_label.text)
+	lines.append("%s Continue" % _key.text)
+	text = " | ".join(lines)
 
 
 ## One line of the summary: a spaced label on the left and its value on the right.

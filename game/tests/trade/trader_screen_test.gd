@@ -1,19 +1,20 @@
 extends GdUnitTestSuite
 ## Trades at the hub from the player's ship with travel turned off, through the trader terminal and mouse events
-## pushed into the viewport: interact on the terminal opens the hub's screen; items dragged from the stash into the
-## sell crate show the hub's offer, and SELL sells them into the wallet; clicking an item in the shop buys one into
-## the stash, unless the wallet is short or the stash is full; FILL UP fills the hydrogen tank as far as the wallet
-## pays; ORDER orders the antimatter the tank is missing, one order at a time, and COLLECT, once it has arrived, fills
-## the tank at once and its gauge a block at a time; the card of the shop item under the pointer shows its price;
-## closing puts what is left in the crate back into the stash; at home the ship's bar shows the bitcoin in the wallet,
-## the hydrogen and the day, over the hub's screen too; the player stands still while trading; and away from the hub
-## the terminal is out of range.
+## pushed into the viewport: interact on the terminal opens the hub's screen; clicking a stack in the stash sells one
+## of it into the wallet, holding the click sells the whole stack, and pressing and moving drags it to rearrange the
+## stash; clicking an item in the shop buys one into the stash, onto a stack of it, unless the wallet is short, and the
+## stash always has room; FILL UP fills the hydrogen tank as far as the wallet pays; ORDER orders the antimatter the
+## tank is missing, one order at a time, and COLLECT, once it has arrived, fills the tank at once and its gauge a block
+## at a time; the cards of the shop item and the stash stack under the pointer show their prices; at home the ship's
+## bar shows the bitcoin in the wallet, the hydrogen and the day, over the hub's screen too; the player stands still
+## while trading; and away from the hub the terminal is out of range.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: the stash room south of x = 12, with the trader
 ## terminal against its south wall at (13.35, 0, 5.8), facing north, its screen 1.5 m up.
 
 const SHIP_SCENE := "res://scenes/ship/ship.tscn"
 const ACTIONS: Array[StringName] = [&"interact", &"inventory", &"pause", &"move_forward"]
 const SOUTH := PI
+const FRAMES_PER_SECOND := 60
 const BEFORE_TERMINAL := Vector3(13.35, 0.0, 4.5)
 const TERMINAL_SCREEN := Vector3(13.35, 1.45, 5.7)
 
@@ -47,7 +48,6 @@ func test_interact_on_the_terminal_opens_the_hub() -> void:
 	assert_bool(_screen.is_open).is_true()
 	assert_bool(_player.is_trading()).is_true()
 	assert_str(_screen.bitcoin_text).is_equal("₿500")
-	assert_str(_screen.offer_text).is_equal("EMPTY")
 
 
 func test_the_terminal_shows_the_hub_its_linked_to() -> void:
@@ -198,33 +198,85 @@ func test_tab_and_esc_close_it() -> void:
 	assert_bool(_screen.is_open).is_false()
 
 
-func test_items_dragged_into_the_crate_sell_for_the_hubs_offer() -> void:
-	var gyroscope := _stash_item("base:gyroscope", Vector2i(0, 0))
-	var drive := _stash_item("base:data_drive", Vector2i(4, 0))
+func test_clicking_a_stash_stack_sells_one_of_it() -> void:
+	var boards := _stash_item("base:circuit_board", Vector2i(0, 0), 3)
+	var price := GameSession.trader.sell_price(boards.definition)
+	await _load_ship()
+	await _open_hub()
+	await _click(_screen.cell_center(GameSession.stash, Vector2i(0, 0)))
+	assert_int(GameSession.bitcoin).is_equal(500 + price)
+	assert_int(boards.quantity).is_equal(2)
+	assert_str(_screen.status_text).is_equal("Sold circuit board for %s." % Bitcoin.format(price))
+	assert_str(_screen.bitcoin_text).is_equal(Bitcoin.format(500 + price))
+
+
+func test_selling_the_last_one_empties_its_slot() -> void:
+	var drive := _stash_item("base:data_drive", Vector2i(2, 1))
+	await _load_ship()
+	await _open_hub()
+	await _click(_screen.cell_center(GameSession.stash, Vector2i(2, 1)))
+	assert_bool(GameSession.stash.has(drive)).is_false()
+	assert_int(GameSession.bitcoin).is_equal(500 + GameSession.trader.sell_price(drive.definition))
+
+
+func test_holding_the_click_still_sells_the_whole_stack() -> void:
+	var boards := _stash_item("base:circuit_board", Vector2i(0, 0), 3)
+	var price := GameSession.trader.sell_price(boards.definition)
+	await _load_ship()
+	await _open_hub()
+	var at := _screen.cell_center(GameSession.stash, Vector2i(0, 0))
+	_mouse_move(at)
+	_mouse_button(at, true)
+	await _physics_frames(2)
+	assert_bool(_screen.is_selling()).is_true()
+	assert_float(_screen.sell_hold_progress()).is_between(0.0, 1.0)
+	assert_int(GameSession.bitcoin).is_equal(500)
+	await _physics_frames(roundi(TraderScreen.SELL_HOLD_TIME * 1.2 * FRAMES_PER_SECOND))
+	assert_bool(GameSession.stash.has(boards)).is_false()
+	assert_int(GameSession.bitcoin).is_equal(500 + 3 * price)
+	assert_str(_screen.status_text).is_equal("Sold 3 circuit boards for %s." % Bitcoin.format(3 * price))
+	# Letting go afterwards sells nothing more.
+	_mouse_button(at, false)
+	await _physics_frames(1)
+	assert_int(GameSession.bitcoin).is_equal(500 + 3 * price)
+
+
+func test_pressing_and_moving_drags_the_stack_to_rearrange_the_stash() -> void:
+	var boards := _stash_item("base:circuit_board", Vector2i(0, 0), 3)
 	await _load_ship()
 	await _open_hub()
 	await _drag(_screen.cell_center(GameSession.stash, Vector2i(0, 0)),
-		_screen.cell_center(GameSession.crate, Vector2i(0, 0)))
-	await _drag(_screen.cell_center(GameSession.stash, Vector2i(4, 0)),
-		_screen.cell_center(GameSession.crate, Vector2i(3, 0)))
-	assert_bool(GameSession.crate.has(gyroscope)).is_true()
-	assert_bool(GameSession.crate.has(drive)).is_true()
-	var offer := GameSession.trader.sell_price(gyroscope.definition) + GameSession.trader.sell_price(drive.definition)
-	assert_str(_screen.offer_text).is_equal("OFFER  %s" % Bitcoin.format(offer))
-	await _click(_screen.sell_button_center())
-	assert_int(GameSession.bitcoin).is_equal(500 + offer)
-	assert_array(GameSession.crate.items).is_empty()
-	assert_array(GameSession.stash.items).is_empty()
-	assert_str(_screen.status_text).is_equal("Sold 2 items for %s." % Bitcoin.format(offer))
-	assert_str(_screen.offer_text).is_equal("EMPTY")
+		_screen.cell_center(GameSession.stash, Vector2i(3, 1)))
+	assert_object(GameSession.stash.item_at(Vector2i(3, 1))).is_same(boards)
+	assert_int(boards.quantity).is_equal(3)
+	assert_int(GameSession.bitcoin).is_equal(500)
 
 
-func test_selling_an_empty_crate_says_how_to_sell() -> void:
+func test_closing_while_a_click_is_held_sells_nothing() -> void:
+	var boards := _stash_item("base:circuit_board", Vector2i(0, 0), 3)
 	await _load_ship()
 	await _open_hub()
-	await _click(_screen.sell_button_center())
+	var at := _screen.cell_center(GameSession.stash, Vector2i(0, 0))
+	_mouse_move(at)
+	_mouse_button(at, true)
+	await _physics_frames(1)
+	_player.close_trader()
+	_mouse_button(at, false)
+	await _physics_frames(roundi(TraderScreen.SELL_HOLD_TIME * 1.2 * FRAMES_PER_SECOND))
+	assert_int(boards.quantity).is_equal(3)
 	assert_int(GameSession.bitcoin).is_equal(500)
-	assert_str(_screen.status_text).is_equal("Drag items from the stash into the crate to sell them.")
+
+
+func test_a_stash_stacks_card_shows_what_one_and_all_of_it_sell_for() -> void:
+	var boards := _stash_item("base:circuit_board", Vector2i(0, 0), 3)
+	var price := GameSession.trader.sell_price(boards.definition)
+	await _load_ship()
+	await _open_hub()
+	_mouse_move(_screen.cell_center(GameSession.stash, Vector2i(0, 0)))
+	await _physics_frames(1)
+	assert_object(_screen.focused).is_same(boards)
+	assert_array(_screen._card_stats(boards.definition)).is_equal([["SELLS FOR", Bitcoin.format(price)],
+		["STACK", "3 / 4"], ["ALL FOR", Bitcoin.format(3 * price)]])
 
 
 func test_clicking_an_item_in_the_shop_buys_one_into_the_stash() -> void:
@@ -241,6 +293,10 @@ func test_clicking_an_item_in_the_shop_buys_one_into_the_stash() -> void:
 	assert_str(_screen.bitcoin_text).is_equal(Bitcoin.format(500 - price))
 	assert_str(_screen.status_text).is_equal("Thermal clip bought for %s, delivered to the stash." % [
 		Bitcoin.format(price)])
+	# Another tops up the same stack.
+	await _click(_screen.shop_tile_center(clip))
+	assert_int(bought.quantity).is_equal(2)
+	assert_int(GameSession.stash.items.size()).is_equal(1)
 
 
 func test_a_gun_is_on_the_shelf_and_can_be_bought() -> void:
@@ -265,16 +321,18 @@ func test_a_buy_the_wallet_cant_cover_is_refused() -> void:
 		Bitcoin.format(GameSession.trader.buy_price(pistol))])
 
 
-func test_a_buy_with_no_room_in_the_stash_is_refused() -> void:
+func test_the_stash_always_has_room_for_a_buy() -> void:
 	var drive := _item("base:data_drive")
 	for i in GameSession.STASH_SIZE.x * GameSession.STASH_SIZE.y:
-		GameSession.stash.add(Item.new(drive))
+		GameSession.stash.add(Item.new(drive, drive.stack_size))
+	assert_int(GameSession.stash.size.y).is_equal(GameSession.STASH_SIZE.y + 1)
 	await _load_ship()
 	await _open_hub()
-	await _click(_screen.shop_tile_center(_item("base:thermal_clip")))
-	assert_int(GameSession.bitcoin).is_equal(500)
-	assert_str(_screen.status_text).is_equal(
-		"No room in the stash for Thermal clip. Make space or sell something first.")
+	var clip := _item("base:thermal_clip")
+	await _click(_screen.shop_tile_center(clip))
+	assert_int(GameSession.bitcoin).is_equal(500 - GameSession.trader.buy_price(clip))
+	assert_str(GameSession.stash.item_at(Vector2i(0, GameSession.STASH_SIZE.y)).definition.id).is_equal(
+		"base:thermal_clip")
 
 
 func test_the_shop_item_under_the_pointer_shows_its_card() -> void:
@@ -287,28 +345,13 @@ func test_the_shop_item_under_the_pointer_shows_its_card() -> void:
 	assert_object(_screen.focused).is_null()
 
 
-func test_closing_puts_whats_left_in_the_crate_back_in_the_stash() -> void:
-	var gyroscope := _stash_item("base:gyroscope", Vector2i(0, 0))
-	await _load_ship()
-	await _open_hub()
-	await _drag(_screen.cell_center(GameSession.stash, Vector2i(0, 0)),
-		_screen.cell_center(GameSession.crate, Vector2i(2, 1)))
-	assert_bool(GameSession.crate.has(gyroscope)).is_true()
-	_player.close_trader()
-	assert_bool(GameSession.stash.has(gyroscope)).is_true()
-	assert_array(GameSession.crate.items).is_empty()
-	assert_int(GameSession.bitcoin).is_equal(500)
-
-
 func test_the_ships_bar_shows_the_wallet_while_trading_too() -> void:
 	await _load_ship()
 	assert_str(_hud().wallet_text).is_equal("₿500")
 	await _open_hub()
 	assert_str(_hud().wallet_text).is_equal("₿500")
 	var drive := _stash_item("base:data_drive", Vector2i(0, 0))
-	await _drag(_screen.cell_center(GameSession.stash, Vector2i(0, 0)),
-		_screen.cell_center(GameSession.crate, Vector2i(0, 0)))
-	await _click(_screen.sell_button_center())
+	await _click(_screen.cell_center(GameSession.stash, Vector2i(0, 0)))
 	var wallet := Bitcoin.format(500 + GameSession.trader.sell_price(drive.definition))
 	assert_str(_hud().wallet_text).is_equal(wallet)
 	await _press(&"inventory")
@@ -403,9 +446,9 @@ func _hud() -> Hud:
 	return _player.get_node("Hud") as Hud
 
 
-static func _stash_item(id: String, cell: Vector2i) -> Item:
-	var item := Item.new(_item(id))
-	GameSession.stash.place(item, cell, 0)
+static func _stash_item(id: String, cell: Vector2i, quantity: int = 1) -> Item:
+	var item := Item.new(_item(id), quantity)
+	GameSession.stash.place(item, cell)
 	return item
 
 

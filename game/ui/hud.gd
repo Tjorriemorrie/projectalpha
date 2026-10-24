@@ -162,9 +162,9 @@ func set_health(health: float, max_health: float, critical: bool) -> void:
 
 
 ## The loaded clip's heat (0 to 1), the heat the shot being charged would add, the clips carried (fresh ones in the
-## pockets, which a reload uses, fresh ones packed in the backpack, and spent ones), whether the clip has no room left
-## for a full charge (low) or for any shot (saturated), and the reload's progress (-1 when not reloading). Called
-## every frame; the gauge only redraws when something changes.
+## ammo slots, which a reload uses, fresh ones packed in the pockets or the backpack, and spent ones), whether the
+## clip has no room left for a full charge (low) or for any shot (saturated), and the reload's progress (-1 when not
+## reloading). Called every frame; the gauge only redraws when something changes.
 func set_clips(heat: float, charge_heat: float, fresh: int, packed: int, spent: int, low: bool, saturated: bool,
 		reload_progress: float) -> void:
 	_clips.visible = true
@@ -182,7 +182,7 @@ func set_clips(heat: float, charge_heat: float, fresh: int, packed: int, spent: 
 		if fresh > 0:
 			count = "Reload  %s  ·  %d fresh" % [key_label(&"reload"), fresh]
 		elif packed > 0:
-			count = "Move a clip to your pockets"
+			count = "Move a clip to your ammo slots"
 		else:
 			count = "No fresh clips"
 	var warn := (low or saturated) and reload_progress < 0.0
@@ -303,10 +303,16 @@ func fade_in(duration: float) -> void:
 	Log.info("🏃 HUD fading in from black: duration=%.1f s" % duration)
 
 
-## Shows how the run ended on the black screen, with the key that continues.
+## Shows how the run ended on the black screen, with the key that continues (and, after an extraction with a haul,
+## the key that unloads it into the stash).
 func show_summary(summary: RunSummary) -> void:
 	_prompt.visible = false
-	_summary.show_summary(summary, key_label(&"interact"))
+	_summary.show_summary(summary, key_label(&"interact"), key_label(&"unload_haul"))
+
+
+## The run summary says what unloading the haul put in the stash.
+func show_unloaded(summary: RunSummary) -> void:
+	_summary.show_unloaded(summary)
 
 
 func hide_summary() -> void:

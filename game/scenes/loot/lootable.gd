@@ -1,8 +1,8 @@
 class_name Lootable
 extends Interactable
 ## Loot the player pries open by holding interact on it, then searches: a container, or a destroyed robot's
-## wreckage. It holds the loot in an ItemGrid; the ship's stash binds one the GameSession keeps, already open. Prying makes a scrape while it is held and a clunk when it gives,
-## and the opening is a noise robots hear. Once open it stays open, and interact searches it straight away: the
+## wreckage. It holds the loot in an ItemGrid of slots; the ship's stash binds one the GameSession keeps, already
+## open. Prying makes a scrape while it is held and a clunk when it gives, and the opening is a noise robots hear. Once open it stays open, and interact searches it straight away: the
 ## player opens the inventory screen with it. Its area should be a little bigger than the body it sits on, so the
 ## player's look ray finds it before the body.
 
@@ -51,19 +51,20 @@ func bind(loot_title: String, kept: ItemGrid) -> void:
 	grid = kept
 	is_open = true
 	_update_prompt()
-	Log.info("🎒 Loot bound to a kept grid: loot=%s, title=%s, grid=%s, items=%d, value=%d" % [
-		_path(), title, kept.size, kept.items.size(), kept.value()])
+	Log.info("🎒 Loot bound to a kept grid: loot=%s, title=%s, grid=%s, stacks=%d, items=%d, value=%d" % [
+		_path(), title, kept.size, kept.items.size(), kept.item_count(), kept.value()])
 
 
-## Packs items into its grid in the order given, each in the first spot it fits. Returns the ones that didn't fit.
+## Packs items into its grid in the order given, one at a time: each tops up a stack of its kind, or takes the first
+## free slot. Returns the ones that didn't fit.
 func fill(items: Array[ItemDefinition]) -> Array[ItemDefinition]:
 	var left_out: Array[ItemDefinition] = []
 	for definition in items:
-		if not grid.add(Item.new(definition)):
+		if grid.add_one(definition) == null:
 			left_out.append(definition)
-	Log.info("🎒 Loot packed: loot=%s, title=%s, items=%d, packed=%d, left_out=%d, free_cells=%d, value=%d" % [
-		_path(), title, items.size(), items.size() - left_out.size(), left_out.size(), grid.free_cells(),
-		grid.value()])
+	Log.info("🎒 Loot packed: loot=%s, title=%s, items=%d, packed=%d, left_out=%d, stacks=%d, free_slots=%d, value=%d" % [
+		_path(), title, items.size(), items.size() - left_out.size(), left_out.size(), grid.items.size(),
+		grid.free_slots(), grid.value()])
 	return left_out
 
 

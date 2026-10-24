@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Spent thermal clip"
-shape = PackedStringArray("#")
+stack_size = 5
+ammo = true
 value = 10
 description = "A saturated thermal clip. Salvage: it can be re-cooled or sold later."
 model = "res://content/base/items/spent_thermal_clip/spent_thermal_clip.glb"

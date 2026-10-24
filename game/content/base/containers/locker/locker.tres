@@ -6,7 +6,7 @@
 script = ExtResource("1_definition")
 display_name = "Locker"
 scene = "res://content/base/containers/locker/locker.tscn"
-grid_size = Vector2i(4, 5)
+grid_size = Vector2i(3, 3)
 budget = 350
 loot = Dictionary[String, float]({
 "base:thermal_clip": 2.0,

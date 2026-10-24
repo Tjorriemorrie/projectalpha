@@ -1,71 +1,92 @@
 class_name ItemGrid
 extends RefCounted
-## A grid of cells that holds items, such as the backpack, the pockets or a container. Each item covers the cells
-## of its shape in its orientation; items never overlap or stick out of the grid. A cell can be reserved so nothing
-## is put there: a reload keeps the cell of the clip it took free for the spent clip. Nodes that change a grid log
-## what they did; the grid itself only emits changed.
+## A grid of square slots that holds stacks of items, such as the backpack, the pockets or a container. A slot is
+## addressed by its cell (column, row going down) and holds one stack (an Item) of one kind, up to the kind's stack
+## size; stacks of the same kind top each other up, and nothing else ever shares a slot. A grid may take only some
+## kinds (accepts(): the weapon slot takes guns, the ammo slots thermal clips). A growing grid (the stash, the floor)
+## keeps spare_rows empty rows below its last stack, growing and shrinking as stacks come and go, so it always has
+## room. Nodes that change a grid log what they did; the grid itself only emits changed.
 
-## Emitted whenever an item is placed or removed, a cell is reserved or released, or the grid grows.
+## Emitted whenever a stack is placed, removed or changes its quantity, or the grid grows or shrinks.
 signal changed
 
-## Where an item would go: the cell its shape starts at, and its orientation.
-class Spot:
-	var cell: Vector2i
-	var orientation: int
-
-	func _init(at: Vector2i, item_orientation: int) -> void:
-		cell = at
-		orientation = item_orientation
-
+## Not a cell: where there is no free slot.
+const NO_CELL := Vector2i(-1, -1)
 
 ## Columns and rows.
 var size: Vector2i
-## The items it holds, in the order they were placed.
+## The stacks it holds, in the order they were placed.
 var items: Array[Item] = []
+## Empty rows a growing grid keeps below its last stack; -1 for a grid of a fixed size.
+var spare_rows := -1
+## The fewest rows a growing grid shrinks to: the rows it was made with.
+var min_rows := 1
 
 var _occupant := {}
-var _reserved := {}
 
 
-func _init(grid_size: Vector2i) -> void:
+func _init(grid_size: Vector2i, spare: int = -1) -> void:
 	size = grid_size
+	spare_rows = spare
+	min_rows = grid_size.y
+	_fit_rows()
 
 
-## Whether an item of this kind fits with its shape starting at cell, in this orientation: every cell inside the
-## grid, free and not reserved. ignore is an item that doesn't count as in the way (the one being moved).
-func fits(definition: ItemDefinition, orientation: int, cell: Vector2i, ignore: Item = null) -> bool:
-	for offset in ItemShape.oriented(definition.get_cells(), orientation):
-		var covered := cell + offset
-		if not has_cell(covered) or _reserved.has(covered):
-			return false
-		var occupant: Item = _occupant.get(covered)
-		if occupant != null and occupant != ignore:
-			return false
+## Whether it keeps empty rows below its last stack, so it always has room.
+func is_growing() -> bool:
+	return spare_rows >= 0
+
+
+## Whether a kind may go in it at all. Every grid takes every kind, but the weapon slot and the ammo slots.
+func accepts(_definition: ItemDefinition) -> bool:
 	return true
 
 
-## Puts an item into the grid with its shape starting at cell, in this orientation, if it fits there. An item that
-## is already in this grid moves. Returns whether it was placed.
-func place(item: Item, cell: Vector2i, orientation: int) -> bool:
-	if not fits(item.definition, orientation, cell, item):
+## Whether a stack of this kind can go into the slot at cell: the slot is in the grid and free (or holds ignore, the
+## stack being moved), and the grid takes the kind.
+func fits(definition: ItemDefinition, cell: Vector2i, ignore: Item = null) -> bool:
+	if not has_cell(cell) or not accepts(definition):
 		return false
-	_release_cells(item)
+	var occupant: Item = _occupant.get(cell)
+	return occupant == null or occupant == ignore
+
+
+## How many of a kind the slot at cell can still take: a whole stack in a free slot, what a stack of the same kind
+## has room for, and none otherwise.
+func room_at(definition: ItemDefinition, cell: Vector2i) -> int:
+	if not has_cell(cell) or not accepts(definition):
+		return 0
+	var occupant: Item = _occupant.get(cell)
+	if occupant == null:
+		return definition.stack_size
+	return occupant.room() if occupant.definition == definition else 0
+
+
+## Puts a stack into the free slot at cell. A stack already in this grid moves. Returns whether it was placed.
+func place(item: Item, cell: Vector2i) -> bool:
+	if not fits(item.definition, cell, item):
+		return false
+	if _occupant.get(item.cell) == item:
+		_occupant.erase(item.cell)
 	item.cell = cell
-	item.orientation = orientation
-	for covered in item.cells():
-		_occupant[covered] = item
+	_occupant[cell] = item
 	if not items.has(item):
 		items.append(item)
+		item.changed.connect(_on_item_changed)
+	_fit_rows()
 	changed.emit()
 	return true
 
 
-## Takes an item out of the grid. Returns whether it was there.
+## Takes a stack out of the grid. Returns whether it was there.
 func remove(item: Item) -> bool:
 	if not items.has(item):
 		return false
-	_release_cells(item)
+	if _occupant.get(item.cell) == item:
+		_occupant.erase(item.cell)
 	items.erase(item)
+	item.changed.disconnect(_on_item_changed)
+	_fit_rows()
 	changed.emit()
 	return true
 
@@ -74,26 +95,7 @@ func has(item: Item) -> bool:
 	return items.has(item)
 
 
-## The first spot an item of this kind fits, or null: the first free cell in reading order in its own orientation,
-## then in each other orientation in turn, so items keep the way they come when they can.
-func find_space(definition: ItemDefinition) -> Spot:
-	for orientation in ItemShape.distinct_orientations(definition.get_cells()):
-		for row in size.y:
-			for column in size.x:
-				if fits(definition, orientation, Vector2i(column, row)):
-					return Spot.new(Vector2i(column, row), orientation)
-	return null
-
-
-## Puts an item into the first spot it fits (see find_space). Returns whether there was room.
-func add(item: Item) -> bool:
-	var spot := find_space(item.definition)
-	if spot == null:
-		return false
-	return place(item, spot.cell, spot.orientation)
-
-
-## The item covering a cell, or null.
+## The stack in the slot at cell, or null.
 func item_at(cell: Vector2i) -> Item:
 	return _occupant.get(cell)
 
@@ -102,70 +104,171 @@ func has_cell(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < size.x and cell.y < size.y
 
 
-## How many items of this kind it holds.
-func count(definition: ItemDefinition) -> int:
-	return items.filter(func(item: Item) -> bool: return item.definition == definition).size()
+## The first free slot in reading order, for a kind the grid takes; NO_CELL when there is none.
+func first_free(definition: ItemDefinition) -> Vector2i:
+	if not accepts(definition):
+		return NO_CELL
+	for row in size.y:
+		for column in size.x:
+			if not _occupant.has(Vector2i(column, row)):
+				return Vector2i(column, row)
+	return NO_CELL
 
 
-## The first item of this kind in reading order of where it starts, or null.
-func first_of(definition: ItemDefinition) -> Item:
-	var found: Item = null
-	for item in items:
-		if item.definition != definition:
+## Puts as many of a stack as there is room for onto the stacks of its kind here, in reading order, taking them off
+## it. Returns how many moved.
+func top_up(item: Item) -> int:
+	if not accepts(item.definition):
+		return 0
+	var moved := 0
+	for stack in in_reading_order():
+		if item.quantity <= 0:
+			break
+		if stack == item or stack.definition != item.definition:
 			continue
-		if found == null or item.cell.y < found.cell.y or (item.cell.y == found.cell.y and item.cell.x < found.cell.x):
-			found = item
-	return found
+		var amount := mini(stack.room(), item.quantity)
+		if amount <= 0:
+			continue
+		stack.quantity += amount
+		item.quantity -= amount
+		moved += amount
+	return moved
 
 
-## Cells no item covers and nothing reserved.
-func free_cells() -> int:
-	return size.x * size.y - _occupant.size() - _reserved.size()
-
-
-## Keeps a free cell free until it is released. Returns whether it could be reserved.
-func reserve(cell: Vector2i) -> bool:
-	if not has_cell(cell) or _occupant.has(cell) or _reserved.has(cell):
+## Puts a stack in: it tops up the stacks of its kind first, and what is left goes into the first free slot. Returns
+## whether all of it went in; what didn't stays on the item.
+func add(item: Item) -> bool:
+	if not accepts(item.definition):
 		return false
-	_reserved[cell] = true
-	changed.emit()
-	return true
+	top_up(item)
+	if item.quantity <= 0:
+		return true
+	var cell := first_free(item.definition)
+	return cell != NO_CELL and place(item, cell)
 
 
-func release(cell: Vector2i) -> void:
-	if _reserved.erase(cell):
-		changed.emit()
+## Adds one of a kind: onto the first stack of it with room, else into the first free slot. Returns the stack it
+## went onto, or null when there is no room.
+func add_one(definition: ItemDefinition) -> Item:
+	if not accepts(definition):
+		return null
+	for stack in in_reading_order():
+		if stack.definition == definition and stack.room() > 0:
+			stack.quantity += 1
+			return stack
+	var item := Item.new(definition)
+	return item if place(item, first_free(definition)) else null
 
 
-func is_reserved(cell: Vector2i) -> bool:
-	return _reserved.has(cell)
+## How many more of a kind it can take: the room on its stacks of that kind and whole stacks in its free slots. A
+## growing grid always has room for more.
+func room_for(definition: ItemDefinition) -> int:
+	if not accepts(definition):
+		return 0
+	var room := free_slots() * definition.stack_size
+	for stack in items:
+		if stack.definition == definition:
+			room += stack.room()
+	return room
 
 
-## Rows down to the bottom of the lowest item; 0 when it is empty.
-func rows_used() -> int:
-	var rows := 0
-	for item in items:
-		rows = maxi(rows, item.cell.y + item.size().y)
-	return rows
+## Takes amount off a stack here into a stack of its own; taking all of it takes the stack itself out. Returns the
+## stack taken, or null when the stack isn't here or amount is none.
+func take(item: Item, amount: int) -> Item:
+	amount = mini(amount, item.quantity)
+	if amount <= 0 or not has(item):
+		return null
+	if amount == item.quantity:
+		remove(item)
+		return item
+	item.quantity -= amount
+	var taken := Item.new(item.definition, amount)
+	taken.clip_heat = item.clip_heat
+	return taken
 
 
-## Makes it this many rows deep when it is shallower (the floor grows to keep room free). Never shrinks.
-func grow_to(rows: int) -> void:
-	if rows <= size.y:
-		return
-	size.y = rows
-	changed.emit()
-
-
-## Total value of the items it holds, in bitcoin.
-func value() -> int:
+## How many items of this kind it holds, in all its stacks.
+func count(definition: ItemDefinition) -> int:
 	var total := 0
 	for item in items:
-		total += item.definition.value
+		if item.definition == definition:
+			total += item.quantity
 	return total
 
 
-func _release_cells(item: Item) -> void:
-	for covered in item.cells():
-		if _occupant.get(covered) == item:
-			_occupant.erase(covered)
+## The first stack of this kind in reading order, or null.
+func first_of(definition: ItemDefinition) -> Item:
+	for item in in_reading_order():
+		if item.definition == definition:
+			return item
+	return null
+
+
+## Its stacks in reading order of their slots: along each row, then down.
+func in_reading_order() -> Array[Item]:
+	var ordered := items.duplicate()
+	ordered.sort_custom(func(a: Item, b: Item) -> bool:
+		return a.cell.y < b.cell.y or (a.cell.y == b.cell.y and a.cell.x < b.cell.x))
+	return ordered
+
+
+## Slots no stack takes.
+func free_slots() -> int:
+	return size.x * size.y - _occupant.size()
+
+
+## How many items it holds, counting every one in every stack.
+func item_count() -> int:
+	var total := 0
+	for item in items:
+		total += item.quantity
+	return total
+
+
+## Rows down to the lowest stack; 0 when it is empty.
+func rows_used() -> int:
+	var rows := 0
+	for item in items:
+		rows = maxi(rows, item.cell.y + 1)
+	return rows
+
+
+## Total value of the stacks it holds, in bitcoin.
+func value() -> int:
+	var total := 0
+	for item in items:
+		total += item.value()
+	return total
+
+
+## Moves a stack into these grids, in order: it tops up their stacks of its kind first, and what is left goes into
+## the first free slot among them. from is the grid holding it now, if any, which it leaves once it has all gone, or
+## when it goes into a free slot whole. Returns how many moved; what didn't stays on the item.
+static func stow(item: Item, grids: Array[ItemGrid], from: ItemGrid = null) -> int:
+	var moved := 0
+	for grid in grids:
+		moved += grid.top_up(item)
+	if item.quantity > 0:
+		for grid in grids:
+			var cell := grid.first_free(item.definition)
+			if cell == NO_CELL:
+				continue
+			if from:
+				from.remove(item)
+			grid.place(item, cell)
+			moved += item.quantity
+			return moved
+	if item.quantity <= 0 and from:
+		from.remove(item)
+	return moved
+
+
+## A growing grid keeps spare_rows empty rows below its last stack, and never fewer rows than min_rows.
+func _fit_rows() -> void:
+	if spare_rows < 0:
+		return
+	size.y = maxi(min_rows, rows_used() + spare_rows)
+
+
+func _on_item_changed() -> void:
+	changed.emit()

@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
 ## Unit tests for Trader, a hub's prices: selling pays an item's value and buying costs twice that, each varied a
 ## little and always the same way by the hub's seed; hydrogen's and antimatter's prices, how much hydrogen a wallet buys;
-## intel's price; the offer for a crate; and the shelf's order.
+## intel's price; the offer for stacks, every item in them; and the shelf's order.
 
 var _clip: ItemDefinition
 var _coil: ItemDefinition
@@ -78,10 +78,10 @@ func test_nothing_is_free_to_buy() -> void:
 	assert_int(Trader.new(1).sell_price(junk)).is_equal(0)
 
 
-func test_offers_the_sum_of_the_sell_prices() -> void:
+func test_offers_the_sum_of_the_sell_prices_of_every_item_in_the_stacks() -> void:
 	var trader := Trader.new(3)
-	var items: Array[Item] = [Item.new(_clip), Item.new(_clip), Item.new(_coil)]
-	assert_int(trader.offer(items)).is_equal(2 * trader.sell_price(_clip) + trader.sell_price(_coil))
+	var items: Array[Item] = [Item.new(_clip, 2), Item.new(_clip), Item.new(_coil)]
+	assert_int(trader.offer(items)).is_equal(3 * trader.sell_price(_clip) + trader.sell_price(_coil))
 	assert_int(trader.offer([])).is_equal(0)
 
 

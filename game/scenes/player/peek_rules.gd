@@ -1,7 +1,8 @@
 class_name PeekRules
 extends RefCounted
-## The free peek's decisions, kept free of nodes and input so they can be unit tested. Head offsets are in metres
-## in the body's frame: x is right, y is up.
+## The peek's decisions, kept free of nodes and input so they can be unit tested. Head offsets are in metres in the
+## body's frame: x is right, y is up. Standing, the head only leans left and right; crouched, it only rises up (over
+## cover), so a peek moves along one axis (restrict()).
 
 enum State { NONE, PEEK, AIM_OUT }
 
@@ -9,6 +10,11 @@ enum State { NONE, PEEK, AIM_OUT }
 const CENTRED_FRACTION := 0.1
 ## Stops a range of zero from dividing by zero.
 const MIN_RANGE := 0.001
+
+
+## A head offset kept to the one way the stance lets the head go: sideways while standing, up while crouched.
+static func restrict(offset: Vector2, crouched: bool) -> Vector2:
+	return Vector2(0.0, maxf(offset.y, 0.0)) if crouched else Vector2(offset.x, 0.0)
 
 
 ## How far out the head is, as a fraction of its range in each direction: the head's range is an ellipse that

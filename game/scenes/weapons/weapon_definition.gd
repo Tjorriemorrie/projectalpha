@@ -1,9 +1,9 @@
 class_name WeaponDefinition
 extends ItemDefinition
 ## A weapon in the content registry: its numbers, and its viewmodel scene (model, muzzle and sounds), which only
-## loads when the weapon is equipped. A weapon is an item too: its shape, value and model (lying flat, for its icon
-## and when it lies on the floor) come from ItemDefinition, and the player holds the one in the inventory's weapon
-## slot. Laser weapons heat up as they fire, and a thermal clip soaks up the heat;
+## loads when the weapon is equipped. A weapon is an item too: its value and model (lying flat, for its icon and when
+## it lies on the floor) come from ItemDefinition, it takes a slot to itself (a stack size of 1), and the player holds
+## the one in the inventory's weapon slot. Laser weapons heat up as they fire, and a thermal clip soaks up the heat;
 ## heats are fractions of one clip (0.05 is 5%). Holding the trigger charges a shot: a charge of 0 is a quick click,
 ## 1 is a full charge, and a part charge scales between the two.
 
@@ -11,7 +11,7 @@ extends ItemDefinition
 @export_file("*.tscn") var viewmodel := ""
 
 @export_group("Clips")
-## The item, by content ID, that a reload loads from the pockets: a fresh thermal clip.
+## The item, by content ID, that a reload loads from the ammo slots: a fresh thermal clip.
 @export var clip_item := ""
 ## The item, by content ID, that the loaded clip becomes when a reload takes it out: a spent thermal clip.
 @export var spent_clip_item := ""

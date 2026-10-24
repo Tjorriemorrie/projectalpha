@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Data drive"
-shape = PackedStringArray("#")
+stack_size = 5
 value = 150
 description = "A sealed storage drive. Whatever is on it, traders pay well for it."
 model = "res://content/base/items/data_drive/data_drive.glb"

@@ -26,7 +26,7 @@ const GROUP := &"robots"
 const SIGHT_MASK := 0b1
 ## Physics layers its shots hit: world (1) stops them, hitbox (4) is what they damage.
 const SHOT_MASK := 0b1001
-## The physics layer of a robot's body (5, enemy), and world (1), which a destroyed robot's wreckage moves to.
+## The physics layer of a robot's body (5, enemy), and world (1), which solid wreckage moves to.
 const ENEMY_LAYER := 1 << 4
 const WORLD_LAYER := 0b1
 ## Metres a shot carries on past the point it aimed at, so a near miss can still hit what is behind it.
@@ -58,6 +58,10 @@ const SMOKE_TIME := 20.0
 @export var lost_chirp: AudioStream
 
 @export_group("Salvage")
+## Whether its wreckage is solid, on the world layer, once it is destroyed: the drone's lies on the floor as cover
+## the player steps over. A ceiling turret's isn't, as its body wasn't while it worked, so it never blocks the way
+## under it (standing on a drone's wreckage below, the player's head would reach it in a 2.5 m corridor).
+@export var solid_wreckage := true
 ## Size and centre of the area round its wreckage that the player pries open for its salvage, a little bigger than
 ## the wreckage so the look ray finds it first.
 @export var salvage_box := Vector3(0.8, 0.8, 0.8)
@@ -383,12 +387,12 @@ func _on_damaged(amount: float, source_position: Vector3, part: Hitbox.Part) -> 
 		name, Hitbox.Part.keys()[part], amount, _health.health, reacted, source_position])
 
 
-## Shuts down for good: the eye and searchlight go dark, it whines, sparks and smokes, and its wreckage stays,
-## solid, on the world layer.
+## Shuts down for good: the eye and searchlight go dark, it whines, sparks and smokes, and its wreckage stays, on the
+## world layer when it is solid (solid_wreckage) and on none otherwise.
 func _on_died() -> void:
 	mind.destroy()
 	remove_from_group(Hearing.LISTENER_GROUP)
-	collision_layer = WORLD_LAYER
+	collision_layer = WORLD_LAYER if solid_wreckage else 0
 	for hitbox in get_hitboxes():
 		hitbox.set_active(false)
 	_idle_sound.stop()
@@ -401,8 +405,8 @@ func _on_died() -> void:
 	LaserEffects.impact(self, get_eye_position(), Vector3.UP, SPARK_COLOR, null)
 	_start_smoke()
 	_add_salvage()
-	Log.info("🤖 Destroyed: robot=%s, enemy=%s, position=%s, shots_fired=%d" % [
-		name, definition.id, global_position, shots_fired])
+	Log.info("🤖 Destroyed: robot=%s, enemy=%s, position=%s, shots_fired=%d, solid_wreckage=%s" % [
+		name, definition.id, global_position, shots_fired, solid_wreckage])
 	_destroy_body()
 	destroyed.emit()
 

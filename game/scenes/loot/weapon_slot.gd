@@ -1,18 +1,16 @@
 class_name WeaponSlot
 extends ItemGrid
-## The inventory's weapon slot: a small grid that holds one gun, the one in the player's hand. Anything that isn't a
-## weapon never fits, and neither does a second gun; the gun it holds can still be moved about inside it.
+## The inventory's weapon slot: one slot holding the gun in the player's hand. Only a weapon goes in it, and a gun
+## stacks alone, so it holds one gun at most.
 
 
-## Whether a weapon fits there: only a weapon, only while the slot holds no other item, and only where the grid has
-## room for its shape.
-func fits(definition: ItemDefinition, orientation: int, cell: Vector2i, ignore: Item = null) -> bool:
-	if not definition is WeaponDefinition:
-		return false
-	for item in items:
-		if item != ignore:
-			return false
-	return super(definition, orientation, cell, ignore)
+func _init(slot_size: Vector2i = Vector2i.ONE) -> void:
+	super(slot_size)
+
+
+## Only a weapon goes in it.
+func accepts(definition: ItemDefinition) -> bool:
+	return definition is WeaponDefinition
 
 
 ## The gun it holds, or null when the player is unarmed.

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Servo motor"
-shape = PackedStringArray("#.", "##")
+stack_size = 3
 value = 70
 description = "A compact actuator from a door mechanism or a robot's joint."
 model = "res://content/base/items/servo_motor/servo_motor.glb"

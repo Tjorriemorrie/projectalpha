@@ -2,14 +2,14 @@ extends Node
 ## The game session: what lasts while the game runs as the player goes between the ship and the wreck (nothing is
 ## saved yet, so quitting starts a new game). It keeps the ship's stash, the bitcoin wallet, the hydrogen and
 ## antimatter tanks with the antimatter on order, the day and the jump drive's recharge, the star system the ship is in
-## (a StarSystem, with the wrecks still there to board) and its trader hub and sell crate, every system revealed so far
+## (a StarSystem, with the wrecks still there to board) and its trader hub, every system revealed so far
 ## (on arrival or by intel, each keeping what is left in it) with the visited ones' hubs, the route through them, where
 ## the ship is in the system (at the hub, docked with a wreck, or where a wreck it boarded was), the clone number and
 ## the runs boarded. It hands what the player carries (the kit: their inventory, whose gun keeps its loaded clip's heat)
 ## from one scene's player to the next, and the docked wreck's roll to the wreck boarded; records how each run ended
-## (RunSummary); and changes the scene between the ship and the wreck, playing the travel sounds itself so they carry
-## on through the change. Only the first clone of a new game gets the basic kit: a death hands no kit over, and the
-## next clone wakes empty-handed and arms from the stash. Flying within the system, jumping to another, refuelling,
+## (RunSummary), and unloads a haul into the stash after an extraction; and changes the scene between the ship and
+## the wreck, playing the travel sounds itself so they carry on through the change. Only the first clone of a new
+## game gets the basic kit: a death hands no kit over, and the next clone wakes empty-handed and arms from the stash. Flying within the system, jumping to another, refuelling,
 ## ordering antimatter, buying intel, selling and buying go through here, since the tanks, the stash and the wallet
 ## live here; all but flying only at the hub. A system never strands the player: while the ship can't jump on yet,
 ## easy wrecks turn up when too few are left to wait for it, or to earn the antimatter he can't afford.
@@ -37,9 +37,10 @@ enum Jump { OK, HERE, OUT_OF_RANGE, AWAY_FROM_HUB, RECHARGING, ORDER_PENDING, SH
 enum Intel { OK, KNOWN, OUT_OF_RANGE, AWAY_FROM_HUB, SHORT_OF_BITCOIN }
 
 const SHIP_SCENE := "res://scenes/ship/ship.tscn"
-const STASH_SIZE := Vector2i(10, 8)
-## The trader hub's sell crate, where items wait to be sold.
-const CRATE_SIZE := Vector2i(6, 4)
+## The stash's columns, and the rows it never shrinks below. It has no size limit: it grows, always keeping
+## STASH_SPARE_ROWS empty rows below its last stack, so storing, unloading and buying never need room.
+const STASH_SIZE := Vector2i(8, 4)
+const STASH_SPARE_ROWS := 1
 ## The little bitcoin a new game starts with: not enough for antimatter, so the first system already needs runs.
 const STARTING_BITCOIN := 500
 ## The antimatter a new game starts with: too little for any jump (the shortest burns 5), so the first order is
@@ -57,7 +58,7 @@ const STRANDED_SHIPS := 3
 const STRANDED_TOP_UP := Vector2i(3, 4)
 const EASY_LEVEL := 1
 
-## The ship's stash: safe whatever happens on a run.
+## The ship's stash: safe whatever happens on a run, and never full.
 var stash: ItemGrid
 ## Bitcoin in the wallet: never lost, whatever happens on a run.
 var bitcoin := STARTING_BITCOIN
@@ -85,9 +86,6 @@ var ship_position := Vector2.ZERO
 var at_hub := true
 ## The trader hub of the system the ship is in.
 var trader: Trader
-## The hub's sell crate: what is in it is sold together. The hub screen puts anything left in it back into the stash
-## when it closes; what doesn't fit stays here for the next visit.
-var crate: ItemGrid
 ## The clone the player is now, counted from 1, one more for every death.
 var clone_number := 1
 ## Runs boarded this session.
@@ -128,8 +126,7 @@ func _ready() -> void:
 ## at the hub of a random star system on the galaxy's outer ring with nothing else revealed, and the first clone waking
 ## up in the clone pod with the basic kit.
 func new_game() -> void:
-	stash = ItemGrid.new(STASH_SIZE)
-	crate = ItemGrid.new(CRATE_SIZE)
+	stash = ItemGrid.new(STASH_SIZE, STASH_SPARE_ROWS)
 	bitcoin = STARTING_BITCOIN
 	hydrogen = HYDROGEN_TANK
 	antimatter = STARTING_ANTIMATTER
@@ -510,15 +507,55 @@ func board(carried: Inventory) -> void:
 	_travel(_boarding.definition.get_scene_path())
 
 
-## The player got out alive with what they carry: it goes to the ship with them, where they arrive in the airlock.
-## Returns the run's summary; continue_to_ship() travels.
+## The player got out alive with what they carry: it goes to the ship with them, where they arrive in the airlock,
+## and the haul in the pockets and the backpack can be unloaded into the stash first (unload()). Returns the run's
+## summary; continue_to_ship() travels.
 func extract(carried: Inventory) -> RunSummary:
-	last_run = RunSummary.make_extracted(carried.item_count(), carried.value(), _value_in, clone_number)
+	var haul := carried.haul()
+	var haul_items := 0
+	var haul_value := 0
+	for item in haul:
+		haul_items += item.quantity
+		haul_value += item.value()
+	last_run = RunSummary.make_extracted(carried.item_count(), carried.value(), _value_in, clone_number, haul_items,
+		haul_value)
 	arrival = Arrival.EXTRACTED
 	_carried = carried
-	Log.info("🧬 Extracted: run=%d, clone=%d, items=%d, value=%d, gained=%d" % [
-		runs, clone_number, last_run.items, last_run.value, last_run.gained])
+	Log.info("🧬 Extracted: run=%d, clone=%d, items=%d, value=%d, gained=%d, haul_items=%d, haul_value=%d" % [
+		runs, clone_number, last_run.items, last_run.value, last_run.gained, haul_items, haul_value])
 	return last_run
+
+
+## After an extraction, unloads the haul the player brought home into the stash in one go: every stack in the pockets
+## and the backpack, topping up stacks of its kind in the stash or taking free slots (the stash always has room). The
+## gun in the weapon slot and the clips in the ammo slots stay. The run's summary records it. Returns the items
+## unloaded: none after a death, or when it was unloaded already.
+func unload(carried: Inventory) -> int:
+	if last_run == null or not last_run.extracted or last_run.unloaded:
+		Log.info("🧬 Nothing to unload: last_run=%s" % last_run)
+		return 0
+	var items := 0
+	var value := 0
+	var stacks := carried.haul()
+	for item in stacks:
+		var from := carried.grid_of(item)
+		var quantity := item.quantity
+		var worth := item.value()
+		from.remove(item)
+		if not stash.add(item):
+			# A growing stash always has room, so this shouldn't happen; if it does, the rest stays carried.
+			from.add(item)
+			Log.error("🧬 No room in the stash to unload a stack, it stays carried: item=%s, left=%d" % [
+				item.definition.id, item.quantity])
+			continue
+		items += quantity
+		value += worth
+	last_run.unloaded = true
+	last_run.unloaded_items = items
+	last_run.unloaded_value = value
+	Log.info("🧬 Haul unloaded into the stash: stacks=%d, items=%d, value=%d, stash_stacks=%d, stash_rows=%d" % [
+		stacks.size(), items, value, stash.items.size(), stash.size.y])
+	return items
 
 
 ## The player died: everything they carried is lost, gun included, and the next clone wakes up in the clone pod
@@ -546,27 +583,29 @@ func continue_to_ship() -> void:
 	_travel(SHIP_SCENE)
 
 
-## Sells everything in the sell crate to the hub: the items go, and the wallet gets the hub's offer. Returns the
-## bitcoin earned (0 for an empty crate, or away from the hub).
-func sell_crate() -> int:
-	var sold: Array[Item] = crate.items.duplicate()
+## Sells up to amount of a stack in the stash to the hub: they leave the stack (all of it takes the stack out), and
+## the wallet gets the hub's price for each. Returns the bitcoin earned: none away from the hub, for a stack that
+## isn't in the stash, or for no amount.
+func sell(item: Item, amount: int) -> int:
 	if not at_hub:
-		Log.warning("🧬 Can't sell away from the hub: crate_items=%d, position=%s" % [sold.size(), ship_position])
+		Log.warning("🧬 Can't sell away from the hub: item=%s, amount=%d, position=%s" % [
+			item.definition.id, amount, ship_position])
 		return 0
-	if sold.is_empty():
-		Log.info("🧬 Nothing in the crate to sell: bitcoin=%d" % bitcoin)
+	if not stash.has(item) or amount <= 0:
+		Log.warning("🧬 Nothing to sell: item=%s, amount=%d, in_stash=%s" % [item.definition.id, amount,
+			stash.has(item)])
 		return 0
-	var total := trader.offer(sold)
-	for item in sold:
-		crate.remove(item)
-	_set_bitcoin(bitcoin + total)
-	Log.info("🧬 Sold the crate: items=%d, earned=%d, bitcoin=%d, first=%s" % [
-		sold.size(), total, bitcoin, sold[0].definition.id])
-	return total
+	var sold := stash.take(item, amount)
+	var earned := trader.sell_price(sold.definition) * sold.quantity
+	_set_bitcoin(bitcoin + earned)
+	Log.info("🧬 Sold: item=%s, sold=%d, left=%d, earned=%d, bitcoin=%d" % [
+		sold.definition.id, sold.quantity, item.quantity if stash.has(item) else 0, earned, bitcoin])
+	return earned
 
 
-## Buys one of an item from the hub into the first free spot in the stash. Returns the new item, or null when the
-## ship is away from the hub, the wallet is short or the stash has no room for it.
+## Buys one of an item from the hub into the stash: onto a stack of it with room, else into the first free slot
+## (the stash always has one). Returns the stack it went onto, or null when the ship is away from the hub or the
+## wallet is short.
 func buy(definition: ItemDefinition) -> Item:
 	var price := trader.buy_price(definition)
 	if not at_hub:
@@ -575,35 +614,15 @@ func buy(definition: ItemDefinition) -> Item:
 	if price > bitcoin:
 		Log.info("🧬 Can't afford it: item=%s, price=%d, bitcoin=%d" % [definition.id, price, bitcoin])
 		return null
-	var item := Item.new(definition)
-	if not stash.add(item):
-		Log.info("🧬 No room in the stash for it: item=%s, price=%d, bitcoin=%d, stash_free=%d" % [
-			definition.id, price, bitcoin, stash.free_cells()])
+	var item := stash.add_one(definition)
+	if item == null:
+		Log.error("🧬 No room in the stash for it, which a growing stash always has: item=%s, price=%d" % [
+			definition.id, price])
 		return null
 	_set_bitcoin(bitcoin - price)
-	Log.info("🧬 Bought: item=%s, price=%d, bitcoin=%d, stash_cell=%s, stash_items=%d" % [
-		definition.id, price, bitcoin, item.cell, stash.items.size()])
+	Log.info("🧬 Bought: item=%s, price=%d, bitcoin=%d, stash_cell=%s, stack=%d, stash_stacks=%d" % [
+		definition.id, price, bitcoin, item.cell, item.quantity, stash.items.size()])
 	return item
-
-
-## Puts what is left in the sell crate back into the stash, each item in the first spot it fits. Returns how many
-## stayed in the crate for want of room.
-func return_crate() -> int:
-	var left := 0
-	var returned := 0
-	for item: Item in crate.items.duplicate():
-		crate.remove(item)
-		if stash.add(item):
-			returned += 1
-		else:
-			crate.place(item, item.cell, item.orientation)
-			left += 1
-	if left > 0:
-		Log.warning("🧬 No room in the stash for everything in the crate, the rest waits there: returned=%d, left=%d" % [
-			returned, left])
-		return left
-	Log.info("🧬 Crate emptied back into the stash: returned=%d, stash_items=%d" % [returned, stash.items.size()])
-	return left
 
 
 ## Plays a sound that carries on through the scene change, such as docking during the fade.

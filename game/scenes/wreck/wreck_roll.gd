@@ -118,12 +118,12 @@ func roll_loot(markers: Dictionary, kinds: Array, gun: ItemDefinition,
 ## The level-1 gun goes into a random container it fits.
 func _put_gun(gun: ItemDefinition, placements: Array[LootPlacement], grids: Array[ItemGrid],
 		rng: RandomNumberGenerator) -> void:
-	var takers := range(grids.size()).filter(func(index: int) -> bool: return grids[index].find_space(gun) != null)
+	var takers := range(grids.size()).filter(func(index: int) -> bool: return grids[index].room_for(gun) > 0)
 	if takers.is_empty():
 		problems.append("The level-1 gun fits no container: gun=%s, containers=%d" % [gun.id, grids.size()])
 		return
 	var index: int = takers[rng.randi_range(0, takers.size() - 1)]
-	grids[index].add(Item.new(gun))
+	grids[index].add_one(gun)
 	placements[index].items.append(gun.id)
 
 

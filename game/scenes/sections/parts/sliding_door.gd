@@ -2,14 +2,23 @@ class_name SlidingDoor
 extends Node3D
 ## A door panel that slides sideways into its wall. Its origin is the bottom centre of the doorway, in the
 ## middle of the wall. It never closes on the player: while someone stands in the doorway a closing door opens
-## again. Automatic doors open when the player comes near and close after a delay; other doors, such as the
-## elevator's, are opened and closed by their owner.
+## again. Automatic doors open for someone (the player or a drone) who comes right up to them or heads for the
+## doorway, not for someone walking past along the wall, so a side door in a corridor stays shut as the player
+## walks by; once open they stay open while anyone is near, and close after a delay. Other doors, such as the
+## elevator's, are opened and closed by their owner. The door's local Z is the wall's normal: the doorway runs
+## along X.
 
 signal opened
 signal closed
 
-## Opens when the player comes near and closes close_delay seconds after they leave.
+## Opens when someone comes up to it or heads for it, and closes close_delay seconds after everyone near has left.
 @export var automatic := true
+## Metres from the wall within which someone near the doorway opens it, whichever way they move.
+@export var near_distance := 0.6
+## Metres per second someone in its proximity must be moving towards the doorway to open it from further out, and
+## the least share of their speed that must point at it (0.5: within about 60° of straight at it).
+@export var approach_speed := 0.5
+@export var approach_share := 0.5
 ## Seconds the panel takes to slide fully open or closed.
 @export var open_time := 0.6
 @export var close_delay := 2.0
@@ -75,13 +84,39 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_automatic(delta: float) -> void:
-	if _proximity.has_overlapping_bodies():
+	var bodies := _proximity.get_overlapping_bodies()
+	var opener: Node3D = null
+	if not open_requested:
+		for body in bodies:
+			if wants_through(body):
+				opener = body
+				break
+	if opener or (open_requested and not bodies.is_empty()):
 		_close_timer = close_delay
+		if opener:
+			Log.info("🚪 Door opening for someone heading through: door=%s, who=%s, distance=%.2f m" % [
+				_label(), opener.name, absf(to_local(opener.global_position).z)])
 		open()
 	elif open_requested:
 		_close_timer -= delta
 		if _close_timer <= 0.0:
 			close()
+
+
+## Whether someone in its proximity is coming through: right up to the wall at the doorway (near_distance), or
+## moving towards it fast enough and straight enough (approach_speed, approach_share). Walking past along the wall
+## is neither.
+func wants_through(body: Node3D) -> bool:
+	var local := to_local(body.global_position)
+	if absf(local.z) <= near_distance:
+		return true
+	var mover := body as CharacterBody3D
+	if mover == null:
+		return false
+	var velocity := global_basis.inverse() * mover.velocity
+	var approach := -signf(local.z) * velocity.z
+	var speed := Vector2(velocity.x, velocity.z).length()
+	return approach >= approach_speed and approach >= speed * approach_share
 
 
 ## Section and socket name, such as "RoomSmall/SocketSouth".

@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
-## Checks rolling a container's loot: the budget the level scales, drawing by weight within the budget and the grid,
-## and the same seed drawing the same. Uses the base game's items: thermal clip ₿25 (1 cell), circuit board ₿60
-## (2 cells), gyroscope ₿160 (2×2) and plasma coil ₿180 (a T of 4 cells).
+## Checks rolling a container's loot: the budget the level scales, drawing by weight within the budget and the slots
+## (stacking as it draws), and the same seed drawing the same. Uses the base game's items: thermal clip ₿25 (stacks of
+## 5), circuit board ₿60 (4), gyroscope ₿160 (2) and plasma coil ₿180 (2).
 
 
 func test_the_level_scales_the_budget_by_half_a_budget_a_level() -> void:
@@ -28,19 +28,21 @@ func test_never_draws_what_costs_more_than_the_budget() -> void:
 	assert_array(drawn).is_empty()
 
 
-func test_stops_when_the_grid_is_full() -> void:
+func test_stops_when_the_slots_are_full() -> void:
 	var grid := ItemGrid.new(Vector2i(2, 1))
 	var drawn := LootRoll.draw(_items(["base:thermal_clip"]), [1.0], 1000, grid, _rng(1))
-	assert_int(drawn.size()).is_equal(2)
-	assert_int(grid.free_cells()).is_equal(0)
+	# Two full stacks of five.
+	assert_int(drawn.size()).is_equal(10)
+	assert_int(grid.free_slots()).is_equal(0)
+	assert_int(grid.room_for(drawn[0])).is_equal(0)
 
 
 func test_draws_only_what_still_fits() -> void:
-	# A 2×2 gyroscope can't fit beside a clip in a 2×2 grid, so only clips come out.
-	var grid := ItemGrid.new(Vector2i(2, 2))
+	# A gyroscope can't go in the one slot a clip already takes, so only clips come out, up to the stack's size.
+	var grid := ItemGrid.new(Vector2i(1, 1))
 	grid.add(Item.new(_items(["base:thermal_clip"])[0]))
 	var drawn := LootRoll.draw(_items(["base:gyroscope", "base:thermal_clip"]), [100.0, 1.0], 1000, grid, _rng(1))
-	assert_int(drawn.size()).is_equal(3)
+	assert_int(drawn.size()).is_equal(4)
 	for item in drawn:
 		assert_str(item.id).is_equal("base:thermal_clip")
 

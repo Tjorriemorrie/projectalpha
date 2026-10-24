@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Hull plating"
-shape = PackedStringArray(".##", "##.")
+stack_size = 2
+plural_name = "Hull plating"
 value = 40
 description = "A torn-off piece of hull armour. Heavy, cheap and awkward to pack."
 model = "res://content/base/items/hull_plating/hull_plating.glb"

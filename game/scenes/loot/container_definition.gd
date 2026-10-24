@@ -1,13 +1,13 @@
 class_name ContainerDefinition
 extends ContentDefinition
 ## A loot container in the content registry: its scene (body, model, lid and sounds), which only loads when a wreck
-## places it, the size of the grid that holds its loot, and how its loot is rolled: its loot table (item IDs and their
+## places it, the slots that hold its loot, and how its loot is rolled: its loot table (item IDs and their
 ## weights) and its bitcoin budget at level 1, which the wreck's level scales (see LootRoll). Bigger containers get
 ## bigger budgets, so their size hints at the haul before the player spends time prying one open.
 
 ## The container's scene, whose root is a LootContainer. A res:// path, or a uid:// when picked in the inspector.
 @export_file("*.tscn") var scene := ""
-## Columns and rows of its grid.
+## Columns and rows of its slots: the small case 3 × 1, the supply crate 3 × 2, the locker 3 × 3.
 @export var grid_size := Vector2i(4, 3)
 ## Small enough for a tight loot marker (in a vent or a dead end). Every container fits a room's markers.
 @export var fits_tight := false

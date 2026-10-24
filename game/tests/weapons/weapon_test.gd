@@ -48,7 +48,7 @@ func test_player_starts_armed_with_five_clips() -> void:
 	assert_bool(_weapon.is_equipped()).is_true()
 	assert_str(_weapon.definition.id).is_equal("base:laser_pistol")
 	assert_float(_player.clips.heat).is_equal(0.0)
-	# One loaded, two in the pockets and two in the backpack.
+	# One loaded, a stack of two in the ammo slots and one of two in the backpack.
 	assert_int(_player.clips.fresh).is_equal(2)
 	assert_int(_player.clips.packed).is_equal(2)
 	assert_int(_player.clips.spent).is_equal(0)
@@ -165,7 +165,7 @@ func test_reload_takes_its_time_and_swaps_the_clip() -> void:
 	assert_int(_weapon.shots_fired).is_equal(1)
 	await _physics_frames(roundi(2.5 * FRAMES_PER_SECOND))
 	assert_bool(_weapon.is_reloading).is_true()
-	# The fresh clip left the pockets when the reload started; its cell waits for the spent one.
+	# The fresh clip left the ammo slots when the reload started; the spent one comes back at the end.
 	assert_int(_player.clips.fresh).is_equal(1)
 	assert_int(_player.clips.spent).is_equal(0)
 	await _physics_frames(FRAMES_PER_SECOND)
@@ -190,8 +190,8 @@ func test_taking_the_gun_out_of_its_slot_mid_reload_calls_the_reload_off() -> vo
 	await _physics_frames(2)
 	assert_bool(_weapon.is_equipped()).is_false()
 	assert_bool(_weapon.is_reloading).is_false()
-	# The fresh clip went back into its pocket cell, and the gun's loaded clip kept its heat.
-	assert_int(_player.inventory.pockets.count(_item("base:thermal_clip"))).is_equal(2)
+	# The fresh clip went back into the ammo slots, and the gun's loaded clip kept its heat.
+	assert_int(_player.inventory.ammo.count(_item("base:thermal_clip"))).is_equal(2)
 	assert_int(_player.inventory.count(_item("base:spent_thermal_clip"))).is_equal(0)
 	assert_float(gun.clip_heat).is_equal_approx(heat, 0.0001)
 	# Unarmed, the trigger does nothing; put back, the gun is in hand again with its heat.

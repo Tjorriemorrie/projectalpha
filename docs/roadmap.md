@@ -45,6 +45,8 @@ Ordered, but only roughly. Re-order freely once the MVP is played.
 | 010 | [Wreck variety](features/010-wreck-variety.md) | done |
 | 011 | [System map](features/011-system-map.md) | done |
 | 012 | [Star map and travel](features/012-star-map-and-travel.md) | done |
+| 013 | [Inventory management revamp](features/013-inventory-management-revamp.md) | done |
+| 014 | [Clones revamp](features/014-clones-revamp.md) | planned |
 
 Later, roughly in this order: triangulation, her messages and the rescue clock's countdown, the company's ships and
 the cure, and the android stock (together with swapping the clone fiction for the android link). Saving has to land
@@ -70,13 +72,15 @@ Promote an idea by giving it a number and a file in `features/`, and linking it 
 - Swap the clone fiction in the game for the android link (008 built clones: the clone pod, `NEW_CLONE`,
   "Clone 3 activated"): the clone pod becomes the android's charging cradle, with the man's body in a link chair.
   Update the README, technical design and 008 spec that describe it.
-- Unlimited stash: no size limit, since the player has to sell to survive and we control the prices. It grows to
-  fit (like the inventory screen's floor), so storing or buying never has to check for room; 009 refuses a buy
-  when the 10×8 stash is full.
-- Armor and gear (e.g. body armor, helmets), found on wrecks and sold at the hubs like everything else.
+- Armor and gear (e.g. body armor, helmets), found on wrecks and sold at the hubs like everything else, worn in
+  slots of their own; bigger backpacks too, as items in a backpack slot that bring more slots (013 gives every
+  player the same 6-slot backpack).
+- Auto-sort in the inventory and the stash: a button that merges stacks and orders the slots (013 has none).
+- Selling from what the player carries at the hub, not only from the stash (013 sells from the stash only).
 - Tuning pass, once a full playthrough is possible: tweak all the control variables together. So far: the hubs'
   sell and buy rates and per-hub price variance (009), item values, starting bitcoin (009), container budgets, loot
-  tables, container weights and the expected robots per level of each layout (010), which ships and stations spawn
+  tables, container weights and the expected robots per level of each layout (010), the slots the player carries
+  and the items' stack sizes (013), which ships and stations spawn
   in a system when it is revealed (how many, now 6 to 8, which kinds, how risky and how many in open space; 011,
   012), the hydrogen tank (24), what a flight burns and hydrogen's price (₿5 a unit; 011), intel's price (012),
   the antimatter tank and what a jump burns (10 units, one a light year; 012), antimatter's price (₿100 a unit; 012),

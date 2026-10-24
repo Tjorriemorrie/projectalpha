@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Laser pistol"
-shape = PackedStringArray("##", ".#")
+stack_size = 1
 value = 200
 description = "A compact laser sidearm. Hold the trigger to charge a heavier shot. Its loaded clip stays in it, and the one in the weapon slot is the one in hand."
 model = "res://content/base/weapons/laser_pistol/laser_pistol_item.glb"

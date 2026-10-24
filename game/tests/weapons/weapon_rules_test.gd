@@ -1,7 +1,8 @@
 extends GdUnitTestSuite
 ## Unit tests for WeaponRules and ThermalClips, using a WeaponDefinition with its defaults (the laser pistol's
-## starting numbers: 5% heat and 25 damage uncharged, 15% heat and 4x damage at a full charge). The clips are items
-## in an inventory: fresh ones in the pockets are the ones a reload can use.
+## starting numbers: 5% heat and 25 damage uncharged, 15% heat and 4x damage at a full charge). The clips are stacks
+## in an inventory: fresh ones in the ammo slots are the ones a reload can use, and the spent one goes back there
+## first, then to the pockets or the backpack, and overflows when there is no room anywhere.
 
 const TOLERANCE := 0.0001
 
@@ -12,19 +13,17 @@ var _spent: ItemDefinition
 
 func before_test() -> void:
 	_pistol = WeaponDefinition.new()
-	_fresh = ItemDefinition.new()
-	_fresh.id = "test:fresh_clip"
-	_spent = ItemDefinition.new()
-	_spent.id = "test:spent_clip"
+	_fresh = _clip("fresh_clip")
+	_spent = _clip("spent_clip")
 
 
-## Clips with this much heat in the gun's loaded one, and fresh clips in the pockets and the backpack.
-func _clips(heat: float, in_pockets: int = 0, in_backpack: int = 0) -> ThermalClips:
+## Clips with this much heat in the gun's loaded one, and stacks of fresh clips in the ammo slots and the backpack.
+func _clips(heat: float, in_ammo: int = 0, in_backpack: int = 0) -> ThermalClips:
 	var inventory := Inventory.new()
-	for i in in_pockets:
-		inventory.pockets.add(Item.new(_fresh))
-	for i in in_backpack:
-		inventory.backpack.add(Item.new(_fresh))
+	if in_ammo > 0:
+		inventory.ammo.add(Item.new(_fresh, in_ammo))
+	if in_backpack > 0:
+		inventory.backpack.add(Item.new(_fresh, in_backpack))
 	var gun := Item.new(_pistol)
 	gun.clip_heat = heat
 	inventory.weapon.add(gun)
@@ -109,19 +108,20 @@ func test_shot_direction_lands_within_spread() -> void:
 	assert_float(rad_to_deg(edge.angle_to(forward))).is_equal_approx(5.0, 0.001)
 
 
-func test_reload_needs_a_fresh_clip_in_the_pockets_and_a_used_one_loaded() -> void:
+func test_reload_needs_a_fresh_clip_in_the_ammo_slots_and_a_used_one_loaded() -> void:
 	assert_bool(_clips(0.5).can_reload()).is_false()
 	assert_bool(_clips(0.0, 2).can_reload()).is_false()
 	assert_bool(_clips(0.05, 2).can_reload()).is_true()
-	# Fresh clips in the backpack have to go into the pockets first.
+	# Fresh clips in the backpack have to go into the ammo slots first.
 	assert_bool(_clips(0.5, 0, 2).can_reload()).is_false()
 
 
 func test_counts_fresh_packed_and_spent_clips() -> void:
 	var clips := _clips(0.0, 2, 3)
+	clips.inventory.pockets.add(Item.new(_fresh))
 	clips.inventory.backpack.add(Item.new(_spent))
 	assert_int(clips.fresh).is_equal(2)
-	assert_int(clips.packed).is_equal(3)
+	assert_int(clips.packed).is_equal(4)
 	assert_int(clips.spent).is_equal(1)
 
 
@@ -133,24 +133,79 @@ func test_reload_wastes_the_loaded_clip() -> void:
 	assert_float(clips.heat).is_equal(0.0)
 
 
-func test_reload_takes_the_first_pocket_clip_and_puts_the_spent_one_in_its_cell() -> void:
+func test_reload_takes_a_clip_off_the_fresh_stack_and_the_spent_one_takes_a_free_ammo_slot() -> void:
 	var clips := _clips(0.5, 3, 1)
-	var pockets := clips.inventory.pockets
-	var cell := clips.take_fresh()
-	assert_vector(Vector2(cell)).is_equal(Vector2(0, 0))
-	assert_bool(pockets.is_reserved(cell)).is_true()
+	var ammo := clips.inventory.ammo
+	assert_bool(clips.take_fresh()).is_true()
+	assert_bool(clips.is_swapping()).is_true()
 	assert_int(clips.fresh).is_equal(2)
 	assert_int(clips.packed).is_equal(1)
-	# Nothing else can go into the reserved cell while the reload runs.
-	assert_bool(pockets.add(Item.new(_fresh))).is_true()
-	assert_object(pockets.item_at(cell)).is_null()
 	clips.swap()
-	assert_bool(pockets.is_reserved(cell)).is_false()
-	assert_str(pockets.item_at(cell).definition.id).is_equal("test:spent_clip")
+	assert_bool(clips.is_swapping()).is_false()
+	assert_int(ammo.item_at(Vector2i(0, 0)).quantity).is_equal(2)
+	assert_str(ammo.item_at(Vector2i(1, 0)).definition.id).is_equal("test:spent_clip")
 	assert_float(clips.heat).is_equal(0.0)
 
 
-func test_swap_without_a_fresh_clip_in_the_pockets_changes_nothing() -> void:
+func test_the_last_fresh_clip_leaves_its_slot_for_the_spent_one() -> void:
+	var clips := _clips(0.5, 1)
+	var ammo := clips.inventory.ammo
+	ammo.place(Item.new(_fresh, 5), Vector2i(1, 0))
+	clips.swap()
+	assert_str(ammo.item_at(Vector2i(0, 0)).definition.id).is_equal("test:spent_clip")
+	assert_int(clips.fresh).is_equal(5)
+
+
+func test_a_spent_clip_tops_up_the_spent_stack_in_the_ammo_slots() -> void:
+	var clips := _clips(0.5, 3)
+	var spent := Item.new(_spent, 2)
+	clips.inventory.ammo.place(spent, Vector2i(1, 0))
+	clips.swap()
+	assert_int(spent.quantity).is_equal(3)
+	assert_int(clips.spent).is_equal(3)
+
+
+func test_with_full_ammo_slots_the_spent_clip_goes_to_the_pockets_then_the_backpack() -> void:
+	var clips := _clips(0.5, 5)
+	var inventory := clips.inventory
+	inventory.ammo.place(Item.new(_spent, 5), Vector2i(1, 0))
+	clips.swap()
+	# A clip came off the fresh stack, but its slot still holds four, and the spent stack is full.
+	assert_int(inventory.pockets.count(_spent)).is_equal(1)
+	inventory.pockets.item_at(Vector2i(0, 0)).quantity = 5
+	inventory.pockets.place(Item.new(_fresh), Vector2i(1, 0))
+	clips.add_heat(0.5)
+	clips.swap()
+	assert_int(inventory.backpack.count(_spent)).is_equal(1)
+
+
+func test_a_spent_clip_with_no_room_anywhere_overflows() -> void:
+	var clips := _clips(0.5, 5)
+	var inventory := clips.inventory
+	inventory.ammo.place(Item.new(_spent, 5), Vector2i(1, 0))
+	for grid: ItemGrid in [inventory.pockets, inventory.backpack]:
+		for row in grid.size.y:
+			for column in grid.size.x:
+				grid.place(Item.new(_pistol), Vector2i(column, row))
+	var overflowed: Array[Item] = []
+	clips.overflowed.connect(func(clip: Item) -> void: overflowed.append(clip))
+	clips.swap()
+	assert_int(overflowed.size()).is_equal(1)
+	assert_str(overflowed[0].definition.id).is_equal("test:spent_clip")
+	assert_float(clips.heat).is_equal(0.0)
+
+
+func test_calling_off_a_swap_puts_the_fresh_clip_back() -> void:
+	var clips := _clips(0.5, 3)
+	clips.take_fresh()
+	assert_int(clips.fresh).is_equal(2)
+	assert_bool(clips.cancel_swap()).is_true()
+	assert_int(clips.fresh).is_equal(3)
+	assert_float(clips.heat).is_equal(0.5)
+	assert_bool(clips.cancel_swap()).is_false()
+
+
+func test_swap_without_a_fresh_clip_in_the_ammo_slots_changes_nothing() -> void:
 	var clips := _clips(0.6, 0, 2)
 	clips.swap()
 	assert_float(clips.heat).is_equal(0.6)
@@ -163,3 +218,11 @@ func test_heat_never_passes_saturation() -> void:
 	clips.add_heat(0.15)
 	assert_float(clips.heat).is_equal(1.0)
 	assert_float(clips.room()).is_equal(0.0)
+
+
+func _clip(clip_name: String) -> ItemDefinition:
+	var clip := ItemDefinition.new()
+	clip.id = "test:%s" % clip_name
+	clip.stack_size = 5
+	clip.ammo = true
+	return clip

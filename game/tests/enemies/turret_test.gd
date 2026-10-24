@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
 ## Plays the turret in the robot test level: turning all the way round, lock-on times, peeking, firing and how its
-## fire walks in, venting, a charged shot to the eye, the wreckage and the salvage pried out of it, the combat music,
-## and seeing in the dark. The drone is taken out so it can't interfere.
+## fire walks in, venting, a charged shot to the eye, the wreckage (never in the way under it) and the salvage pried
+## out of it, the combat music, and seeing in the dark. The drone is taken out so it can't interfere.
 ## Positions refer to the layout of res://scenes/test/robot_test.tscn: the turret hangs from the hall's ceiling at
 ## (0, 3, -5.5), facing south down the lit hall towards the door at (0, 0, 2), clear of the pillar in the middle of
 ## the hall; the entrance stub south of the corridor is dark and out of its sight.
@@ -151,12 +151,25 @@ func test_destroyed_turret_stays_as_wreckage() -> void:
 	assert_int(destroyed[0]).is_equal(1)
 	assert_bool(is_instance_valid(_turret) and _turret.is_inside_tree()).is_true()
 	assert_int(_turret.mind.state).is_equal(RobotMind.State.DESTROYED)
-	assert_int(_turret.collision_layer).is_equal(Robot.WORLD_LAYER)
+	# Its body stays off every layer, as it was while it worked: the wreckage isn't solid.
+	assert_int(_turret.collision_layer).is_equal(0)
 	assert_bool(_turret.get_node("%Searchlight").visible).is_false()
 	for hitbox in _turret.get_hitboxes():
 		assert_bool(hitbox.is_active()).is_false()
 	assert_int(_turret.shots_fired).is_equal(0)
 	assert_float(_player.get_health().health).is_equal(100.0)
+
+
+func test_destroyed_turrets_wreckage_never_blocks_the_way_under_it() -> void:
+	_turret.get_health().take_damage(500.0, IN_SIGHT)
+	await _place(IN_SIGHT)
+	await _physics_frames(2 * FRAMES_PER_SECOND)
+	# The player standing high enough (as on a drone's wreckage in a low corridor) for the head to reach the bottom of
+	# the turret's body, which hangs 0.42 m below its mount: rising further meets nothing until the ceiling.
+	var bottom := _turret.global_position.y - 0.42
+	var under := Transform3D(Basis.IDENTITY, Vector3(_turret.global_position.x,
+		bottom - _player.stand_height - 0.05, _turret.global_position.z))
+	assert_bool(_player.test_move(under, Vector3.UP * 0.3)).is_false()
 
 
 func test_wreckage_can_be_pried_open_for_its_salvage() -> void:

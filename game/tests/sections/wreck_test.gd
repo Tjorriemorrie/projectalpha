@@ -102,19 +102,21 @@ func test_reports_loot_that_cant_be_placed() -> void:
 		_placement("Room/EnemySpot", "base:supply_crate", []),
 		_placement("Room/LootSpotWest", "base:nothing", []),
 		_placement("Room/Nook", "base:locker", []),
-		_placement("Room/LootSpotEast", "base:small_case", ["base:plasma_coil", "base:unknown", "base:gyroscope"]),
+		_placement("Room/LootSpotEast", "base:small_case",
+			["base:plasma_coil", "base:unknown", "base:gyroscope", "base:power_cell", "base:data_drive"]),
 	]
 
 	add_child(wreck)
 
 	assert_int(wreck.containers.size()).is_equal(1)
-	assert_int(wreck.containers[0].get_lootable().grid.items.size()).is_equal(1)
+	# The small case has three slots.
+	assert_int(wreck.containers[0].get_lootable().grid.items.size()).is_equal(3)
 	assert_array(wreck.assembly_errors).contains_exactly_in_any_order([
 		"Not a loot marker: marker=Room/EnemySpot, container=base:supply_crate",
 		"Not a registered container: marker=Room/LootSpotWest, container=base:nothing",
 		"Container doesn't fit its marker: marker=Room/Nook, container=base:locker, space=TIGHT",
 		"Not a registered item: marker=Room/LootSpotEast, item=base:unknown",
-		"Item doesn't fit its container: marker=Room/LootSpotEast, container=base:small_case, item=base:gyroscope",
+		"Item doesn't fit its container: marker=Room/LootSpotEast, container=base:small_case, item=base:data_drive",
 	])
 
 

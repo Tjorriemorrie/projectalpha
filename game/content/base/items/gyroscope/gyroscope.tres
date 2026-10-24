@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Gyroscope"
-shape = PackedStringArray("##", "##")
+stack_size = 2
 value = 160
 description = "A stabiliser gimbal from a ship's attitude control, still spinning true."
 model = "res://content/base/items/gyroscope/gyroscope.glb"

@@ -1,6 +1,7 @@
 extends GdUnitTestSuite
-## Plays the free peek in the cover area of the greybox test scene (its south-east corner) with simulated keys and
-## mouse motion, and checks where the head goes and what the debug watchers can see.
+## Plays the peek in the cover area of the greybox test scene (its south-east corner) with simulated keys and mouse
+## motion, and checks where the head goes (sideways while standing, up while crouched) and what the debug watchers
+## can see.
 ## Positions refer to the layout of res://scenes/test/player_test.tscn; the player faces north (-z), so right is +x.
 
 const TEST_SCENE := "res://scenes/test/player_test.tscn"
@@ -54,16 +55,49 @@ func test_peek_moves_head_and_keeps_view() -> void:
 	assert_vector(_player.head_offset).is_equal(Vector2.ZERO)
 
 
-func test_peek_reaches_up_and_down() -> void:
+func test_standing_the_peek_only_leans_left_and_right() -> void:
 	await _place(OPEN)
 	Input.action_press(&"peek")
 	await _physics_frames(2)
 	_player.move_head(Vector2(0.0, -FAR))
 	await _physics_frames(20)
-	assert_vector(_player.head_offset).is_equal_approx(Vector2(0.0, _player.peek_up_reach), _tolerance())
-	_player.move_head(Vector2(0.0, 2.0 * FAR))
+	assert_vector(_player.head_offset).is_equal(Vector2.ZERO)
+	# Up and to the left at once only leans left.
+	_player.move_head(Vector2(-FAR, -FAR))
 	await _physics_frames(20)
-	assert_vector(_player.head_offset).is_equal_approx(Vector2(0.0, -_player.peek_down_reach), _tolerance())
+	assert_vector(_player.head_offset).is_equal_approx(Vector2(-_player.peek_side_reach, 0.0), _tolerance())
+
+
+func test_crouched_the_peek_only_rises_up() -> void:
+	Input.action_press(&"crouch_hold")
+	await _place(OPEN)
+	await _physics_frames(20)
+	Input.action_press(&"peek")
+	await _physics_frames(2)
+	_player.move_head(Vector2(FAR, 0.0))
+	await _physics_frames(20)
+	assert_vector(_player.head_offset).is_equal(Vector2.ZERO)
+	_player.move_head(Vector2(0.0, FAR))
+	await _physics_frames(20)
+	assert_vector(_player.head_offset).is_equal(Vector2.ZERO)
+	_player.move_head(Vector2(FAR, -FAR))
+	await _physics_frames(20)
+	assert_vector(_player.head_offset).is_equal_approx(Vector2(0.0, _player.peek_up_reach), _tolerance())
+
+
+func test_crouching_mid_peek_brings_a_lean_back_and_lets_the_head_rise() -> void:
+	await _place(OPEN)
+	Input.action_press(&"peek")
+	await _physics_frames(2)
+	_player.move_head(Vector2(FAR, 0.0))
+	await _physics_frames(20)
+	assert_float(_player.head_offset.x).is_greater(0.0)
+	Input.action_press(&"crouch_hold")
+	await _physics_frames(20)
+	assert_vector(_player.head_offset).is_equal(Vector2.ZERO)
+	_player.move_head(Vector2(0.0, -FAR))
+	await _physics_frames(20)
+	assert_vector(_player.head_offset).is_equal_approx(Vector2(0.0, _player.peek_up_reach), _tolerance())
 
 
 func test_view_tilts_towards_lean() -> void:

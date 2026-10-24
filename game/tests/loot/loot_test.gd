@@ -1,8 +1,8 @@
 extends GdUnitTestSuite
 ## Plays looting in the loot test level: the containers it places, prying one open by holding interact (and letting
 ## go or looking away), the noise it makes, searching an open one, standing still while the inventory is open,
-## dropping an item, finding it on the inventory screen's floor and dragging it back, and reloading from the
-## pockets.
+## dropping a stack, finding it on the inventory screen's floor and dragging it back, and reloading from the ammo
+## slots, with a spent clip that has no room dropping on the floor.
 ## Positions refer to the layout of res://scenes/test/loot_test.tscn: the store room is the cell round the origin,
 ## with a locker against its north wall at x = -1.25 and a supply crate at x = 1.25, both facing south; the corridor
 ## runs south from its doorway at z = 2 to the entrance stub, which holds a small case; a vent leads east from the
@@ -42,8 +42,10 @@ func test_places_and_fills_the_containers() -> void:
 	assert_array(_wreck.assembly_errors).is_empty()
 	var names := _wreck.containers.map(func(container: LootContainer) -> String: return container.name)
 	assert_array(names).contains_exactly(["Locker_Store", "SupplyCrate_Store", "SmallCase_Entrance", "SmallCase_Vent"])
-	assert_vector(Vector2(_locker.grid.size)).is_equal(Vector2(4, 5))
-	assert_int(_locker.grid.items.size()).is_equal(4)
+	assert_vector(Vector2(_locker.grid.size)).is_equal(Vector2(3, 3))
+	# The two thermal clips share a stack.
+	assert_int(_locker.grid.items.size()).is_equal(3)
+	assert_int(_locker.grid.count(_item("base:thermal_clip"))).is_equal(2)
 	assert_int(_wreck.containers[3].get_lootable().grid.count(_item("base:plasma_coil"))).is_equal(1)
 	assert_bool(_locker.is_open).is_false()
 
@@ -155,24 +157,24 @@ func test_a_dropped_item_lands_on_the_floor_and_interact_opens_the_floor() -> vo
 	var ear := _add_ear(IN_CORRIDOR + Vector3(0.0, 0.0, -1.0))
 	await _place(IN_CORRIDOR)
 	var dropped := await _drop_backpack_clip()
-	assert_int(_player.clips.packed).is_equal(1)
+	assert_int(_player.clips.packed).is_equal(0)
 	assert_array(ear.heard).contains([&"item_drop"])
 	assert_float(dropped.global_position.y).is_less(0.2)
 	assert_float(dropped.global_position.distance_to(IN_CORRIDOR)).is_less(1.0)
 	_look_at(dropped.global_position)
 	await _physics_frames(3)
-	assert_str(_hud().prompt_text).is_equal("E Pick up thermal clip")
+	assert_str(_hud().prompt_text).is_equal("E Pick up 2 thermal clips")
 	await _press(&"interact")
 	# Nothing goes into a grid by itself: the floor opens with the clip on it, to be dragged.
 	var screen := _player.get_inventory_screen()
 	assert_bool(_player.is_inventory_open()).is_true()
 	assert_bool(screen.floor_grid.has(dropped.item)).is_true()
-	assert_int(_player.clips.packed + _player.clips.fresh).is_equal(3)
+	assert_int(_player.clips.packed + _player.clips.fresh).is_equal(2)
 	screen.begin_drag(screen.floor_grid, dropped.item.cell)
-	screen.drop_drag(_player.inventory.pockets, Vector2i(2, 0))
+	screen.drop_drag(_player.inventory.ammo, Vector2i(0, 0))
 	await _physics_frames(2)
 	assert_bool(is_instance_valid(dropped)).is_false()
-	assert_int(_player.clips.fresh).is_equal(3)
+	assert_int(_player.clips.fresh).is_equal(4)
 
 
 func test_the_floor_shows_dropped_items_in_reach_and_in_sight() -> void:
@@ -188,23 +190,44 @@ func test_the_floor_shows_dropped_items_in_reach_and_in_sight() -> void:
 	assert_bool(floor.has(far.item)).is_false()
 
 
-func test_reload_takes_a_clip_from_the_pockets() -> void:
+func test_reload_takes_a_clip_from_the_ammo_slots() -> void:
 	await _place(IN_CORRIDOR)
 	_player.clips.heat = 0.5
 	await _press(&"reload")
 	assert_bool(_player.get_weapon().is_reloading).is_true()
-	assert_bool(_player.inventory.pockets.is_reserved(Vector2i(0, 0))).is_true()
+	assert_int(_player.clips.fresh).is_equal(1)
 	await _physics_frames(roundi(3.2 * FRAMES_PER_SECOND))
-	var pockets := _player.inventory.pockets
-	assert_str(pockets.item_at(Vector2i(0, 0)).definition.id).is_equal("base:spent_thermal_clip")
-	assert_str(pockets.item_at(Vector2i(1, 0)).definition.id).is_equal("base:thermal_clip")
+	var ammo := _player.inventory.ammo
+	assert_str(ammo.item_at(Vector2i(0, 0)).definition.id).is_equal("base:thermal_clip")
+	assert_int(ammo.item_at(Vector2i(0, 0)).quantity).is_equal(1)
+	assert_str(ammo.item_at(Vector2i(1, 0)).definition.id).is_equal("base:spent_thermal_clip")
 	assert_int(_player.clips.packed).is_equal(2)
 
 
-func test_reload_needs_a_clip_in_the_pockets() -> void:
+func test_a_spent_clip_with_no_room_drops_on_the_floor_with_a_clatter() -> void:
+	var ear := _add_ear(IN_CORRIDOR + Vector3(0.0, 0.0, -1.0))
 	await _place(IN_CORRIDOR)
-	for item in _player.inventory.pockets.items.duplicate():
-		_player.inventory.pockets.remove(item)
+	var inventory := _player.inventory
+	var spent := ContentRegistry.get_definition("base:spent_thermal_clip") as ItemDefinition
+	var drive := ContentRegistry.get_definition("base:data_drive") as ItemDefinition
+	inventory.ammo.place(Item.new(spent, spent.stack_size), Vector2i(1, 0))
+	for grid: ItemGrid in [inventory.pockets, inventory.backpack]:
+		while grid.free_slots() > 0:
+			grid.add(Item.new(drive, drive.stack_size))
+	_player.clips.heat = 0.5
+	await _press(&"reload")
+	await _physics_frames(roundi(3.2 * FRAMES_PER_SECOND))
+	var dropped := _wreck.get_children().filter(func(node: Node) -> bool: return node is DroppedItem)
+	assert_int(dropped.size()).is_equal(1)
+	assert_str((dropped[0] as DroppedItem).item.definition.id).is_equal("base:spent_thermal_clip")
+	assert_array(ear.heard).contains([&"item_drop"])
+	assert_float(_player.clips.heat).is_equal(0.0)
+
+
+func test_reload_needs_a_clip_in_the_ammo_slots() -> void:
+	await _place(IN_CORRIDOR)
+	for item in _player.inventory.ammo.items.duplicate():
+		_player.inventory.ammo.remove(item)
 	_player.clips.heat = 0.5
 	await _press(&"reload")
 	assert_bool(_player.get_weapon().is_reloading).is_false()
@@ -220,11 +243,11 @@ func test_a_reload_finishes_while_the_inventory_is_open() -> void:
 	assert_bool(_player.is_inventory_open()).is_true()
 	await _physics_frames(roundi(3.2 * FRAMES_PER_SECOND))
 	assert_bool(_player.get_weapon().is_reloading).is_false()
-	assert_str(_player.inventory.pockets.item_at(Vector2i(0, 0)).definition.id).is_equal("base:spent_thermal_clip")
+	assert_str(_player.inventory.ammo.item_at(Vector2i(1, 0)).definition.id).is_equal("base:spent_thermal_clip")
 	assert_bool(_player.is_inventory_open()).is_true()
 
 
-## Drops the backpack's first clip from the inventory screen, closes it, and waits for the clip to land.
+## Drops the backpack's stack of clips from the inventory screen, closes it, and waits for the stack to land.
 func _drop_backpack_clip() -> DroppedItem:
 	await _press(&"inventory")
 	var screen := _player.get_inventory_screen()

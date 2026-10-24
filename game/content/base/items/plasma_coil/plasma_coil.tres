@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Plasma coil"
-shape = PackedStringArray("###", ".#.")
+stack_size = 2
 value = 180
 description = "A weapon-grade coil with its core still live. The richest find for its size."
 model = "res://content/base/items/plasma_coil/plasma_coil.glb"

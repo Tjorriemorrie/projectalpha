@@ -88,8 +88,8 @@ projectalpha/
 | Autoload | Responsibility |
 |----------|----------------|
 | ContentRegistry | Discovers and registers all content definitions by ID (see [Content and modding](#content-and-modding)) |
-| ItemIcons | Renders every registered item's grid icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
-| GameSession | The session between scenes: the stash, the wallet, the hydrogen tank, the day, the star system the ship is in and where in it, its trader hub and sell crate, the clone number, the docked wreck, the kit and the wreck's roll handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session), [Trading](#trading), [Wreck layouts and rolls](#wreck-layouts-and-rolls) and [Star systems and the system map](#star-systems-and-the-system-map)) |
+| ItemIcons | Renders every registered item's square slot icon from its model at startup (see [Loot and inventory](#loot-and-inventory)) |
+| GameSession | The session between scenes: the stash, the wallet, the hydrogen tank, the day, the star system the ship is in and where in it, its trader hub, the clone number, the docked wreck, the kit and the wreck's roll handed over, run summaries and travel (see [Runs, the ship and the session](#runs-the-ship-and-the-session), [Trading](#trading), [Wreck layouts and rolls](#wreck-layouts-and-rolls) and [Star systems and the system map](#star-systems-and-the-system-map)) |
 
 ### Communication between nodes
 
@@ -99,7 +99,7 @@ projectalpha/
 ### Game state and saving
 
 The session lives in memory in `GameSession` (008): the stash, the clone number, the runs boarded and the kit
-handed between scenes, since 009 the wallet, the hub's price seed and the sell crate, since 010 the docked
+handed between scenes, since 009 the wallet and the hub's price seed (and until 013 a sell crate), since 010 the docked
 wreck's roll, since 011 the star system with the wrecks still in it, where the ship is, the hydrogen and the
 day, and since 012 the antimatter and its order, the drive's recharge, every system revealed with its hub, and the
 route. Nothing is saved yet, so quitting starts a new game. TBD: what is saved, file format, where
@@ -149,15 +149,16 @@ Settled in [003](features/003-content-registry.md):
 - **Kinds so far.** `SectionDefinition` (003), `WeaponDefinition` (005), `EnemyDefinition` (006), and
   `ItemDefinition` and `ContainerDefinition` (007). A weapon definition holds all its numbers (damage, heat, charge,
   kick, spread, zoom, reload and raise times) and the items it loads and unloads, so a new weapon is a new folder.
-  Since 009 `WeaponDefinition` extends `ItemDefinition`: a gun is an item (shape, value, a model lying flat), so it
+  Since 009 `WeaponDefinition` extends `ItemDefinition`: a gun is an item (value, a model lying flat), so it
   registers once and `get_all(ItemDefinition)` lists it with the other items. `WreckDefinition` (010) is a wreck
   layout: its scene, level range, expected robots per level and number of containers. Since 010 a container
   definition also holds its loot table, budget and roll weight. `StarSystemDefinition` (011) is a star system of
   the fixed galaxy, with its places as `SystemPlace` sub-resources; `art-source/galaxy/systems.py` writes all 50
   from [galaxy.md](galaxy.md) and `galaxy.json`, so the doc stays the one place they are written down.
   An enemy definition holds its scene, the marker mount it needs, the robot brain's numbers and the salvage in its
-  wreckage; how a kind moves is exported on its scene. An item definition holds its shape (rows of text), value and
-  model, so a new item is a folder with a `.tres` and a `.glb` and no icon to draw. None needed a change to the
+  wreckage; how a kind moves is exported on its scene. An item definition holds its stack size, value, whether it
+  is ammo, an optional plural name, and its model (since 013; until then a shape as rows of text), so a new item is
+  a folder with a `.tres` and a `.glb` and no icon to draw. None needed a change to the
   registry.
 - **Content referring to content** does it by ID (`"base:thermal_clip"`), looked up through the registry when it is
   used, never when it registers, so the order packs and kinds load in doesn't matter.
@@ -188,7 +189,9 @@ cylinder collision shape. Its sizes are constraints for every section and prop:
 Built in [004](features/004-free-peek-and-cover.md). There is no cover system: cover is level geometry, and the
 player peeks from wherever they stand.
 
-- The head offset lives in the body's yaw frame (x right, y up). A sphere (radius 0.15 m) swept out from the
+- The head offset lives in the body's yaw frame (x right, y up). Standing, it only goes sideways; crouched, only
+  up (`PeekRules.restrict()`, applied to every mouse move and every physics frame, so a stance change mid-peek
+  brings the head onto the new axis). A sphere (radius 0.15 m) swept out from the
   normal eye position against `world` stops the head at walls. The camera interpolates the head between physics
   frames like the body, and a sideways lean rolls the view (up to 8°).
 - `Player.peek_state` (`PeekRules.State`: `NONE`, `PEEK`, `AIM_OUT`) and `peek_state_changed` tell other systems
@@ -234,14 +237,17 @@ so WASD keeps its position on other keyboard layouts.
 | `shoot` | Left mouse button: a click fires, holding charges and releasing fires |
 | `reload` | R |
 | `inventory` | Tab: opens and closes the inventory (Esc and `interact` also close it) |
-| `inventory_drag` | Left mouse button (hold): drags an item in the inventory |
-| `inventory_rotate` | Right mouse button: turns the dragged item a quarter turn |
-| `inventory_mirror` | Middle mouse button and the wheel: mirrors the dragged item |
+| `inventory_drag` | Left mouse button (hold): drags a stack in the inventory and the hub; with shift, or a double-click, quick-moves it; at the hub a click on a stash stack sells one and a hold the stack |
+| `inventory_split` | Right mouse button (hold): takes half a stack into hand |
+| `inventory_more`, `inventory_fewer` | Wheel up and down: one more or one fewer into the hand; otherwise scrolls a tall grid |
 | `map_tab` | Q: switches between the system map and the star map |
+| `unload_haul` | Q: on the run summary after an extraction, unloads the haul into the stash |
 
 The inventory actions share buttons with `shoot` and `aim`; while the inventory is open the weapon takes no input.
 The HUD's screens get only mouse events (they don't take keyboard focus), so the keys that work them (`inventory`,
-`pause` and `interact` to close, `map_tab` to switch the map's tabs) are read by the player in `_physics_process`.
+`pause` and `interact` to close, `map_tab` to switch the map's tabs, `unload_haul` on the run summary) are read by
+the player in `_physics_process`. A quick move reads shift from the press's own event (`shift_pressed`) and a
+double-click from its `double_click`, so tests push both as real events.
 
 Prompts show the bound key by reading the Input Map (`as_text_physical_keycode()`), never a hard-coded letter.
 
@@ -258,7 +264,7 @@ Physics engine: Jolt, at the default 60 ticks per second.
 | 2     | player | The player body (collides with `world`) |
 | 3     | interactable | `Interactable` areas (buttons), found by the player's interact ray |
 | 4     | hitbox | `Hitbox` areas of anything that can be damaged: the player (head, body, arm), shooting targets, robots (eye, body). They collide with nothing; shots cast rays against `world` and `hitbox` |
-| 5     | enemy  | Drone bodies (006). The player and drones collide with it; shots and sight ignore it. Turrets, out of reach, are on no layer; destroyed robots move to `world` |
+| 5     | enemy  | Drone bodies (006). The player and drones collide with it; shots and sight ignore it. Turrets, out of reach, are on no layer, dead or alive; a destroyed drone's wreckage moves to `world` (`Robot.solid_wreckage`, off on the turret's scene, so a dead turret never blocks the way under it) |
 | 6     | item   | Dropped items (007). They collide with `world` and each other only, so the player walks through them and shots and sight ignore them; their `PickUp` interactable is on `interactable`. Loot containers are on `world` |
 
 Render layers: 2 `exterior` is the wreck's hull outside the ship's window (008), lit only by its own light; 20
@@ -318,7 +324,10 @@ Built in [002](features/002-wreck-section-kit.md). Wrecks are assembled from sec
 
 - `SlidingDoor`: an `AnimatableBody3D` panel that slides sideways into the wall. A doorway area holds a closing
   door open while the player stands in it, but never opens a closed one. Automatic doors also have a proximity
-  area (1.5 m either side) and close 2 s after the player leaves. Drones open and hold doors the same way.
+  area (1.6 m either side), but open only for a body in it that is within `near_distance` (0.6 m) of the wall or
+  heading for the doorway (`SlidingDoor.wants_through()`: at least `approach_speed`, 0.5 m/s, and half its speed
+  pointing at it), so walking past a side door down a corridor leaves it shut. Once open, any body in the area
+  keeps it open; it closes 2 s after the last leaves. Drones open and hold doors the same way.
 - `Elevator` (a `Section` spanning two decks): call buttons on each deck, a send button on the platform, doors
   driven by the elevator that only open at the deck where the platform is, and a `dinged(deck, sound_position)`
   signal on arrival. The ding is also a noise robots hear (006).
@@ -339,7 +348,9 @@ Built in [005](features/005-weapon-and-health.md).
 - **Weapons and thermal clips.** `Weapon` (under the player's camera) runs the gun in the inventory's weapon slot
   with the clips the player carries (`ThermalClips`: the loaded clip's heat as a fraction, kept on the gun item as
   `Item.clip_heat` since 009 so it goes wherever the gun goes; the fresh and spent clips are items in the player's
-  inventory since 007, and a reload takes a fresh one from the pockets). The player re-arms whenever the slot changes
+  inventory since 007, and since 013 a reload takes a fresh one off a stack in the ammo slots, the spent one going
+  back there first, then to the pockets or the backpack, and overflowing to the floor). The player re-arms whenever
+  the slot changes
   (`Player._arm()`): `Weapon.equip()` the new gun, or `unequip()` and stay unarmed, which calls off a reload under
   way (`ThermalClips.cancel_swap()` puts the fresh clip back). `WeaponRules` holds the decisions. `Weapon.blocks_sprint()` and `Weapon.is_aiming` feed the player's sprint block and speed cap; the
   player passes in whether it can shoot (not while peeking), whether it is lowered (sprinting or sorting the
@@ -409,44 +420,56 @@ Built in [006](features/006-robot-enemy.md). Robots are the first enemies; later
 
 ### Loot and inventory
 
-Built in [007](features/007-loot-and-grid-inventory.md).
+Built in [007](features/007-loot-and-grid-inventory.md); slots and stacks since
+[013](features/013-inventory-management-revamp.md).
 
-- **Grids and shapes.** Items take up shapes of cells (`ItemShape`: rows of text, eight orientations: quarter turns
-  clockwise, then the same mirrored). `ItemGrid` (node-free) holds `Item`s (definition, orientation, cell) with no
-  overlaps, finds space in reading order and any orientation, and can reserve cells. The player's `Inventory` is
-  the weapon slot (`WeaponSlot`, 3×2, which only takes one weapon: the gun in hand, since 009), the pockets (4×1)
-  and the backpack (6×5). Loot only moves by being dragged: nothing is ever sorted into a grid
-  by itself (only level set-up packs containers, and a reload puts its spent clip in the fresh clip's cell).
+- **Slots and stacks.** `ItemGrid` (node-free) is a grid of square slots, each addressed by its cell and holding one
+  stack, an `Item` (definition, `quantity` up to `ItemDefinition.stack_size`, cell, and a gun's `clip_heat`). Stacks
+  of a kind top each other up; nothing else shares a slot. Its calls: `place`, `remove`, `top_up`, `add` (top up,
+  then the first free slot), `add_one`, `take` (part of a stack), `room_for`, `room_at`, and the static `stow()`
+  that moves a stack across grids in order (top-ups first, then a free slot). A growing grid (`spare_rows` ≥ 0) keeps
+  that many empty rows below its last stack, so it always has room. `accepts()` limits what a grid takes:
+  `WeaponSlot` (1×1) weapons, `AmmoSlots` `ammo` items. The player's `Inventory` is the weapon slot, ammo (2×1),
+  pockets (2×1) and backpack (6×1); `stow_order()` says where a stack moved to the player goes (clips to the ammo
+  slots, a gun to the weapon slot, then the backpack and the pockets) and `haul()` is what unloading takes.
   Node-free classes don't log; the nodes that change them log the outcome.
 - **Loot.** A `Lootable` (`Interactable` with an `ItemGrid`) is anything the player pries open by holding interact
   and then searches: container scenes (`LootContainer` root on `world`, its model's `Lid` node swung open on its
   hinge) and destroyed robots' wreckage (`Robot.get_salvage()`, from `EnemyDefinition.salvage`). Prying open is a
-  noise (4 m).
+  noise (4 m). Containers have 3×1, 3×2 and 3×3 slots, wreckage 2×1; `fill()` adds one item at a time, stacking.
 - **The screen.** The `InventoryScreen` overlays the running game, which keeps going while it is open; the player
-  stands still and the weapon takes no input. The container and the floor are on the left half, the player's
-  grids (weapon slot, pockets, backpack) on the right. What it shares with the hub's screen (dragging, previews, the
-  item card, placards, key hints, the two-column layout) lives in its base, `GridScreen`, with hooks for the rest. Items are dragged, turned and mirrored with the mouse; pressing one selects it, and the one
-  under the pointer shows its item card. The screen always shows the floor: the dropped items within reach and in sight, in a grid that grows to keep two empty rows.
-  Dragging an item onto it, or releasing one outside the placards, makes a `DroppedItem` (a rigid body on the
-  `item` layer, one box per cell) that clatters as a 3 m noise; dragging one off it frees the body. Its calls
-  (`begin_drag`, `drop_drag` and so on) are what its mouse input makes, so tests call them directly.
-- **Icons.** `ItemIcons` renders each item's model from straight above at startup, fitted to its shape at 64 px a
-  cell, with glow capped so colours read. Item models are built to their shapes (0.15 m a cell, origin in the
-  middle of the footprint, rows along +Z). Headless runs have no renderer, so no icons: the grid tints the cells
-  instead.
+  stands still and the weapon takes no input. The container (or the stash) and the floor are on the left half, the
+  player's slots on the right (weapon and ammo in one row). What it shares with the hub's screen (dragging,
+  splitting, quick moves, previews, the item card, placards, key hints, the two-column layout) lives in its base,
+  `GridScreen`, with hooks for the rest. A stack is dragged whole (`begin_drag`) or split (`begin_split`, then
+  `adjust_drag(±1)`), lands in a free slot or tops up a stack of its kind (`drop_drag`), and shift or a
+  double-click quick-moves it (`quick_move` to `_quick_targets()`). Every move ends in `_on_moved()`. Pressing one
+  selects it, and the one under the pointer shows its item card (value, stack, what the slot is worth). The floor
+  is a growing grid of the stacks dropped within reach and in sight (`InventoryScreen.make_floor()`, 6 wide); after
+  every move the screen compares it with what lay there and emits `dropped_on_floor` (the player makes a
+  `DroppedItem`, a rigid body on the `item` layer, one box round its model, that clatters as a 3 m noise),
+  `floor_topped_up` (it clatters again) or `taken_from_floor` (its body goes), so whole drops, top-ups and part
+  pickups all keep the world in step. `ItemGridView` draws the slots (icon, count in the corner) and scrolls a grid
+  taller than its `max_rows` (the stash 4, the floor 2). Its calls are what its mouse input makes, so tests call
+  them directly as well as pushing real events.
+- **Icons.** `ItemIcons` renders each item's model from straight above at startup into a 128 px square, the
+  camera fitted round the model's bounds (`DroppedItem.model_bounds()`), with glow capped so colours read. Item
+  models keep their shapes (built at 0.15 m a cell, origin in the middle of the footprint). Headless runs have no
+  renderer, so no icons: the slots are tinted instead.
 
 ### Runs, the ship and the session
 
 Built in [008](features/008-extraction-and-clone-loop.md).
 
-- **Session.** `GameSession` keeps the stash (`ItemGrid` 10×8), the clone number (one more per death), the runs
+- **Session.** `GameSession` keeps the stash (a growing `ItemGrid`, 8 wide and at least 4 rows, always a row
+  spare, since 013), the clone number (one more per death), the runs
   boarded, how the player arrives on the ship (`NEW_CLONE` in the clone pod, `EXTRACTED` in the airlock) and the kit
   (the `Inventory`, whose gun carries its clip's heat) while it crosses to the next scene. `board()`, `extract()` and
   `die()` record the run (`RunSummary`) and hand the kit over (a death hands none); `board()` and
   `continue_to_ship()` travel. A player takes the kit in `_setup_combat()` (`take_carried()`, once). With none, it
   builds the basic kit only while `basic_kit_next` is on (a new game, or a level started on its own): the gun from
-  `starting_weapon_id` in the weapon slot, `starting_pocket_clips` (2) and `starting_backpack_clips` (0; the test
-  levels set 2). After a death `basic_kit_next` is off and the next clone wakes empty-handed (009). Travel sounds play on the
+  `starting_weapon_id` in the weapon slot, `starting_ammo_clips` (2, one stack) and `starting_backpack_clips` (0;
+  the test levels set 2). After a death `basic_kit_next` is off and the next clone wakes empty-handed (009). Travel sounds play on the
   session, so they carry on through the scene change; every arrival fades in from black (`fade_in_next`).
 - **Airlocks.** The airlock section (`Airlock`) has an outer door (`%OuterDoor`, an `Interactable` with a hold time)
   and a sign above it. While interact is held on it, it loops a cycling sound and makes an `airlock` noise (10 m)
@@ -458,12 +481,15 @@ Built in [008](features/008-extraction-and-clone-loop.md).
 - **Leaving.** `Player.extract()` and `Player.board()` stop the player without the death's slump: a reload under way
   finishes, the weapon and hitboxes go (nothing can see or hit them), and the screen fades to black over the docking
   sound (`leave_fade_time`). Boarding then travels; extracting and dying show the run summary, and interact (read in
-  `_physics_process`) continues to the ship.
+  `_physics_process`) continues to the ship. After an extraction with a haul in the pockets or the backpack,
+  `unload_haul` first moves it into the stash (`Player.unload_haul()`, `GameSession.unload()`, recorded on the
+  `RunSummary`), and the card says what went (013).
 - **The ship.** `Ship` is a `Wreck` with no robots or loot (a wreck bakes navigation only when it has robots). It
   turns its lamps warm and steady (`CeilingLamp.set_steady()`) with a warm fill light under each, and places the
   player in the clone pod (`ClonePod`) or the airlock. Its player instance has `holstered` on (`Weapon.holstered`:
   lowered, no aim or trigger, reloads work) and `has_floor` off (the inventory screen has no floor and returns items
-  released outside). The `Stash` binds a `Lootable` to the session's grid (`Lootable.bind()`), already open.
+  released outside, and a spent clip with no room goes into the stash). The `Stash` binds a `Lootable` to the
+  session's grid (`Lootable.bind()`), already open.
 - **Trader terminal.** `TraderTerminal` stands beside the stash; its `Interactable` ("Trade") opens the hub's
   screen through `Player.open_trader()` (009), only while the ship is at the hub (011); elsewhere its screen reads
   "OUT OF RANGE" and it is off.
@@ -484,17 +510,19 @@ Built in [009](features/009-trader-hub.md).
   (`PRICE_VARIANCE`), seeded from the hub's seed and the item's ID so a hub always quotes the same price.
   `Trader.shelf()` is every registered item, weapons first, then the cheapest up; stock is unlimited, and a mod adds
   stock by adding items. The rates are a first guess for the tuning pass (roadmap backlog).
-- **Wallet and trades.** `GameSession` keeps `bitcoin` (₿500 at the start, never lost; `bitcoin_changed`), the
-  system's `trader` (rolled when the ship arrives in a system, titled "<System> Hanse") and the sell `crate` (6×4).
-  Trading only works at the hub (`GameSession.at_hub`, 011). `sell_crate()` pays
-  the hub's offer for everything in the crate, `buy()` puts one item in the stash's first free spot and is refused
-  when the wallet is short or the stash full, and `return_crate()` puts what is left back in the stash (what doesn't
-  fit stays in the crate for the next visit).
-- **The screen.** `TraderScreen` (a `GridScreen`): the crate with the offer and a SELL button and the shop
-  (`ShopView`: icon tiles with buy prices, red and dimmed when unaffordable) on the left, the wallet, the hydrogen
-  tank (a `FuelGauge` and FILL UP, 011) and the stash on the right. Items drag between the stash and the crate only; clicking a shop tile buys one and selects it in the
-  stash. The wallet ticks to its new amount with the change fading beside it, and a status line explains every deal
-  or refusal. Selling is from the stash only, so carried loot goes into the stash first.
+- **Wallet and trades.** `GameSession` keeps `bitcoin` (₿500 at the start, never lost; `bitcoin_changed`) and the
+  system's `trader` (rolled when the ship arrives in a system, titled "<System> Hanse"). Trading only works at the
+  hub (`GameSession.at_hub`, 011). `sell(item, amount)` takes up to that many off a stack in the stash and pays the
+  hub's price for each; `buy()` adds one to the stash (`add_one()`: onto a stack of it, else a free slot, which a
+  growing stash always has) and is refused only when the wallet is short. `Trader.offer()` counts every item in the
+  stacks. (009's sell crate and SELL went in 013.)
+- **The screen.** `TraderScreen` (a `GridScreen`): the shop (`ShopView`: icon tiles with buy prices, red and dimmed
+  when unaffordable) on the left, the wallet, the fuel (FILL UP and ORDER, 011 and 012) and the stash on the right.
+  A press on a stash stack waits (`is_selling()`): letting go sells one, holding it still for `SELL_HOLD_TIME` (1 s)
+  sells the stack with a ring filling round the pointer, and moving it more than `DRAG_THRESHOLD` (6 px) drags it to
+  rearrange the stash. Clicking a shop tile buys one and selects its stack in the stash. The wallet ticks to its new
+  amount with the change fading beside it, and a status line explains every deal or refusal. Selling is from the
+  stash only, so carried loot goes into the stash first (unloading after a run does it in one go).
 - **Bitcoin.** The only currency is bitcoin: every amount the player sees goes through `Bitcoin.format()`
   (`scripts/bitcoin.gd`): the ₿ symbol, commas between thousands, and a sign for changes (`₿1,240`, `−₿50`,
   `+₿154`). At home the HUD's bar across the top shows the wallet: the ship's player has `shows_wallet` on, calls
@@ -523,7 +551,7 @@ Built in [010](features/010-wreck-variety.md).
   kind that fits, by `ContainerDefinition.weight` (locker 1, crate 2, case 1). At level 1 the cheapest registered gun
   goes into a random container first. Then `LootRoll.draw()` fills each container from its `loot` table (item ID to
   weight) up to `LootRoll.budget_for(budget, level)` (×1, ×1.5, ×2 at levels 1–3), drawing only items that fit the
-  budget left and the grid, packed as `Lootable.fill()` packs them. Unknown item IDs are skipped and logged.
+  budget left and the slots (`room_for()`), stacked as `Lootable.fill()` stacks them. Unknown item IDs are skipped and logged.
   `Dice` (`scripts/`) does the random picks, always from the roll's own generator.
 - **Robot salvage** stays fixed per enemy kind (`EnemyDefinition.salvage`).
 

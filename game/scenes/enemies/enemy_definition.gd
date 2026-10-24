@@ -73,9 +73,9 @@ extends ContentDefinition
 @export var crash_loudness: float = 15.0
 
 @export_group("Salvage")
-## Columns and rows of the grid its wreckage holds its salvage in.
-@export var salvage_grid := Vector2i(3, 3)
-## The parts the player can pry out of its wreckage, by content ID, packed into the grid in this order.
+## Columns and rows of the slots its wreckage holds its salvage in: one for each part.
+@export var salvage_grid := Vector2i(2, 1)
+## The parts the player can pry out of its wreckage, by content ID, packed into its slots in this order.
 @export var salvage := PackedStringArray()
 
 

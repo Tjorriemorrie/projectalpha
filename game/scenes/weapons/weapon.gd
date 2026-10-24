@@ -75,7 +75,7 @@ func is_equipped() -> bool:
 
 
 ## Puts the weapon away when its gun leaves the weapon slot: a reload under way is called off (the fresh clip goes
-## back into its pocket cell, so putting the gun away never speeds a reload up), a charge is dropped with no heat used,
+## back into the ammo slots, so putting the gun away never speeds a reload up), a charge is dropped with no heat used,
 ## and the viewmodel goes. The player is unarmed until another gun is equipped.
 func unequip() -> void:
 	if not is_equipped():
@@ -146,15 +146,15 @@ func start_reload() -> bool:
 			is_equipped(), _enabled, is_reloading, charge >= 0.0])
 		return false
 	if not clips.can_reload():
-		Log.info(("🔫 Reload not started: fresh=%d, packed=%d, heat=%.0f%% (needs a fresh clip in the pockets and "
-			+ "a used one loaded)") % [clips.fresh, clips.packed, clips.heat * 100.0])
+		Log.info(("🔫 Reload not started: fresh=%d, packed=%d, heat=%.0f%% (needs a fresh clip in the ammo slots "
+			+ "and a used one loaded)") % [clips.fresh, clips.packed, clips.heat * 100.0])
 		return false
-	var cell := clips.take_fresh()
+	clips.take_fresh()
 	is_reloading = true
 	_reload_left = definition.reload_time
 	_trigger_wait = -1.0
-	Log.info("🔫 Reload started: heat=%.0f%% (wasted), pocket_cell=%s, fresh=%d, packed=%d, spent=%d, time=%.1f s" % [
-		clips.heat * 100.0, cell, clips.fresh, clips.packed, clips.spent, definition.reload_time])
+	Log.info("🔫 Reload started: heat=%.0f%% (wasted), fresh=%d, packed=%d, spent=%d, time=%.1f s" % [
+		clips.heat * 100.0, clips.fresh, clips.packed, clips.spent, definition.reload_time])
 	reload_started.emit()
 	return true
 
@@ -177,7 +177,7 @@ func suppress_trigger() -> void:
 
 
 ## Finishes a reload under way at once, when the run ends with the player alive or the gun is put away: the spent
-## clip goes into the cell the fresh one left. Returns whether there was one.
+## clip goes back into the inventory as at the end of any reload. Returns whether there was one.
 func finish_reload() -> bool:
 	if not is_reloading:
 		Log.info("🔫 No reload to finish: heat=%.0f%%" % (clips.heat * 100.0 if clips else 0.0))

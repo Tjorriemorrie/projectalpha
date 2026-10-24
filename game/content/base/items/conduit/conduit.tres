@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 display_name = "Conduit"
-shape = PackedStringArray("###")
+stack_size = 3
 value = 30
 description = "A length of armoured power conduit. Bulky for what it is worth."
 model = "res://content/base/items/conduit/conduit.glb"

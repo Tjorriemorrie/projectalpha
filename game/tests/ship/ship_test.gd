@@ -2,10 +2,11 @@ extends GdUnitTestSuite
 ## Plays the player's ship with travel turned off: it assembles, the first clone wakes in the clone pod with the basic
 ## kit, a clone after a death wakes empty-handed and arms by dragging a gun from the stash into the weapon slot (which
 ## takes nothing else), and a player back from the wreck arrives in the airlock with what they carried; the stash
-## opens with the session's grid and takes items dragged with the mouse, there is no floor, the pistol is holstered but
-## reloads, the airlock says which wreck is docked and what the scan says about its robots, and holding interact on
-## its outer door boards that wreck with the kit and the wreck's roll handed over; with nothing docked the outer door
-## is shut and the window shows no hull, and flying to a wreck docks it at once. The cockpit console names the system.
+## opens with the session's slots and takes stacks dragged with the mouse (growing a row), there is no floor, the
+## pistol is holstered but reloads (a spent clip with no room goes into the stash), the airlock says which wreck is
+## docked and what the scan says about its robots, and holding interact on its outer door boards that wreck with the
+## kit and the wreck's roll handed over; with nothing docked the outer door is shut and the window shows no hull, and
+## flying to a wreck docks it at once. The cockpit console names the system.
 ## Positions refer to the layout of res://scenes/ship/ship.tscn: one deck at y = 0, the cockpit at the origin, a
 ## corridor east along z = 0 to x = 12, the clone bay south of x = 4 with the pod at (4, 0, 5), the bedroom north of
 ## x = 8, the stash room south of x = 12 with the stash against its south wall at z = 5.8, and the airlock north of
@@ -97,7 +98,7 @@ func test_a_gun_dragged_from_the_stash_into_the_weapon_slot_arms_the_player() ->
 	GameSession.die(Inventory.new())
 	var pistol := Item.new(_item("base:laser_pistol"))
 	pistol.clip_heat = 0.25
-	GameSession.stash.place(pistol, Vector2i(0, 0), 0)
+	GameSession.stash.place(pistol, Vector2i(0, 0))
 	await _load_ship()
 	await _look_at_stash()
 	await _press(&"interact")
@@ -109,7 +110,7 @@ func test_a_gun_dragged_from_the_stash_into_the_weapon_slot_arms_the_player() ->
 	assert_float(_player.clips.heat).is_equal_approx(0.25, 0.001)
 	# Dragging it back out leaves the player unarmed again.
 	await _drag(screen, screen.cell_center(_player.inventory.weapon, Vector2i(0, 0)),
-		screen.cell_center(GameSession.stash, Vector2i(5, 5)))
+		screen.cell_center(GameSession.stash, Vector2i(5, 1)))
 	assert_object(_player.inventory.gun()).is_null()
 	assert_bool(_player.get_weapon().is_equipped()).is_false()
 
@@ -119,10 +120,10 @@ func test_only_a_gun_fits_the_weapon_slot() -> void:
 	await _look_at_stash()
 	await _press(&"interact")
 	var screen := _player.get_inventory_screen()
-	var clip := _player.inventory.pockets.item_at(Vector2i(0, 0))
-	await _drag(screen, screen.cell_center(_player.inventory.pockets, Vector2i(0, 0)),
-		screen.cell_center(_player.inventory.weapon, Vector2i(2, 1)))
-	assert_object(_player.inventory.pockets.item_at(Vector2i(0, 0))).is_same(clip)
+	var clip := _player.inventory.ammo.item_at(Vector2i(0, 0))
+	await _drag(screen, screen.cell_center(_player.inventory.ammo, Vector2i(0, 0)),
+		screen.cell_center(_player.inventory.weapon, Vector2i(0, 0)))
+	assert_object(_player.inventory.ammo.item_at(Vector2i(0, 0))).is_same(clip)
 	assert_int(_player.inventory.weapon.items.size()).is_equal(1)
 
 
@@ -158,11 +159,13 @@ func test_an_item_dragged_with_the_mouse_goes_into_the_stash_and_stays() -> void
 	await _look_at_stash()
 	await _press(&"interact")
 	var screen := _player.get_inventory_screen()
-	var clip := _player.inventory.pockets.item_at(Vector2i(0, 0))
-	await _drag(screen, screen.cell_center(_player.inventory.pockets, Vector2i(0, 0)),
+	var clip := _player.inventory.ammo.item_at(Vector2i(0, 0))
+	await _drag(screen, screen.cell_center(_player.inventory.ammo, Vector2i(0, 0)),
 		screen.cell_center(GameSession.stash, Vector2i(4, 3)))
 	assert_object(GameSession.stash.item_at(Vector2i(4, 3))).is_same(clip)
-	assert_bool(_player.inventory.pockets.has(clip)).is_false()
+	assert_bool(_player.inventory.ammo.has(clip)).is_false()
+	# The stash grew a row, so it keeps one empty below its last stack.
+	assert_int(GameSession.stash.size.y).is_equal(5)
 
 
 func test_an_item_released_outside_goes_back_with_no_floor() -> void:
@@ -170,10 +173,10 @@ func test_an_item_released_outside_goes_back_with_no_floor() -> void:
 	await _look_at_stash()
 	await _press(&"interact")
 	var screen := _player.get_inventory_screen()
-	var clip := _player.inventory.pockets.item_at(Vector2i(0, 0))
+	var clip := _player.inventory.ammo.item_at(Vector2i(0, 0))
 	# The middle of the screen, between the placards.
-	await _drag(screen, screen.cell_center(_player.inventory.pockets, Vector2i(0, 0)), Vector2(640.0, 680.0))
-	assert_object(_player.inventory.pockets.item_at(Vector2i(0, 0))).is_same(clip)
+	await _drag(screen, screen.cell_center(_player.inventory.ammo, Vector2i(0, 0)), Vector2(640.0, 680.0))
+	assert_object(_player.inventory.ammo.item_at(Vector2i(0, 0))).is_same(clip)
 	assert_array(get_tree().get_nodes_in_group(DroppedItem.GROUP)).is_empty()
 
 
@@ -196,6 +199,23 @@ func test_the_pistol_is_holstered_but_reloads() -> void:
 	assert_float(_player.clips.heat).is_equal(0.0)
 	assert_int(_player.clips.spent).is_equal(1)
 	assert_int(_player.clips.fresh).is_equal(1)
+
+
+func test_a_spent_clip_with_no_room_on_the_ship_goes_into_the_stash() -> void:
+	await _load_ship()
+	await _place(Vector3(8.0, 0.0, 0.0), NORTH)
+	var inventory := _player.inventory
+	var spent := _item("base:spent_thermal_clip")
+	var drive := _item("base:data_drive")
+	inventory.ammo.place(Item.new(spent, spent.stack_size), Vector2i(1, 0))
+	for grid: ItemGrid in [inventory.pockets, inventory.backpack]:
+		while grid.free_slots() > 0:
+			grid.add(Item.new(drive, drive.stack_size))
+	_player.clips.heat = 0.5
+	await _press(&"reload")
+	await _physics_frames(roundi((_player.get_weapon().definition.reload_time + 0.2) * FRAMES_PER_SECOND))
+	assert_int(GameSession.stash.count(spent)).is_equal(1)
+	assert_array(get_tree().get_nodes_in_group(DroppedItem.GROUP)).is_empty()
 
 
 func test_the_airlock_shows_the_docked_wreck() -> void:

@@ -1,5 +1,5 @@
 extends GdUnitTestSuite
-## Unit tests for the free peek's decisions. Offsets are in metres: x right, y up.
+## Unit tests for the peek's decisions. Offsets are in metres: x right, y up.
 
 const SIDE := 0.4
 const UP := 0.35
@@ -9,6 +9,17 @@ const AIM_UP := 0.5
 const NONE := PeekRules.State.NONE
 const PEEK := PeekRules.State.PEEK
 const AIM_OUT := PeekRules.State.AIM_OUT
+
+
+func test_restrict_keeps_a_standing_peek_sideways_and_a_crouched_one_up(offset: Vector2, crouched: bool,
+		expected: Vector2, test_parameters := [
+	[Vector2(0.2, 0.1), false, Vector2(0.2, 0.0)],
+	[Vector2(-0.3, -0.1), false, Vector2(-0.3, 0.0)],
+	[Vector2(0.2, 0.1), true, Vector2(0.0, 0.1)],
+	# Crouched, the head never goes down.
+	[Vector2(0.2, -0.1), true, Vector2.ZERO],
+]) -> void:
+	assert_vector(PeekRules.restrict(offset, crouched)).is_equal(expected)
 
 
 func test_clamp_to_range(offset: Vector2, expected: Vector2, test_parameters := [

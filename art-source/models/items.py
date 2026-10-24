@@ -5,11 +5,11 @@ Run from the repository root (Blender 5.2):
 Writes game/content/base/items/<name>/<name>.glb for every item (or only the one named), and renders a preview PNG
 of all of them in a row when asked.
 
-Each item is built to its grid shape (see SHAPES, which must match the shapes in the items' .tres files): a cell is
-CELL metres, rows run towards -Y (Blender's front, which Godot imports as +Z, where the grid's rows go down), Z is up
-and 1 unit is 1 metre. The origin is the middle of the shape's footprint on the floor, so seen from straight above
-the model covers its cells; the game renders the item's grid icon that way. Every item is one object, named after
-the item.
+Each item is built to a footprint of cells (see SHAPES; since 013 the game takes one square slot for every item, so
+the shapes only give the models their forms): a cell is CELL metres, rows run towards -Y (Blender's front, which Godot
+imports as +Z), Z is up and 1 unit is 1 metre. The origin is the middle of the footprint on the floor; the game
+renders the item's square slot icon from straight above, framed round the model. Every item is one object, named
+after the item.
 """
 
 import math

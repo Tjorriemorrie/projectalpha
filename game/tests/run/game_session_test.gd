@@ -1,8 +1,9 @@
 extends GdUnitTestSuite
 ## Checks the game session on its own, with travel turned off: a new game, handing the kit the player carries from one
 ## scene to the next (once, the gun keeping its loaded clip's heat), the summaries of an extraction and a death, clone
-## numbers, the basic kit only for the first clone, the stash lasting through runs and deaths, the wallet (selling
-## the crate, buying into the stash, and the crate going back to the stash, only at the hub), flying within the system
+## numbers, the basic kit only for the first clone, the stash lasting through runs and deaths and never running out of
+## room, unloading a haul into it after an extraction, the wallet (selling from a stack in the stash and buying onto
+## one, only at the hub), flying within the system
 ## on hydrogen (never further than the tank gets back to the hub), refuelling at the hub, the day counter, and the
 ## docked wreck: boarded, its roll handed to that wreck once, and gone from the system for good after the run.
 ## Most tests swap the new game's system for a hand-made one with known distances: the hub at the origin, the hauler
@@ -40,13 +41,13 @@ func test_a_new_game_wakes_the_first_clone_with_an_empty_stash() -> void:
 	assert_int(GameSession.clone_number).is_equal(1)
 	assert_int(GameSession.runs).is_equal(0)
 	assert_int(GameSession.arrival).is_equal(GameSession.Arrival.NEW_CLONE)
-	assert_vector(Vector2(GameSession.stash.size)).is_equal(Vector2(10, 8))
+	assert_vector(Vector2(GameSession.stash.size)).is_equal(Vector2(8, 4))
+	assert_bool(GameSession.stash.is_growing()).is_true()
 	assert_array(GameSession.stash.items).is_empty()
 	assert_object(GameSession.take_carried()).is_null()
 	assert_bool(GameSession.basic_kit_next).is_true()
 	assert_bool(GameSession.fade_in_next).is_true()
 	assert_int(GameSession.bitcoin).is_equal(500)
-	assert_array(GameSession.crate.items).is_empty()
 
 
 func test_a_new_game_starts_on_day_0_with_a_full_tank_at_the_hub_of_a_star_system() -> void:
@@ -151,9 +152,9 @@ func test_refuelling_trading_and_buying_only_happen_at_the_hub() -> void:
 	assert_int(GameSession.refuel()).is_equal(0)
 	assert_int(GameSession.hydrogen).is_equal(10)
 	var gyroscope := Item.new(_item("base:gyroscope"))
-	GameSession.crate.add(gyroscope)
-	assert_int(GameSession.sell_crate()).is_equal(0)
-	assert_bool(GameSession.crate.has(gyroscope)).is_true()
+	GameSession.stash.add(gyroscope)
+	assert_int(GameSession.sell(gyroscope, 1)).is_equal(0)
+	assert_bool(GameSession.stash.has(gyroscope)).is_true()
 	assert_object(GameSession.buy(_item("base:thermal_clip"))).is_null()
 	assert_int(GameSession.bitcoin).is_equal(500)
 
@@ -182,7 +183,7 @@ func test_days_only_pass_by_boarding() -> void:
 	GameSession.fly_to_wreck(_hauler)
 	GameSession.fly_to_hub()
 	GameSession.refuel()
-	GameSession.sell_crate()
+	GameSession.buy(_item("base:thermal_clip"))
 	assert_int(GameSession.day).is_equal(0)
 
 
@@ -214,6 +215,9 @@ func test_extracting_keeps_the_kit_and_sums_up_the_haul() -> void:
 	assert_int(summary.items).is_equal(4)
 	assert_int(summary.value).is_equal(50 + 180 + 150)
 	assert_int(summary.gained).is_equal(180 + 150)
+	assert_int(summary.haul_items).is_equal(4)
+	assert_int(summary.haul_value).is_equal(50 + 180 + 150)
+	assert_bool(summary.can_unload()).is_true()
 	assert_int(summary.clone_number).is_equal(1)
 	assert_int(GameSession.arrival).is_equal(GameSession.Arrival.EXTRACTED)
 	assert_object(GameSession.last_run).is_same(summary)
@@ -238,6 +242,43 @@ func test_dying_loses_the_kit_and_wakes_the_next_clone() -> void:
 	assert_object(GameSession.take_carried()).is_null()
 	# The next clone wakes empty-handed, and arms from the stash.
 	assert_bool(GameSession.basic_kit_next).is_false()
+
+
+func test_unloading_puts_the_haul_in_the_stash_and_keeps_the_gun_and_the_ammo() -> void:
+	var carried := Inventory.new()
+	var gun := Item.new(_item("base:laser_pistol"))
+	carried.weapon.add(gun)
+	carried.ammo.add(Item.new(_item("base:thermal_clip"), 2))
+	carried.pockets.add(Item.new(_item("base:plasma_coil")))
+	carried.backpack.add(Item.new(_item("base:circuit_board"), 2))
+	var waiting := Item.new(_item("base:circuit_board"), 3)
+	GameSession.stash.add(waiting)
+	GameSession.fly_to_wreck(_hauler)
+	GameSession.board(carried)
+	GameSession.take_carried()
+	var summary := GameSession.extract(carried)
+	assert_int(GameSession.unload(carried)).is_equal(3)
+	# The boards top up the stack waiting in the stash, and the one left over takes a slot of its own.
+	assert_int(waiting.quantity).is_equal(4)
+	assert_int(GameSession.stash.count(_item("base:circuit_board"))).is_equal(5)
+	assert_int(GameSession.stash.count(_item("base:plasma_coil"))).is_equal(1)
+	assert_array(carried.pockets.items).is_empty()
+	assert_array(carried.backpack.items).is_empty()
+	assert_object(carried.gun()).is_same(gun)
+	assert_int(carried.ammo.count(_item("base:thermal_clip"))).is_equal(2)
+	assert_bool(summary.unloaded).is_true()
+	assert_int(summary.unloaded_items).is_equal(3)
+	assert_int(summary.unloaded_value).is_equal(180 + 2 * 60)
+	assert_bool(summary.can_unload()).is_false()
+	assert_int(GameSession.unload(carried)).is_equal(0)
+
+
+func test_there_is_nothing_to_unload_after_a_death() -> void:
+	var carried := _kit(["base:gyroscope"])
+	GameSession.die(carried)
+	assert_bool(GameSession.last_run.can_unload()).is_false()
+	assert_int(GameSession.unload(carried)).is_equal(0)
+	assert_array(GameSession.stash.items).is_empty()
 
 
 func test_every_death_counts_a_clone() -> void:
@@ -271,21 +312,22 @@ func test_the_wallet_lasts_through_deaths_and_a_new_game_resets_it() -> void:
 	assert_bool(GameSession.basic_kit_next).is_true()
 
 
-func test_selling_the_crate_pays_the_hubs_offer() -> void:
-	var gyroscope := _item("base:gyroscope")
-	var drive := _item("base:data_drive")
-	GameSession.crate.add(Item.new(gyroscope))
-	GameSession.crate.add(Item.new(drive))
-	var offer := GameSession.trader.sell_price(gyroscope) + GameSession.trader.sell_price(drive)
+func test_selling_takes_from_a_stash_stack_and_pays_the_hubs_price() -> void:
+	var boards := Item.new(_item("base:circuit_board"), 3)
+	GameSession.stash.add(boards)
+	var price := GameSession.trader.sell_price(boards.definition)
 	var changes: Array[int] = []
 	var on_change := func(amount: int) -> void: changes.append(amount)
 	GameSession.bitcoin_changed.connect(on_change)
-	assert_int(GameSession.sell_crate()).is_equal(offer)
+	assert_int(GameSession.sell(boards, 2)).is_equal(2 * price)
 	GameSession.bitcoin_changed.disconnect(on_change)
-	assert_int(GameSession.bitcoin).is_equal(500 + offer)
-	assert_array(changes).is_equal([500 + offer])
-	assert_array(GameSession.crate.items).is_empty()
-	assert_int(GameSession.sell_crate()).is_equal(0)
+	assert_int(boards.quantity).is_equal(1)
+	assert_array(changes).is_equal([500 + 2 * price])
+	# Asking for more than is left sells what is left, and the stack goes.
+	assert_int(GameSession.sell(boards, 5)).is_equal(price)
+	assert_bool(GameSession.stash.has(boards)).is_false()
+	assert_int(GameSession.bitcoin).is_equal(500 + 3 * price)
+	assert_int(GameSession.sell(boards, 1)).is_equal(0)
 
 
 func test_buying_puts_one_in_the_stash_and_takes_the_price() -> void:
@@ -295,6 +337,9 @@ func test_buying_puts_one_in_the_stash_and_takes_the_price() -> void:
 	assert_object(item).is_not_null()
 	assert_object(GameSession.stash.item_at(Vector2i(0, 0))).is_same(item)
 	assert_int(GameSession.bitcoin).is_equal(500 - price)
+	# Another tops up the same stack.
+	assert_object(GameSession.buy(clip)).is_same(item)
+	assert_int(item.quantity).is_equal(2)
 	# A bought gun comes with a fresh clip loaded.
 	GameSession.bitcoin = 10000
 	var pistol := GameSession.buy(_item("base:laser_pistol"))
@@ -308,31 +353,16 @@ func test_buying_is_refused_when_the_wallet_is_short() -> void:
 	assert_array(GameSession.stash.items).is_empty()
 
 
-func test_buying_is_refused_when_the_stash_is_full() -> void:
+func test_the_stash_never_runs_out_of_room() -> void:
 	var drive := _item("base:data_drive")
 	for i in GameSession.STASH_SIZE.x * GameSession.STASH_SIZE.y:
-		GameSession.stash.add(Item.new(drive))
+		GameSession.stash.add(Item.new(drive, drive.stack_size))
+	assert_int(GameSession.stash.size.y).is_equal(GameSession.STASH_SIZE.y + 1)
 	GameSession.bitcoin = 10000
-	assert_object(GameSession.buy(_item("base:thermal_clip"))).is_null()
-	assert_int(GameSession.bitcoin).is_equal(10000)
-
-
-func test_whats_left_in_the_crate_goes_back_to_the_stash() -> void:
-	var gyroscope := Item.new(_item("base:gyroscope"))
-	GameSession.crate.add(gyroscope)
-	assert_int(GameSession.return_crate()).is_equal(0)
-	assert_bool(GameSession.stash.has(gyroscope)).is_true()
-	assert_array(GameSession.crate.items).is_empty()
-
-
-func test_what_doesnt_fit_in_the_stash_waits_in_the_crate() -> void:
-	var drive := _item("base:data_drive")
-	for i in GameSession.STASH_SIZE.x * GameSession.STASH_SIZE.y:
-		GameSession.stash.add(Item.new(drive))
-	var gyroscope := Item.new(_item("base:gyroscope"))
-	GameSession.crate.add(gyroscope)
-	assert_int(GameSession.return_crate()).is_equal(1)
-	assert_bool(GameSession.crate.has(gyroscope)).is_true()
+	var clip := GameSession.buy(_item("base:thermal_clip"))
+	assert_object(clip).is_not_null()
+	assert_vector(Vector2(clip.cell)).is_equal(Vector2(0, GameSession.STASH_SIZE.y))
+	assert_int(GameSession.stash.size.y).is_equal(GameSession.STASH_SIZE.y + 2)
 
 
 func test_boarding_with_nothing_docked_does_nothing() -> void:

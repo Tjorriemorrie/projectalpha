@@ -1,7 +1,7 @@
 class_name ShopView
 extends Control
 ## Draws the trader hub's shelf for the trader screen: a tile for every item on sale, COLUMNS to a row, each a
-## recessed well with the item's icon fitted into it (or its cells tinted, without an icon) and its buy price under it,
+## recessed well with the item's icon fitted into it (or tinted, without an icon) and its buy price under it,
 ## in red with the icon dimmed when the wallet can't cover it. The tile under the pointer is outlined brighter. It only
 ## draws and finds the tile under a point; the TraderScreen does the buying. It redraws when what it shows changes.
 
@@ -89,10 +89,7 @@ func _draw() -> void:
 		var affordable := price <= bitcoin
 		draw_rect(well, WELL_COLOR)
 		draw_rect(well, HOVER_COLOR if definition == hovered else EDGE_COLOR, false, 1.0)
-		var span := Vector2(ItemShape.size_of(definition.get_cells()))
-		var cell := minf((tile_px - 2.0 * PADDING) / span.x, (tile_px - 2.0 * PADDING) / span.y)
-		var origin := well.position + (Vector2.ONE * tile_px - span * cell) / 2.0
-		ItemGridView.draw_item(self, definition, 0, origin, cell,
+		ItemGridView.draw_item(self, definition, well.position + Vector2.ONE * PADDING, tile_px - 2.0 * PADDING,
 			HOVER_COLOR if definition == hovered else OUTLINE_COLOR, 1.0 if affordable else UNAFFORDABLE_ALPHA)
 		draw_string(_font, Vector2(rect.position.x, rect.end.y - 4.0), Bitcoin.format(price),
 			HORIZONTAL_ALIGNMENT_CENTER, tile_px, 12, PRICE_COLOR if affordable else DANGER_COLOR)

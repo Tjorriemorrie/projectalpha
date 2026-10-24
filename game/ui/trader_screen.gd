@@ -1,17 +1,17 @@
 class_name TraderScreen
 extends GridScreen
 ## The trader hub's screen, part of the HUD (see GridScreen), opened from the ship's trader terminal: the hub on the
-## left half, what the player owns on the right. The hub's side is the sell crate, with the hub's offer for what is in
-## it and a SELL button, and the shop: every item, at the hub's buy price. The player's side is the wallet, the ship's
-## fuel (the hydrogen tank with a FILL UP button, and the antimatter tank with an ORDER button), and the ship's stash.
-## Items are dragged from the stash into the crate and back, SELL sells the crate, clicking an item in the shop buys
-## one into the stash, FILL UP fills the hydrogen tank as far as the wallet pays, and ORDER orders the antimatter the
-## tank is missing (every empty unit, or nothing), which arrives at the hub days later; once it has, the button reads
-## COLLECT, and collecting it fills the gauge a block at a time (the tank itself is full at once, so closing the
-## screen cuts only the animation). After every deal the wallet ticks to its new amount, with the change fading beside
-## it, and a status line says what happened (or why it couldn't). What is left in the crate goes back to the stash when the screen closes. The trades go through the
-## GameSession, which keeps the hub, the crate, the stash, the tanks and the wallet. The player opens and closes it,
-## only while the ship is at the hub.
+## left half, what the player owns on the right. The hub's side is the shop: every item, at the hub's buy price. The
+## player's side is the wallet, the ship's fuel (the hydrogen tank with a FILL UP button, and the antimatter tank with
+## an ORDER button), and the ship's stash. Clicking a stack in the stash sells one of it, and holding the click on it
+## still for SELL_HOLD_TIME sells the whole stack (a ring fills round the pointer); pressing it and moving the pointer
+## drags it instead, to rearrange the stash. Clicking an item in the shop buys one into the stash, FILL UP fills the
+## hydrogen tank as far as the wallet pays, and ORDER orders the antimatter the tank is missing (every empty unit, or
+## nothing), which arrives at the hub days later; once it has, the button reads COLLECT, and collecting it fills the
+## gauge a block at a time (the tank itself is full at once, so closing the screen cuts only the animation). After
+## every deal the wallet ticks to its new amount, with the change fading beside it, and a status line says what
+## happened (or why it couldn't). The trades go through the GameSession, which keeps the hub, the stash, the tanks and
+## the wallet. The player opens and closes it, only while the ship is at the hub.
 
 ## The antimatter gauge shows a new amount while collected antimatter fills it, so the ship's bar can follow it.
 signal antimatter_shown(antimatter: int)
@@ -19,14 +19,19 @@ signal antimatter_shown(antimatter: int)
 ## Seconds the wallet takes to tick to a new amount, and the change beside it to fade out after it.
 const TICK_TIME := 0.45
 const DELTA_FADE_TIME := 1.4
-## A shop tile's size, in grid cells, so the shop is about as wide as the crate.
+## A shop tile's size, in slots.
 const TILE_CELLS := 1.4
+## Seconds a click on a stash stack is held still to sell the whole stack, and the pixels the pointer may move while
+## it is held before the press becomes a drag.
+const SELL_HOLD_TIME := 1.0
+const DRAG_THRESHOLD := 6.0
+## The ring that fills round the pointer while a sale of a whole stack is held.
+const RING_RADIUS := 15.0
 ## Seconds each unit of collected antimatter takes to fill on the gauge.
 const FILL_STEP := 0.1
 
-## What the readouts say, for tests: e.g. "OFFER  ₿340", "Sold 4 items for ₿340." and "₿500" (the amount the
-## wallet is ticking to).
-var offer_text := ""
+## What the readouts say, for tests: e.g. "Sold 3 circuit boards for ₿180." and "₿500" (the amount the wallet is
+## ticking to).
 var status_text := ""
 var bitcoin_text := ""
 ## What the tank readouts and their buttons say, for tests: e.g. "18/24", "FILL UP  ₿30", "2/10" and
@@ -36,14 +41,8 @@ var fill_text := ""
 var antimatter_text := ""
 var order_text := ""
 
-var _crate_view: ItemGridView
 var _stash_view: ItemGridView
 var _shop: ShopView
-var _offer: Label
-var _sell_button: PanelContainer
-var _sell_style: StyleBoxFlat
-var _sell_label: Label
-var _sell_hovered := false
 var _bitcoin: Label
 var _delta: Label
 var _stash_size: Label
@@ -68,30 +67,15 @@ var _delta_fade: Tween
 var _shown_antimatter := 0
 var _filling := false
 var _fill_tween: Tween
+## The stash stack a click was pressed on, which sells on release, or whole once held long enough; null when none.
+var _pending: Item
+var _pending_at := Vector2.ZERO
+var _pending_time := 0.0
 
 
 func _build() -> void:
-	_crate_view = ItemGridView.new()
-	_stash_view = ItemGridView.new()
+	_stash_view = _make_view(InventoryScreen.LOOT_ROWS_SHOWN)
 	_shop = ShopView.new()
-	var crate_body := VBoxContainer.new()
-	crate_body.add_theme_constant_override("separation", 10)
-	crate_body.add_child(_crate_view)
-	var footer := HBoxContainer.new()
-	footer.add_theme_constant_override("separation", 12)
-	_offer = _label("", 13, DIM_TEXT_COLOR, true)
-	_offer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_offer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	footer.add_child(_offer)
-	_sell_style = _button_style()
-	_sell_button = PanelContainer.new()
-	_sell_button.add_theme_stylebox_override("panel", _sell_style)
-	_sell_label = _label("SELL", 13, INK_COLOR, true)
-	_sell_button.add_child(_sell_label)
-	footer.add_child(_sell_button)
-	crate_body.add_child(footer)
-	_left_column.add_child(_placard("SELL CRATE", _label("Drag items in to sell them", 12, DIM_TEXT_COLOR, false),
-		crate_body))
 	_left_column.add_child(_placard("SHOP", _label("Delivered to the stash", 12, DIM_TEXT_COLOR, false), _shop))
 	_bitcoin = _label("", 24, INK_COLOR, false)
 	_delta = _label("", 13, LASER_COLOR, true)
@@ -122,6 +106,7 @@ func _build() -> void:
 		fuel_body))
 	_stash_size = _label("", 12, DIM_TEXT_COLOR, true)
 	_right_column.add_child(_placard("STASH", _stash_size, _stash_view))
+	_right_column.add_child(_label("Click a stack to sell one, hold to sell it all", 12, DIM_TEXT_COLOR, false))
 	_status = _label("", 13, DIM_TEXT_COLOR, false)
 	# It wraps within the column and keeps room for two lines, so a long message never moves the placards.
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -130,23 +115,21 @@ func _build() -> void:
 
 
 func _hints() -> Array:
-	return [[&"inventory_drag", "Drag"], [&"inventory_rotate", "Rotate"], [&"inventory_mirror", "Mirror"],
-		[&"", "Click an item in the shop to buy one"], [&"inventory", "Close"]]
+	return [[&"inventory_drag", "Sell or buy one, drag"], [&"inventory_split", "Split"],
+		[&"inventory_more", "One more or fewer"], [&"inventory", "Close"]]
 
 
-## Opens the screen on the GameSession's hub, sell crate, stash, tanks and wallet.
+## Opens the screen on the GameSession's hub, stash, tanks and wallet.
 func open() -> void:
 	var cell_px := _cell_size()
-	_crate_view.setup(GameSession.crate, cell_px)
 	_stash_view.setup(GameSession.stash, cell_px)
 	_shop.setup(GameSession.trader, Trader.shelf(ContentRegistry.get_all(ItemDefinition)),
 		roundf(cell_px * TILE_CELLS), _font)
-	_stash_size.text = "%d × %d" % [GameSession.stash.size.x, GameSession.stash.size.y]
 	_fuel_gauge.custom_minimum_size = Vector2(cell_px * 3.0, 10.0)
 	_antimatter_gauge.custom_minimum_size = Vector2(cell_px * 3.0, 10.0)
 	_fuel_note.custom_minimum_size = Vector2(cell_px * GameSession.STASH_SIZE.x, 0.0)
-	if not GameSession.crate.changed.is_connected(_update_offer):
-		GameSession.crate.changed.connect(_update_offer)
+	if not GameSession.stash.changed.is_connected(_update_stash):
+		GameSession.stash.changed.connect(_update_stash)
 	if not GameSession.bitcoin_changed.is_connected(_on_bitcoin_changed):
 		GameSession.bitcoin_changed.connect(_on_bitcoin_changed)
 	if not GameSession.hydrogen_changed.is_connected(_update_fuel):
@@ -163,55 +146,58 @@ func open() -> void:
 	bitcoin_text = Bitcoin.format(GameSession.bitcoin)
 	_shop.set_bitcoin(GameSession.bitcoin)
 	_set_status("", DIM_TEXT_COLOR)
-	_update_offer()
+	_pending = null
+	_update_stash()
 	_update_fuel(GameSession.hydrogen)
 	_show_screen()
-	Log.info("💰 Trader opened: hub=%s, bitcoin=%d, hydrogen=%d, antimatter=%d, order=%d, shelf=%d, crate_items=%d, stash_items=%d, cell=%.0f px" % [
+	Log.info("💰 Trader opened: hub=%s, bitcoin=%d, hydrogen=%d, antimatter=%d, order=%d, shelf=%d, stash_stacks=%d, stash_items=%d, slot=%.0f px" % [
 		GameSession.trader.title, GameSession.bitcoin, GameSession.hydrogen, GameSession.antimatter,
-		GameSession.order_units, _shop.definitions.size(), GameSession.crate.items.size(),
-		GameSession.stash.items.size(), _cell_px])
+		GameSession.order_units, _shop.definitions.size(), GameSession.stash.items.size(),
+		GameSession.stash.item_count(), _cell_px])
 
 
-## Closes the screen: an item still being dragged goes back where it came from, and what is left in the crate goes
-## back to the stash (what doesn't fit waits in the crate for the next visit).
+## Closes the screen: a stack still being dragged goes back where it came from, and a click held on a stack sells
+## nothing.
 func close() -> void:
 	if not is_open:
 		Log.info("💰 Trader screen not closed, it isn't open")
 		return
+	_pending = null
 	_hide_screen()
 	# Collected antimatter is in the tank already; only its filling on the gauge stops.
 	_stop_filling()
-	var left := GameSession.return_crate()
-	if GameSession.crate.changed.is_connected(_update_offer):
-		GameSession.crate.changed.disconnect(_update_offer)
+	if GameSession.stash.changed.is_connected(_update_stash):
+		GameSession.stash.changed.disconnect(_update_stash)
 	if GameSession.bitcoin_changed.is_connected(_on_bitcoin_changed):
 		GameSession.bitcoin_changed.disconnect(_on_bitcoin_changed)
 	if GameSession.hydrogen_changed.is_connected(_update_fuel):
 		GameSession.hydrogen_changed.disconnect(_update_fuel)
 	if GameSession.antimatter_changed.is_connected(_update_fuel):
 		GameSession.antimatter_changed.disconnect(_update_fuel)
-	Log.info("💰 Trader closed: bitcoin=%d, left_in_crate=%d, stash_items=%d" % [
-		GameSession.bitcoin, left, GameSession.stash.items.size()])
+	Log.info("💰 Trader closed: bitcoin=%d, stash_stacks=%d, stash_items=%d" % [
+		GameSession.bitcoin, GameSession.stash.items.size(), GameSession.stash.item_count()])
 
 
-## Sells what is in the crate. Returns the bitcoin earned (0 when the crate is empty).
-func sell() -> int:
-	var count := GameSession.crate.items.size()
-	if count == 0:
+## Sells up to amount of a stack in the stash to the hub. Returns the bitcoin earned (0 when nothing was sold); the
+## status line says what went for how much.
+func sell(item: Item, amount: int) -> int:
+	var definition := item.definition
+	var count := mini(amount, item.quantity)
+	var earned := GameSession.sell(item, count)
+	if earned <= 0:
 		_play(bump_sound)
-		_set_status("Drag items from the stash into the crate to sell them.", DIM_TEXT_COLOR)
-		Log.info("💰 Nothing to sell, the crate is empty: bitcoin=%d" % GameSession.bitcoin)
+		_set_status("%s can't be sold here." % definition.display_name, DANGER_COLOR)
+		Log.info("💰 Sale refused: item=%s, amount=%d, quantity=%d" % [definition.id, amount, item.quantity])
 		return 0
-	var earned := GameSession.sell_crate()
 	_play(place_sound)
-	_set_status("Sold %d %s for %s." % [count, "item" if count == 1 else "items", Bitcoin.format(earned)],
-		DIM_TEXT_COLOR)
-	Log.info("💰 Sold the crate: items=%d, earned=%d, bitcoin=%d" % [count, earned, GameSession.bitcoin])
+	_set_status("Sold %s for %s." % [definition.name_for(count), Bitcoin.format(earned)], DIM_TEXT_COLOR)
+	Log.info("💰 Sold: item=%s, sold=%d, left=%d, earned=%d, bitcoin=%d" % [
+		definition.id, count, item.quantity if GameSession.stash.has(item) else 0, earned, GameSession.bitcoin])
 	return earned
 
 
-## Buys one of an item into the stash, and selects it there so the player sees where it went. Returns the new item,
-## or null when the wallet is short or the stash is full; the status line then says which.
+## Buys one of an item into the stash, onto a stack of it or into a free slot, and selects that stack so the player
+## sees where it went. Returns the stack, or null when the wallet is short; the status line then says so.
 func buy(definition: ItemDefinition) -> Item:
 	var price := GameSession.trader.buy_price(definition)
 	if price > GameSession.bitcoin:
@@ -224,17 +210,16 @@ func buy(definition: ItemDefinition) -> Item:
 	var item := GameSession.buy(definition)
 	if item == null:
 		_play(bump_sound)
-		_set_status("No room in the stash for %s. Make space or sell something first." % definition.display_name,
-			DANGER_COLOR)
-		Log.info("💰 Buy refused, no room in the stash: item=%s, price=%d, stash_free=%d" % [
-			definition.id, price, GameSession.stash.free_cells()])
+		_set_status("%s can't be bought here." % definition.display_name, DANGER_COLOR)
+		Log.warning("💰 Buy refused by the session: item=%s, price=%d, bitcoin=%d" % [
+			definition.id, price, GameSession.bitcoin])
 		return null
 	_play(place_sound)
 	select(item)
 	_set_status("%s bought for %s, delivered to the stash." % [definition.display_name, Bitcoin.format(price)],
 		DIM_TEXT_COLOR)
-	Log.info("💰 Bought: item=%s, price=%d, bitcoin=%d, stash_cell=%s" % [
-		definition.id, price, GameSession.bitcoin, item.cell])
+	Log.info("💰 Bought: item=%s, price=%d, bitcoin=%d, stash_cell=%s, stack=%d" % [
+		definition.id, price, GameSession.bitcoin, item.cell, item.quantity])
 	return item
 
 
@@ -348,11 +333,6 @@ func shop_tile_center(definition: ItemDefinition) -> Vector2:
 	return get_global_transform().affine_inverse() * middle
 
 
-## The middle of the SELL button, in this control's pixels.
-func sell_button_center() -> Vector2:
-	return get_global_transform().affine_inverse() * _sell_button.get_global_rect().get_center()
-
-
 ## The shop's item under the pointer, or null.
 func shop_item_at_pointer() -> ItemDefinition:
 	if not _pointer_over(_shop):
@@ -360,10 +340,52 @@ func shop_item_at_pointer() -> ItemDefinition:
 	return _shop.definition_at(_shop.get_global_transform().affine_inverse() * (get_global_transform() * pointer))
 
 
+## Whether a click on a stash stack is held, to sell one when let go or the whole stack once held long enough.
+func is_selling() -> bool:
+	return _pending != null
+
+
+## How far a held click has got to selling its whole stack, from 0 to 1; -1 when none is held.
+func sell_hold_progress() -> float:
+	return clampf(_pending_time / SELL_HOLD_TIME, 0.0, 1.0) if _pending else -1.0
+
+
+func _process(delta: float) -> void:
+	if not is_open or _pending == null:
+		return
+	_pending_time += delta
+	if _pending_time >= SELL_HOLD_TIME:
+		var item := _pending
+		_pending = null
+		Log.info("💰 Click held, selling the whole stack: item=%s, quantity=%d" % [item.definition.id, item.quantity])
+		sell(item, item.quantity)
+	_overlay.queue_redraw()
+
+
+## A press on a stash stack waits to see what it is: let go, it sells one; held still, the whole stack; moved, a drag.
+func _on_slot_pressed(grid: ItemGrid, cell: Vector2i) -> bool:
+	if grid != GameSession.stash:
+		return begin_drag(grid, cell)
+	_pending = grid.item_at(cell)
+	_pending_at = pointer
+	_pending_time = 0.0
+	select(_pending)
+	return true
+
+
+## Letting go of a click that is still waiting sells one of its stack.
+func _on_slot_released() -> bool:
+	if _pending == null:
+		return false
+	var item := _pending
+	_pending = null
+	_overlay.queue_redraw()
+	if GameSession.stash.has(item):
+		sell(item, 1)
+	return true
+
+
 func _on_pressed() -> bool:
-	if _pointer_over(_sell_button):
-		sell()
-		return true
 	if _pointer_over(_fill_button):
 		refuel()
 		return true
@@ -381,11 +403,13 @@ func _on_pressed() -> bool:
 
 
 func _on_refreshed() -> void:
+	if _pending and pointer.distance_to(_pending_at) > DRAG_THRESHOLD:
+		# The press moved: it is a drag, to rearrange the stash.
+		var item := _pending
+		_pending = null
+		if GameSession.stash.has(item):
+			begin_drag(GameSession.stash, item.cell)
 	_shop.set_hovered(shop_item_at_pointer() if dragged == null else null)
-	var over_sell := dragged == null and _pointer_over(_sell_button)
-	if over_sell != _sell_hovered:
-		_sell_hovered = over_sell
-		_update_sell_button()
 	var over_fill := dragged == null and _pointer_over(_fill_button)
 	var over_order := dragged == null and _pointer_over(_order_button)
 	if over_fill != _fill_hovered or over_order != _order_hovered:
@@ -400,35 +424,36 @@ func _card_definition() -> ItemDefinition:
 	return _shop.hovered
 
 
-## A shop item's card shows what it costs and what it would sell back for; a crate or stash item's card shows what
-## it sells for.
+## A shop item's card shows what it costs, what it would sell back for and how many stack; a stash stack's card
+## shows what one sells for, the stack, and what the whole stack sells for.
 func _card_stats(definition: ItemDefinition) -> Array:
 	var trader := GameSession.trader
-	var cells := definition.get_cells().size()
-	var size_stat := ["SIZE", "%d %s" % [cells, "CELL" if cells == 1 else "CELLS"]]
 	if focused == null:
 		var price := trader.buy_price(definition)
 		return [["BUY", Bitcoin.format(price), INK_COLOR if price <= GameSession.bitcoin else DANGER_COLOR],
-			["SELLS FOR", Bitcoin.format(trader.sell_price(definition))], size_stat]
-	return [["SELLS FOR", Bitcoin.format(trader.sell_price(definition))], size_stat,
-		["PER CELL", Bitcoin.format(roundi(float(trader.sell_price(definition)) / cells))]]
+			["SELLS FOR", Bitcoin.format(trader.sell_price(definition))], ["STACKS", "UP TO %d" % definition.stack_size]]
+	return [["SELLS FOR", Bitcoin.format(trader.sell_price(definition))],
+		["STACK", "%d / %d" % [focused.quantity, definition.stack_size]],
+		["ALL FOR", Bitcoin.format(trader.sell_price(definition) * focused.quantity)]]
 
 
-func _update_offer() -> void:
-	var offer := GameSession.trader.offer(GameSession.crate.items)
-	offer_text = "OFFER  %s" % Bitcoin.format(offer) if not GameSession.crate.items.is_empty() else "EMPTY"
-	_offer.text = offer_text
-	_offer.add_theme_color_override("font_color", LASER_COLOR if offer > 0 else DIM_TEXT_COLOR)
-	_update_sell_button()
+## The stack under the pointer while a click is held on it: the ring round the pointer fills as the hold nears
+## selling the whole stack.
+func _draw_overlay() -> void:
+	super()
+	if _pending == null:
+		return
+	var progress := sell_hold_progress()
+	_overlay.draw_arc(pointer, RING_RADIUS, 0.0, TAU, 32, Color(INK_COLOR, 0.25), 2.0, true)
+	if progress > 0.0:
+		_overlay.draw_arc(pointer, RING_RADIUS, -PI / 2.0, -PI / 2.0 + TAU * progress, 32, LASER_COLOR, 3.0, true)
 
 
-## The SELL button lights up in the laser's blue when there is something to sell, brighter under the pointer.
-func _update_sell_button() -> void:
-	var active := not GameSession.crate.items.is_empty()
-	_sell_style.border_color = LASER_COLOR if active else Color(INK_COLOR, 0.25)
-	_sell_style.bg_color = Color(LASER_COLOR, 0.28 if _sell_hovered else 0.12) if active \
-		else Color(PLACARD_COLOR, 0.4)
-	_sell_label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
+## The stash's readout: how many stacks it holds, and their worth at this hub.
+func _update_stash() -> void:
+	var stacks := GameSession.stash.items.size()
+	_stash_size.text = "%d %s  ·  %s" % [stacks, "STACK" if stacks == 1 else "STACKS",
+		Bitcoin.format(GameSession.trader.offer(GameSession.stash.items))]
 
 
 ## The tanks' readouts and gauges, FILL UP with what filling the hydrogen tank costs, and ORDER with what filling the
@@ -537,7 +562,7 @@ func _style_fuel_button(style: StyleBoxFlat, label: Label, active: bool, hovered
 	label.add_theme_color_override("font_color", INK_COLOR if active else Color(DIM_TEXT_COLOR, 0.6))
 
 
-## A button's frame: SELL, FILL UP and ORDER.
+## A button's frame: FILL UP and ORDER.
 func _button_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.set_border_width_all(1)
@@ -581,12 +606,10 @@ func _set_status(text: String, color: Color) -> void:
 
 
 func _views() -> Array[ItemGridView]:
-	return [_crate_view, _stash_view]
+	return [_stash_view]
 
 
 func _grid_name(grid: ItemGrid) -> String:
-	if grid == GameSession.crate:
-		return "crate"
 	if grid == GameSession.stash:
 		return "stash"
 	return "grid"

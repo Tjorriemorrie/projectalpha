@@ -6,7 +6,7 @@
 script = ExtResource("1_definition")
 display_name = "Supply crate"
 scene = "res://content/base/containers/supply_crate/supply_crate.tscn"
-grid_size = Vector2i(4, 3)
+grid_size = Vector2i(3, 2)
 weight = 2.0
 budget = 200
 loot = Dictionary[String, float]({
